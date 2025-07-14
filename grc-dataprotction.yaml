@@ -1,0 +1,157 @@
+# Ansible Playbooks for GRC Toolkit AI Agent - Data Protection IT Controls
+# These playbooks are examples for an MVP demo to gather evidence for NIST 800-53 R.5 controls.
+#
+# To run these playbooks:
+# 1. Ensure Ansible is installed on your control machine.
+# 2. Create an inventory file (e.g., 'inventory.ini') with your target hosts:
+#    [webservers]
+#    your_web_server_ip_or_hostname
+#
+#    [databases]
+#    your_db_server_ip_or_hostname
+#
+#    [all_servers]
+#    your_server_ip_or_hostname
+#
+# 3. Run a playbook using: `ansible-playbook -i inventory.ini <playbook_name>.yml`
+#    You might need to add `--ask-pass` for SSH password or `--private-key /path/to/key.pem` for key-based auth.
+
+---
+# Playbook 1: Check File Permissions for Sensitive Data (NIST AC-3: Access Enforcement)
+# This playbook verifies that a sensitive file/directory has appropriate permissions.
+# Replace '/path/to/sensitive/data' and '0640' with your actual path and desired permissions.
+- name: Verify sensitive data file permissions (AC-3)
+  hosts: all_servers # Or a more specific group like 'databases'
+  become: yes # Use sudo/root privileges if needed to access paths
+  vars:
+    sensitive_file_path: "/var/lib/mysql/sensitive_data.sql" # Example: a database backup file
+    expected_permissions: "0640" # Example: owner read/write, group read, others no access
+
+  tasks:
+    - name: Get file permissions
+      stat:
+        path: "{{ sensitive_file_path }}"
+      register: file_stat_result
+
+    - name: Check if file exists
+      fail:
+        msg: "Sensitive file '{{ sensitive_file_path }}' does not exist."
+      when: not file_stat_result.stat.exists
+
+    - name: Verify permissions
+      assert:
+        that:
+          - file_stat_result.stat.mode == expected_permissions
+        fail_msg: "Permissions for '{{ sensitive_file_path }}' are {{ file_stat_result.stat.mode }}, expected {{ expected_permissions }}"
+        success_msg: "Permissions for '{{ sensitive_file_path }}' are correctly set to {{ expected_permissions }}"
+      when: file_stat_result.stat.exists
+
+    - name: Report file owner and group
+      debug:
+        msg: "File '{{ sensitive_file_path }}' is owned by {{ file_stat_result.stat.pw_name }} (UID: {{ file_stat_result.stat.uid }}) and group {{ file_stat_result.stat.gr_name }} (GID: {{ file_stat_result.stat.gid }})"
+      when: file_stat_result.stat.exists
+
+---
+# Playbook 2: Check TLS/SSL Configuration for Web Server (NIST SC-8: Transmission Confidentiality and Integrity)
+# This playbook checks the minimum TLS version configured for an Apache web server.
+# Adapt for Nginx or other services by changing file paths and regex.
+- name: Verify web server TLS configuration (SC-8)
+  hosts: webservers # Target web servers
+  become: yes
+  vars:
+    apache_ssl_config_path: "/etc/apache2/mods-enabled/ssl.conf" # Common path for Apache SSL config
+    nginx_ssl_config_path: "/etc/nginx/nginx.conf" # Common path for Nginx SSL config
+    min_tls_version_apache_regex: "^\\s*SSLProtocol\\s+.*TLSv1\\.2.*" # Regex to find TLSv1.2 or higher
+    min_tls_version_nginx_regex: "^\\s*ssl_protocols\\s+.*TLSv1\\.2.*" # Regex to find TLSv1.2 or higher
+
+  tasks:
+    - name: Check for Apache SSL config file
+      stat:
+        path: "{{ apache_ssl_config_path }}"
+      register: apache_ssl_config_stat
+
+    - name: Check for Nginx SSL config file
+      stat:
+        path: "{{ nginx_ssl_config_path }}"
+      register: nginx_ssl_config_stat
+
+    - name: Verify Apache TLS protocol setting
+      lineinfile:
+        path: "{{ apache_ssl_config_path }}"
+        regexp: "{{ min_tls_version_apache_regex }}"
+        state: present # Ensure the line exists and matches the regex
+        search_after: "^\\s*<VirtualHost" # Optional: search within VirtualHost context
+      check_mode: yes # Run in check mode to just verify, not change
+      register: apache_tls_check
+      when: apache_ssl_config_stat.stat.exists
+
+    - name: Report Apache TLS status
+      debug:
+        msg: "Apache TLSv1.2 or higher protocol configured: {{ 'Yes' if apache_tls_check.found else 'No' }}"
+      when: apache_ssl_config_stat.stat.exists
+
+    - name: Verify Nginx TLS protocol setting
+      lineinfile:
+        path: "{{ nginx_ssl_config_path }}"
+        regexp: "{{ min_tls_version_nginx_regex }}"
+        state: present
+      check_mode: yes
+      register: nginx_tls_check
+      when: nginx_ssl_config_stat.stat.exists
+
+    - name: Report Nginx TLS status
+      debug:
+        msg: "Nginx TLSv1.2 or higher protocol configured: {{ 'Yes' if nginx_tls_check.found else 'No' }}"
+      when: nginx_ssl_config_stat.stat.exists
+
+    - name: Fail if no relevant web server config found
+      fail:
+        msg: "No Apache or Nginx SSL configuration file found on this host to verify TLS settings."
+      when: not apache_ssl_config_stat.stat.exists and not nginx_ssl_config_stat.stat.exists
+
+---
+# Playbook 3: Check Logging Configuration for a Critical Service (NIST AU-2: Audit Events)
+# This playbook checks if logging is enabled for the 'sshd' service by inspecting its configuration.
+# Adapt for other services (e.g., database, application logs) by changing file paths and keywords.
+- name: Verify critical service logging (AU-2)
+  hosts: all_servers # Or specific servers
+  become: yes
+  vars:
+    sshd_config_path: "/etc/ssh/sshd_config"
+    log_level_regex: "^\\s*LogLevel\\s+(INFO|VERBOSE|DEBUG.*)" # Checks for Info, Verbose, or Debug levels
+    syslog_facility_regex: "^\\s*SyslogFacility\\s+AUTHPRIV" # Checks for AUTHPRIV facility
+
+  tasks:
+    - name: Get sshd config file status
+      stat:
+        path: "{{ sshd_config_path }}"
+      register: sshd_config_stat
+
+    - name: Fail if sshd config file not found
+      fail:
+        msg: "SSHD configuration file '{{ sshd_config_path }}' not found."
+      when: not sshd_config_stat.stat.exists
+
+    - name: Check LogLevel setting
+      lineinfile:
+        path: "{{ sshd_config_path }}"
+        regexp: "{{ log_level_regex }}"
+        state: present
+      check_mode: yes
+      register: log_level_check
+
+    - name: Check SyslogFacility setting
+      lineinfile:
+        path: "{{ sshd_config_path }}"
+        regexp: "{{ syslog_facility_regex }}"
+        state: present
+      check_mode: yes
+      register: syslog_facility_check
+
+    - name: Report SSHD logging status
+      debug:
+        msg: |
+          SSHD Logging Status (AU-2):
+          - LogLevel set to INFO/VERBOSE/DEBUG: {{ 'Yes' if log_level_check.found else 'No' }}
+          - SyslogFacility set to AUTHPRIV: {{ 'Yes' if syslog_facility_check.found else 'No' }}
+          Recommendations: Ensure LogLevel is set to INFO or higher and SyslogFacility is AUTHPRIV for proper auditing.
