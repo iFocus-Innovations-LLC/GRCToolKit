@@ -57,10 +57,10 @@
             </button>
         </div>
 
-        <div id="responseArea" class="mt-8 p-6 bg-gray-50 rounded-lg border border-gray-200 shadow-inner min-h-[150px] flex flex-col justify-center items-center text-gray-700">
+        <div id="responseArea" class="mt-8 p-6 bg-gray-50 rounded-lg border border-gray-200 shadow-inner min-h-[150px] text-gray-700">
             <p id="initialMessage" class="text-center text-gray-500">Your AI-generated NIST control recommendations will appear here.</p>
             <div id="errorMessage" class="text-red-600 text-center hidden"></div>
-            <pre id="aiResponse" class="whitespace-pre-wrap font-mono text-sm leading-relaxed"></pre>
+            <div id="aiResponse" class="hidden"></div>
         </div>
     </div>
 
@@ -99,22 +99,49 @@
 
             try {
                 let chatHistory = [];
-                // Construct the prompt to guide the AI to act as a GRC expert
-                const fullPrompt = `As an AI GRC expert, given the following scenario, identify and list the most relevant NIST 800-53 R.5 Security and Privacy Controls. Explain briefly why each control is relevant. If no specific controls are directly applicable, suggest general areas of focus based on NIST CSF 2.0.
+                // Construct the prompt to guide the AI to act as a GRC expert with structured JSON output
+                const fullPrompt = `As an AI GRC expert, given the following scenario, identify and list the most relevant NIST 800-53 R.5 Security and Privacy Controls. 
 
                 Scenario: "${prompt}"
 
-                Format your response clearly with control IDs and brief explanations.`;
+                Please respond with a valid JSON object in the following format:
+                {
+                    "summary": "Brief summary of the scenario and overall compliance approach",
+                    "controls": [
+                        {
+                            "id": "AC-3",
+                            "title": "Access Enforcement",
+                            "category": "Access Control",
+                            "relevance": "High/Medium/Low",
+                            "description": "Brief description of the control",
+                            "rationale": "Why this control is relevant to the scenario",
+                            "implementation_notes": "Key implementation considerations"
+                        }
+                    ],
+                    "csf_mappings": [
+                        {
+                            "function": "Protect",
+                            "category": "Identity Management and Access Control",
+                            "subcategory": "PR.AC-1"
+                        }
+                    ],
+                    "recommendations": [
+                        "Additional recommendations for compliance"
+                    ]
+                }
+
+                Ensure the JSON is valid and properly formatted.`;
 
                 chatHistory.push({ role: "user", parts: [{ text: fullPrompt }] });
 
                 const payload = {
                     contents: chatHistory,
                     generationConfig: {
-                        temperature: 0.7, // Adjust for creativity vs. focus
+                        temperature: 0.3, // Lower temperature for more consistent JSON output
                         topK: 40,
                         topP: 0.95,
-                        maxOutputTokens: 1024,
+                        maxOutputTokens: 2048, // Increased for more detailed responses
+                        responseMimeType: "application/json", // Encourage JSON output
                     },
                 };
                 const apiKey = ""; // Canvas will automatically provide the API key at runtime
@@ -136,7 +163,22 @@
                     result.candidates[0].content && result.candidates[0].content.parts &&
                     result.candidates[0].content.parts.length > 0) {
                     const text = result.candidates[0].content.parts[0].text;
-                    aiResponse.textContent = text;
+                    
+                    try {
+                        // Try to parse the JSON response
+                        const jsonResponse = JSON.parse(text);
+                        displayStructuredResponse(jsonResponse);
+                    } catch (parseError) {
+                        // If JSON parsing fails, fall back to plain text display
+                        console.warn('Failed to parse JSON response, falling back to plain text:', parseError);
+                        initialMessage.classList.add('hidden');
+                        errorMessage.classList.add('hidden');
+                        aiResponse.classList.remove('hidden');
+                        aiResponse.innerHTML = `<div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg mb-4">
+                            <p class="text-yellow-800 text-sm"><strong>Note:</strong> Response received in plain text format. For better formatting, the AI should return structured JSON.</p>
+                        </div>
+                        <pre class="whitespace-pre-wrap font-mono text-sm leading-relaxed bg-white p-4 rounded border">${text}</pre>`;
+                    }
                 } else {
                     displayMessage('No relevant controls found or an unexpected response structure. Please try a different query.', 'error');
                 }
@@ -150,10 +192,122 @@
             }
         });
 
+        function displayStructuredResponse(data) {
+            // Clear previous content
+            initialMessage.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+            aiResponse.innerHTML = '';
+            aiResponse.classList.remove('hidden');
+
+            // Create structured HTML for the response
+            let html = '';
+
+            // Summary section
+            if (data.summary) {
+                html += `
+                    <div class="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400 rounded-r-lg">
+                        <h3 class="text-lg font-semibold text-blue-800 mb-2">Summary</h3>
+                        <p class="text-blue-700">${data.summary}</p>
+                    </div>
+                `;
+            }
+
+            // Controls section
+            if (data.controls && data.controls.length > 0) {
+                html += `
+                    <div class="mb-6">
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">NIST 800-53 R.5 Controls</h3>
+                        <div class="space-y-4">
+                `;
+
+                data.controls.forEach(control => {
+                    const relevanceColor = {
+                        'High': 'bg-red-100 border-red-300 text-red-800',
+                        'Medium': 'bg-yellow-100 border-yellow-300 text-yellow-800',
+                        'Low': 'bg-green-100 border-green-300 text-green-800'
+                    }[control.relevance] || 'bg-gray-100 border-gray-300 text-gray-800';
+
+                    html += `
+                        <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                            <div class="flex items-start justify-between mb-3">
+                                <div>
+                                    <h4 class="text-lg font-semibold text-gray-800">${control.id}: ${control.title}</h4>
+                                    <p class="text-sm text-gray-600">${control.category}</p>
+                                </div>
+                                <span class="px-3 py-1 rounded-full text-xs font-medium border ${relevanceColor}">
+                                    ${control.relevance} Priority
+                                </span>
+                            </div>
+                            <div class="space-y-2">
+                                <p class="text-gray-700"><strong>Description:</strong> ${control.description}</p>
+                                <p class="text-gray-700"><strong>Rationale:</strong> ${control.rationale}</p>
+                                ${control.implementation_notes ? `<p class="text-gray-700"><strong>Implementation Notes:</strong> ${control.implementation_notes}</p>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
+            // CSF Mappings section
+            if (data.csf_mappings && data.csf_mappings.length > 0) {
+                html += `
+                    <div class="mb-6">
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">NIST CSF 2.0 Mappings</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                `;
+
+                data.csf_mappings.forEach(mapping => {
+                    html += `
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-800">${mapping.function}</h4>
+                            <p class="text-sm text-gray-600">${mapping.category}</p>
+                            <p class="text-xs text-gray-500 mt-1">${mapping.subcategory}</p>
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Recommendations section
+            if (data.recommendations && data.recommendations.length > 0) {
+                html += `
+                    <div class="mb-6">
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">Additional Recommendations</h3>
+                        <ul class="space-y-2">
+                `;
+
+                data.recommendations.forEach(recommendation => {
+                    html += `
+                        <li class="flex items-start space-x-2">
+                            <span class="text-blue-500 mt-1">•</span>
+                            <span class="text-gray-700">${recommendation}</span>
+                        </li>
+                    `;
+                });
+
+                html += `
+                        </ul>
+                    </div>
+                `;
+            }
+
+            aiResponse.innerHTML = html;
+        }
+
         function displayMessage(message, type) {
             initialMessage.classList.add('hidden');
             errorMessage.classList.add('hidden');
-            aiResponse.textContent = '';
+            aiResponse.classList.add('hidden');
+            aiResponse.innerHTML = '';
 
             if (type === 'error') {
                 errorMessage.textContent = message;
@@ -162,7 +316,6 @@
                 initialMessage.textContent = message || 'Your AI-generated NIST control recommendations will appear here.';
                 initialMessage.classList.remove('hidden');
             }
-            // For successful AI response, content is directly set to aiResponse.textContent
         }
 
         // Set initial message visibility
