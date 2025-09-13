@@ -60,6 +60,46 @@
         <div id="responseArea" class="mt-8 p-6 bg-gray-50 rounded-lg border border-gray-200 shadow-inner min-h-[150px] text-gray-700">
             <p id="initialMessage" class="text-center text-gray-500">Your AI-generated NIST control recommendations will appear here.</p>
             <div id="errorMessage" class="text-red-600 text-center hidden"></div>
+            
+            <!-- Filter and Sort Controls -->
+            <div id="filterControls" class="hidden mb-6 p-4 bg-white rounded-lg border border-gray-200">
+                <div class="flex flex-wrap gap-4 items-center justify-between">
+                    <div class="flex flex-wrap gap-4 items-center">
+                        <div>
+                            <label for="priorityFilter" class="block text-sm font-medium text-gray-700 mb-1">Filter by Priority:</label>
+                            <select id="priorityFilter" class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500">
+                                <option value="all">All Priorities</option>
+                                <option value="High">High Priority</option>
+                                <option value="Medium">Medium Priority</option>
+                                <option value="Low">Low Priority</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="categoryFilter" class="block text-sm font-medium text-gray-700 mb-1">Filter by Category:</label>
+                            <select id="categoryFilter" class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500">
+                                <option value="all">All Categories</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="sortBy" class="block text-sm font-medium text-gray-700 mb-1">Sort by:</label>
+                            <select id="sortBy" class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500">
+                                <option value="priority">Priority</option>
+                                <option value="id">Control ID</option>
+                                <option value="title">Title</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="exportBtn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
+                            Export Results
+                        </button>
+                        <button id="clearFiltersBtn" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
+                            Clear Filters
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
             <div id="aiResponse" class="hidden"></div>
         </div>
     </div>
@@ -198,6 +238,16 @@
             errorMessage.classList.add('hidden');
             aiResponse.innerHTML = '';
             aiResponse.classList.remove('hidden');
+            
+            // Show filter controls
+            const filterControls = document.getElementById('filterControls');
+            filterControls.classList.remove('hidden');
+            
+            // Populate category filter
+            populateCategoryFilter(data.controls);
+            
+            // Store data globally for filtering
+            window.currentResponseData = data;
 
             // Create structured HTML for the response
             let html = '';
@@ -216,8 +266,13 @@
             if (data.controls && data.controls.length > 0) {
                 html += `
                     <div class="mb-6">
-                        <h3 class="text-xl font-bold text-gray-800 mb-4">NIST 800-53 R.5 Controls</h3>
-                        <div class="space-y-4">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-xl font-bold text-gray-800">NIST 800-53 R.5 Controls</h3>
+                            <span id="resultsCounter" class="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                                ${data.controls.length} control${data.controls.length !== 1 ? 's' : ''} found
+                            </span>
+                        </div>
+                        <div class="space-y-4" id="controlsContainer">
                 `;
 
                 data.controls.forEach(control => {
@@ -227,11 +282,23 @@
                         'Low': 'bg-green-100 border-green-300 text-green-800'
                     }[control.relevance] || 'bg-gray-100 border-gray-300 text-gray-800';
 
+                    // Create NIST documentation link
+                    const nistUrl = `https://csrc.nist.gov/Projects/risk-management/sp800-53-controls/release-search#/control/${control.id}`;
+                    
                     html += `
-                        <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div class="control-item border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow" 
+                             data-priority="${control.relevance}" 
+                             data-category="${control.category}" 
+                             data-id="${control.id}">
                             <div class="flex items-start justify-between mb-3">
-                                <div>
-                                    <h4 class="text-lg font-semibold text-gray-800">${control.id}: ${control.title}</h4>
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <h4 class="text-lg font-semibold text-gray-800">${control.id}: ${control.title}</h4>
+                                        <a href="${nistUrl}" target="_blank" rel="noopener noreferrer" 
+                                           class="text-blue-600 hover:text-blue-800 text-sm font-medium underline">
+                                            View NIST Docs
+                                        </a>
+                                    </div>
                                     <p class="text-sm text-gray-600">${control.category}</p>
                                 </div>
                                 <span class="px-3 py-1 rounded-full text-xs font-medium border ${relevanceColor}">
@@ -301,6 +368,141 @@
             }
 
             aiResponse.innerHTML = html;
+            
+            // Initialize filter event listeners
+            initializeFilters();
+        }
+
+        function populateCategoryFilter(controls) {
+            const categoryFilter = document.getElementById('categoryFilter');
+            const categories = [...new Set(controls.map(control => control.category))].sort();
+            
+            // Clear existing options except "All Categories"
+            categoryFilter.innerHTML = '<option value="all">All Categories</option>';
+            
+            categories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category;
+                option.textContent = category;
+                categoryFilter.appendChild(option);
+            });
+        }
+
+        function initializeFilters() {
+            const priorityFilter = document.getElementById('priorityFilter');
+            const categoryFilter = document.getElementById('categoryFilter');
+            const sortBy = document.getElementById('sortBy');
+            const exportBtn = document.getElementById('exportBtn');
+            const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+
+            priorityFilter.addEventListener('change', applyFilters);
+            categoryFilter.addEventListener('change', applyFilters);
+            sortBy.addEventListener('change', applyFilters);
+            exportBtn.addEventListener('click', exportResults);
+            clearFiltersBtn.addEventListener('click', clearFilters);
+        }
+
+        function applyFilters() {
+            const priorityFilter = document.getElementById('priorityFilter').value;
+            const categoryFilter = document.getElementById('categoryFilter').value;
+            const sortBy = document.getElementById('sortBy').value;
+            
+            const controlItems = document.querySelectorAll('.control-item');
+            let visibleItems = [];
+
+            controlItems.forEach(item => {
+                const priority = item.dataset.priority;
+                const category = item.dataset.category;
+                
+                let show = true;
+                
+                if (priorityFilter !== 'all' && priority !== priorityFilter) {
+                    show = false;
+                }
+                
+                if (categoryFilter !== 'all' && category !== categoryFilter) {
+                    show = false;
+                }
+                
+                if (show) {
+                    item.style.display = 'block';
+                    visibleItems.push(item);
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+
+            // Sort visible items
+            sortControls(visibleItems, sortBy);
+            
+            // Update results counter
+            updateResultsCounter(visibleItems.length);
+        }
+
+        function updateResultsCounter(count) {
+            const counter = document.getElementById('resultsCounter');
+            if (counter) {
+                counter.textContent = `${count} control${count !== 1 ? 's' : ''} shown`;
+            }
+        }
+
+        function sortControls(items, sortBy) {
+            const container = document.getElementById('controlsContainer');
+            
+            items.sort((a, b) => {
+                switch (sortBy) {
+                    case 'priority':
+                        const priorityOrder = { 'High': 3, 'Medium': 2, 'Low': 1 };
+                        return priorityOrder[b.dataset.priority] - priorityOrder[a.dataset.priority];
+                    case 'id':
+                        return a.dataset.id.localeCompare(b.dataset.id);
+                    case 'title':
+                        const titleA = a.querySelector('h4').textContent;
+                        const titleB = b.querySelector('h4').textContent;
+                        return titleA.localeCompare(titleB);
+                    default:
+                        return 0;
+                }
+            });
+
+            // Reorder DOM elements
+            items.forEach(item => {
+                container.appendChild(item);
+            });
+        }
+
+        function exportResults() {
+            if (!window.currentResponseData) {
+                alert('No data to export');
+                return;
+            }
+
+            const data = window.currentResponseData;
+            const exportData = {
+                timestamp: new Date().toISOString(),
+                scenario: document.getElementById('scenarioInput').value,
+                summary: data.summary,
+                controls: data.controls,
+                csf_mappings: data.csf_mappings,
+                recommendations: data.recommendations
+            };
+
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `grc-analysis-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function clearFilters() {
+            document.getElementById('priorityFilter').value = 'all';
+            document.getElementById('categoryFilter').value = 'all';
+            document.getElementById('sortBy').value = 'priority';
+            applyFilters();
         }
 
         function displayMessage(message, type) {
@@ -308,6 +510,10 @@
             errorMessage.classList.add('hidden');
             aiResponse.classList.add('hidden');
             aiResponse.innerHTML = '';
+            
+            // Hide filter controls
+            const filterControls = document.getElementById('filterControls');
+            filterControls.classList.add('hidden');
 
             if (type === 'error') {
                 errorMessage.textContent = message;
