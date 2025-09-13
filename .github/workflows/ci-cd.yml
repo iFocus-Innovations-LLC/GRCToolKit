@@ -1,0 +1,216 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GAR_LOCATION: us-central1
+  REPOSITORY: grc-toolkit
+  SERVICE: grc-toolkit
+  REGION: us-central1
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Docker image for testing
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: false
+        tags: grc-toolkit:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Test Docker image
+      run: |
+        # Start the container
+        docker run -d --name test-container -p 8080:8080 grc-toolkit:test
+        
+        # Wait for container to be ready
+        sleep 10
+        
+        # Test health endpoint
+        curl -f http://localhost:8080/health || exit 1
+        
+        # Test main page loads
+        curl -f http://localhost:8080/ || exit 1
+        
+        # Clean up
+        docker stop test-container
+        docker rm test-container
+
+    - name: Security scan with Trivy
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'grc-toolkit:test'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Google Auth
+      id: auth
+      uses: 'google-github-actions/auth@v2'
+      with:
+        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+    - name: Set up Cloud SDK
+      uses: 'google-github-actions/setup-gcloud@v2'
+
+    - name: Configure Docker to use gcloud as a credential helper
+      run: gcloud auth configure-docker $GAR_LOCATION-docker.pkg.dev
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: $GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$SERVICE
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64,linux/arm64
+
+  deploy-staging:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Google Auth
+      id: auth
+      uses: 'google-github-actions/auth@v2'
+      with:
+        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+    - name: Set up Cloud SDK
+      uses: 'google-github-actions/setup-gcloud@v2'
+
+    - name: Configure kubectl
+      run: gcloud container clusters get-credentials ${{ secrets.GKE_CLUSTER_NAME }} --region $REGION --project $PROJECT_ID
+
+    - name: Deploy to staging
+      run: |
+        # Update image tag in deployment
+        sed -i "s|gcr.io/PROJECT_ID/grc-toolkit:latest|$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$SERVICE:develop|g" k8s/deployment.yaml
+        
+        # Apply Kubernetes manifests
+        kubectl apply -f k8s/namespace.yaml
+        kubectl apply -f k8s/configmap.yaml
+        kubectl apply -f k8s/deployment.yaml
+        kubectl apply -f k8s/service.yaml
+        
+        # Wait for deployment to be ready
+        kubectl rollout status deployment/grc-toolkit -n grc-toolkit --timeout=300s
+
+    - name: Run smoke tests
+      run: |
+        # Get the service endpoint
+        kubectl get service grc-toolkit-service -n grc-toolkit
+        
+        # Port forward for testing
+        kubectl port-forward service/grc-toolkit-service 8080:80 -n grc-toolkit &
+        sleep 10
+        
+        # Test the application
+        curl -f http://localhost:8080/health || exit 1
+        curl -f http://localhost:8080/ || exit 1
+
+  deploy-production:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Google Auth
+      id: auth
+      uses: 'google-github-actions/auth@v2'
+      with:
+        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+    - name: Set up Cloud SDK
+      uses: 'google-github-actions/setup-gcloud@v2'
+
+    - name: Configure kubectl
+      run: gcloud container clusters get-credentials ${{ secrets.GKE_CLUSTER_NAME }} --region $REGION --project $PROJECT_ID
+
+    - name: Deploy to production
+      run: |
+        # Update image tag in deployment
+        sed -i "s|gcr.io/PROJECT_ID/grc-toolkit:latest|$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$SERVICE:latest|g" k8s/deployment.yaml
+        
+        # Apply Kubernetes manifests
+        kubectl apply -f k8s/namespace.yaml
+        kubectl apply -f k8s/configmap.yaml
+        kubectl apply -f k8s/deployment.yaml
+        kubectl apply -f k8s/service.yaml
+        kubectl apply -f k8s/ingress.yaml
+        kubectl apply -f k8s/hpa.yaml
+        
+        # Wait for deployment to be ready
+        kubectl rollout status deployment/grc-toolkit -n grc-toolkit --timeout=300s
+
+    - name: Run production smoke tests
+      run: |
+        # Get the service endpoint
+        kubectl get service grc-toolkit-service -n grc-toolkit
+        
+        # Port forward for testing
+        kubectl port-forward service/grc-toolkit-service 8080:80 -n grc-toolkit &
+        sleep 10
+        
+        # Test the application
+        curl -f http://localhost:8080/health || exit 1
+        curl -f http://localhost:8080/ || exit 1
+
+    - name: Notify deployment success
+      if: success()
+      run: |
+        echo "✅ Production deployment successful!"
+        echo "Application is now live at: https://grc-toolkit.yourdomain.com"
