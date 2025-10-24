@@ -38,7 +38,7 @@ test_health_check() {
 
 test_api_key_injection() {
     echo -e "\n${BLUE}🔐 Testing API Key Injection...${NC}"
-    if curl -s "$BASE_URL/" | grep -q 'window.GEMINI_API_KEY = "AIzaSyC3vuBHAjDA-laqOQ0p8dYDky-CjzJ1aEM"'; then
+    if curl -s "$BASE_URL/" | grep -q 'window.GEMINI_API_KEY = "REDACTED_ROTATED_KEY"'; then
         echo -e "${GREEN}✅ API key properly injected${NC}"
         return 0
     else
