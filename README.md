@@ -1,19 +1,57 @@
 # GRCToolKit
+
+A comprehensive Governance, Risk, and Compliance (GRC) toolkit that provides AI-powered analysis of compliance scenarios and suggests relevant NIST 800-53 R.5 controls. The application is containerized and ready for deployment to Google Cloud Platform (GCP) Kubernetes environments.
+
+## 🚀 Quick Start
+
+### Local Development
+1. Open `grctoolkit.html` in your web browser
+2. Enter a GRC scenario in the text area
+3. Click "Analyze Scenario" to get AI-powered NIST control recommendations
+
+### Containerized Deployment
+For production deployment to GCP Kubernetes, see the [Deployment Guide](DEPLOYMENT.md).
+
+```bash
+# Quick deployment to GCP
+./scripts/setup-gcp.sh
+./scripts/deploy.sh production
+```
+
+## 🏗️ Architecture
+
 This web application provides a user interface for interacting with a simulated AI GRC agent. When you enter a scenario and click "Analyze Scenario," it will send your prompt to the gemini-2.0-flash model, which is instructed to act as a GRC expert and return relevant NIST 800-53 R.5 controls.
 
-Key Features of the Provided Code:
+## ✨ Key Features
 
-1. Responsive Design: Uses Tailwind CSS for a clean, mobile-first, and responsive layout.
+### Enhanced User Interface
+- **Responsive Design**: Clean, mobile-first layout using Tailwind CSS
+- **Structured JSON Output**: AI responses formatted as structured data for better parsing
+- **Advanced Filtering**: Filter controls by priority and category
+- **Smart Sorting**: Sort by priority, control ID, or title
+- **NIST Documentation Links**: Direct links to official NIST 800-53 documentation
+- **Export Functionality**: Download analysis results as JSON
 
-1. User Input: A textarea for users to describe their GRC scenario.
+### AI Integration
+- **Gemini 2.0 Flash**: Advanced AI model for GRC analysis
+- **Structured Responses**: JSON-formatted output with controls, CSF mappings, and recommendations
+- **Context-Aware Analysis**: AI acts as a GRC expert with domain-specific knowledge
+- **Error Handling**: Graceful fallback for API failures
 
-1. AI Integration (Simulated): Makes a fetch call to the Gemini API (gemini-2.0-flash) to get a response, simulating the AI agent's core logic.
+### v1.1 OSCAL Integration Features
+- **OSCAL Compliance**: Full NIST 800-53 R5 OSCAL catalog integration
+- **AI Compliance Engine**: Automated assessment and control mapping
+- **Ansible Automation**: Automated compliance control implementation
+- **Auditor Reports**: Automated compliance documentation generation
+- **Enterprise Security**: Enhanced security documentation and best practices
 
-Loading Indicator: A simple spinner and text change to indicate when the AI is processing.
-
-1. Error Handling: Basic error display for API call failures or unexpected responses.
-
-1. NIST 800-53 Focus: The prompt specifically guides the AI to focus on NIST 800-53 R.5 controls.
+### Production-Ready Deployment
+- **Containerized**: Docker-based deployment with nginx
+- **Kubernetes Ready**: Complete K8s manifests for GCP deployment
+- **CI/CD Pipeline**: Automated testing and deployment with GitHub Actions
+- **Auto-scaling**: Horizontal Pod Autoscaler for dynamic scaling
+- **Security**: Non-root containers, security headers, and vulnerability scanning
+- **Monitoring**: Health checks, logging, and observability features
 
 Next Steps & Potential Enhancements:
 
