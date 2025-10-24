@@ -1,0 +1,134 @@
+---
+# Ansible Playbook: AU-2 Audit Events
+# Validates that audit events are properly configured and logged
+# Based on NIST 800-53 Rev. 5 Control AU-2
+
+- name: "AU-2: Audit Events Validation"
+  hosts: all
+  become: yes
+  vars:
+    control_id: "AU-2"
+    control_title: "Audit Events"
+    compliance_framework: "NIST 800-53 Rev. 5"
+    
+  tasks:
+    - name: "AU-2.1: Verify auditd service is running"
+      block:
+        - name: "Check auditd service status"
+          systemd:
+            name: "auditd"
+            state: "started"
+            enabled: yes
+          register: auditd_status
+          
+        - name: "AU-2.1: FAIL - Audit service not running"
+          fail:
+            msg: "Audit service not running - AU-2.1 compliance failure"
+          when: auditd_status.failed
+          
+      rescue:
+        - name: "AU-2.1: WARN - Audit service check failed"
+          debug:
+            msg: "Could not verify audit service status"
+
+    - name: "AU-2.2: Verify audit rules are configured"
+      block:
+        - name: "Check for audit rules file"
+          stat:
+            path: "/etc/audit/rules.d/audit.rules"
+          register: audit_rules_file
+          
+        - name: "Verify audit rules content"
+          shell: "grep -c '^[^#]' /etc/audit/rules.d/audit.rules 2>/dev/null || echo '0'"
+          register: audit_rules_count
+          when: audit_rules_file.stat.exists
+          
+        - name: "AU-2.2: FAIL - No audit rules configured"
+          fail:
+            msg: "No audit rules found - AU-2.2 compliance failure"
+          when: audit_rules_file.stat.exists and audit_rules_count.stdout == "0"
+          
+        - name: "AU-2.2: WARN - Audit rules file missing"
+          debug:
+            msg: "Audit rules file not found - consider configuring audit rules"
+          when: not audit_rules_file.stat.exists
+
+    - name: "AU-2.3: Verify audit log files exist"
+      block:
+        - name: "Check audit log directory"
+          stat:
+            path: "/var/log/audit"
+          register: audit_log_dir
+          
+        - name: "Check for audit log files"
+          shell: "find /var/log/audit -name 'audit.log*' -type f | wc -l"
+          register: audit_log_files
+          
+        - name: "AU-2.3: WARN - No audit log files found"
+          debug:
+            msg: "No audit log files found - audit logging may not be active"
+          when: audit_log_files.stdout == "0"
+
+    - name: "AU-2.4: Verify audit log permissions"
+      block:
+        - name: "Check audit log file permissions"
+          stat:
+            path: "/var/log/audit/audit.log"
+          register: audit_log_perms
+          when: audit_log_files.stdout != "0"
+          
+        - name: "Verify audit log is readable by audit group"
+          shell: "ls -la /var/log/audit/audit.log | grep -E 'audit|root'"
+          register: audit_log_ownership
+          when: audit_log_perms.stat.exists
+          failed_when: false
+          
+        - name: "AU-2.4: INFO - Audit log permissions"
+          debug:
+            msg: "Audit log ownership: {{ audit_log_ownership.stdout }}"
+          when: audit_log_ownership.stdout != ""
+
+    - name: "AU-2.5: Verify audit configuration"
+      block:
+        - name: "Check auditd configuration"
+          stat:
+            path: "/etc/audit/auditd.conf"
+          register: auditd_config
+          
+        - name: "Verify auditd configuration content"
+          shell: "grep -E '^[^#].*=' /etc/audit/auditd.conf | wc -l"
+          register: auditd_config_lines
+          when: auditd_config.stat.exists
+          
+        - name: "AU-2.5: INFO - Audit configuration found"
+          debug:
+            msg: "Audit configuration lines: {{ auditd_config_lines.stdout }}"
+          when: auditd_config.stat.exists
+
+    - name: "Generate AU-2 compliance report"
+      block:
+        - name: "Create compliance report directory"
+          file:
+            path: "/tmp/grc-compliance-reports"
+            state: "directory"
+            mode: "0755"
+            
+        - name: "Generate AU-2 compliance report"
+          template:
+            src: "au-2-compliance-report.j2"
+            dest: "/tmp/grc-compliance-reports/au-2-compliance-{{ ansible_date_time.epoch }}.json"
+            mode: "0644"
+          vars:
+            compliance_status: "{{ 'PASS' if not (auditd_status.failed) else 'FAIL' }}"
+            validation_timestamp: "{{ ansible_date_time.iso8601 }}"
+            hostname: "{{ inventory_hostname }}"
+            audit_rules_count: "{{ audit_rules_count.stdout | default('0') }}"
+            audit_log_files: "{{ audit_log_files.stdout }}"
+            
+  handlers:
+    - name: "Notify compliance team"
+      mail:
+        to: "{{ compliance_notification_email | default('compliance@company.com') }}"
+        subject: "AU-2 Compliance Validation - {{ inventory_hostname }}"
+        body: "AU-2 Audit Events validation completed. Status: {{ compliance_status }}"
+      when: compliance_notification_email is defined

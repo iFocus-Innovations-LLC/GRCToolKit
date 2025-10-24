@@ -33,6 +33,11 @@ spec:
             configMapKeyRef:
               name: grc-toolkit-config
               key: APP_VERSION
+        - name: GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: grc-toolkit-secrets
+              key: gemini-api-key
         resources:
           requests:
             memory: "64Mi"
@@ -56,6 +61,12 @@ spec:
           periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 3
+        # Graceful shutdown configuration
+        terminationGracePeriodSeconds: 30
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "echo '🛑 PreStop hook triggered, initiating graceful shutdown...' && sleep 2"]
         securityContext:
           allowPrivilegeEscalation: false
           runAsNonRoot: true

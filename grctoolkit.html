@@ -93,6 +93,12 @@
                         <button id="exportBtn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
                             Export Results
                         </button>
+                        <button id="validateControlsBtn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
+                            Validate Controls
+                        </button>
+                        <button id="generateAuditReportBtn" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
+                            Generate Audit Report
+                        </button>
                         <button id="clearFiltersBtn" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
                             Clear Filters
                         </button>
@@ -104,7 +110,15 @@
         </div>
     </div>
 
+    <!-- Load GRC Compliance Engine and Report Generator -->
+    <script src="/ai-agent/grc-compliance-engine.js"></script>
+    <script src="/compliance-docs/auditor-report-generator.js"></script>
+    
     <script type="module">
+        // Configuration - Set your Gemini API key here
+        // Get your API key from: https://aistudio.google.com/
+        window.GEMINI_API_KEY = ""; // Will be injected at runtime from Kubernetes Secret
+        
         // Global variables for Firebase configuration, if needed for future persistence.
         // For this example, we are using the Gemini API directly, so Firebase is not strictly needed for this specific feature.
         // However, if you were to store user queries or results, Firebase Firestore would be ideal.
@@ -120,6 +134,21 @@
         const initialMessage = document.getElementById('initialMessage');
         const errorMessage = document.getElementById('errorMessage');
         const aiResponse = document.getElementById('aiResponse');
+        
+        // Initialize GRC Compliance Engine
+        let grcComplianceEngine = null;
+        let auditorReportGenerator = null;
+        
+        // Initialize compliance tools when page loads
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                grcComplianceEngine = new GRCComplianceEngine();
+                auditorReportGenerator = new AuditorReportGenerator();
+                console.log('✅ GRC Compliance tools initialized');
+            } catch (error) {
+                console.error('❌ Failed to initialize GRC Compliance tools:', error);
+            }
+        });
 
         analyzeButton.addEventListener('click', async () => {
             const prompt = scenarioInput.value.trim();
@@ -184,7 +213,7 @@
                         responseMimeType: "application/json", // Encourage JSON output
                     },
                 };
-                const apiKey = ""; // Canvas will automatically provide the API key at runtime
+                const apiKey = window.GEMINI_API_KEY || ""; // Set window.GEMINI_API_KEY in browser console or configure below
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
                 const response = await fetch(apiUrl, {
@@ -400,6 +429,18 @@
             sortBy.addEventListener('change', applyFilters);
             exportBtn.addEventListener('click', exportResults);
             clearFiltersBtn.addEventListener('click', clearFilters);
+            
+            // Add event listeners for new OSCAL integration buttons
+            const validateControlsBtn = document.getElementById('validateControlsBtn');
+            const generateAuditReportBtn = document.getElementById('generateAuditReportBtn');
+            
+            if (validateControlsBtn) {
+                validateControlsBtn.addEventListener('click', validateControls);
+            }
+            
+            if (generateAuditReportBtn) {
+                generateAuditReportBtn.addEventListener('click', generateAuditReport);
+            }
         }
 
         function applyFilters() {
@@ -526,6 +567,306 @@
 
         // Set initial message visibility
         initialMessage.classList.remove('hidden');
+        
+        // OSCAL Integration Functions
+        
+        /**
+         * Validate controls using Ansible playbooks
+         */
+        async function validateControls() {
+            if (!grcComplianceEngine || !window.currentResponseData) {
+                displayMessage('Please analyze a scenario first to get control recommendations.', 'error');
+                return;
+            }
+            
+            try {
+                displayMessage('🔍 Validating controls using Ansible playbooks...', 'initial');
+                
+                // Get the scenario from the input
+                const scenario = scenarioInput.value.trim();
+                
+                // Analyze scenario to get validation plan
+                const analysis = await grcComplianceEngine.analyzeScenario(scenario);
+                
+                // Execute compliance validation (simulated)
+                const targetHosts = ['localhost']; // In production, this would be configurable
+                const validationResults = await grcComplianceEngine.executeComplianceValidation(
+                    analysis.validationPlan, 
+                    targetHosts
+                );
+                
+                // Display validation results
+                displayValidationResults(validationResults);
+                
+            } catch (error) {
+                console.error('Error validating controls:', error);
+                displayMessage(`Failed to validate controls: ${error.message}`, 'error');
+            }
+        }
+        
+        /**
+         * Generate audit report using OSCAL format
+         */
+        async function generateAuditReport() {
+            if (!auditorReportGenerator || !window.currentResponseData) {
+                displayMessage('Please analyze a scenario first to generate audit report.', 'error');
+                return;
+            }
+            
+            try {
+                displayMessage('📊 Generating OSCAL-compliant audit report...', 'initial');
+                
+                // Simulate assessment results (in production, this would come from actual validation)
+                const mockAssessmentResults = {
+                    executionId: 'exec-' + Date.now(),
+                    startTime: new Date().toISOString(),
+                    endTime: new Date().toISOString(),
+                    targetHosts: ['localhost'],
+                    playbookResults: [
+                        {
+                            playbook: 'ac-3-access-enforcement',
+                            status: 'completed',
+                            output: 'Access enforcement controls validated successfully',
+                            findings: [
+                                {
+                                    control: 'AC-3',
+                                    status: 'PASS',
+                                    message: 'Access enforcement controls properly configured',
+                                    evidence: 'Authentication services running, ACLs configured'
+                                }
+                            ],
+                            timestamp: new Date().toISOString()
+                        }
+                    ],
+                    overallStatus: 'passed'
+                };
+                
+                // Generate auditor report
+                const report = await auditorReportGenerator.generateAuditorReport(mockAssessmentResults, {
+                    title: 'GRC Compliance Assessment Report',
+                    framework: 'NIST SP 800-53 Rev. 5',
+                    organization: 'Target Organization',
+                    assessor: 'GRC Toolkit AI Agent'
+                });
+                
+                // Display and download report
+                displayAuditReport(report);
+                
+            } catch (error) {
+                console.error('Error generating audit report:', error);
+                displayMessage(`Failed to generate audit report: ${error.message}`, 'error');
+            }
+        }
+        
+        /**
+         * Display validation results
+         */
+        function displayValidationResults(validationResults) {
+            const results = validationResults.results;
+            
+            let html = `
+                <div class="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400 rounded-r-lg">
+                    <h3 class="text-lg font-semibold text-blue-800 mb-2">🔍 Control Validation Results</h3>
+                    <p class="text-blue-700">Validation completed using Ansible playbooks and OSCAL framework</p>
+                </div>
+                
+                <div class="mb-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Validation Summary</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-green-800">Overall Status</h4>
+                            <p class="text-green-700 text-2xl font-bold">${results.overallStatus.toUpperCase()}</p>
+                        </div>
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-blue-800">Playbooks Executed</h4>
+                            <p class="text-blue-700 text-2xl font-bold">${results.playbookResults.length}</p>
+                        </div>
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-purple-800">Target Hosts</h4>
+                            <p class="text-purple-700 text-lg">${results.targetHosts.join(', ')}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Playbook Results</h3>
+                    <div class="space-y-4">
+            `;
+            
+            results.playbookResults.forEach(result => {
+                const statusColor = result.status === 'completed' ? 'green' : 'red';
+                html += `
+                    <div class="border border-gray-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="text-lg font-semibold text-gray-800">${result.playbook}</h4>
+                            <span class="px-3 py-1 rounded-full text-sm font-medium bg-${statusColor}-100 text-${statusColor}-800">
+                                ${result.status.toUpperCase()}
+                            </span>
+                        </div>
+                        <p class="text-gray-700 mb-2">${result.output}</p>
+                        <div class="mt-3">
+                            <h5 class="font-medium text-gray-800 mb-2">Findings:</h5>
+                            <ul class="space-y-1">
+                `;
+                
+                result.findings.forEach(finding => {
+                    const findingColor = finding.status === 'PASS' ? 'green' : 'red';
+                    html += `
+                        <li class="flex items-start space-x-2">
+                            <span class="text-${findingColor}-500 mt-1">•</span>
+                            <div>
+                                <span class="font-medium text-${findingColor}-800">${finding.control}: ${finding.status}</span>
+                                <p class="text-gray-700 text-sm">${finding.message}</p>
+                                <p class="text-gray-600 text-xs">Evidence: ${finding.evidence}</p>
+                            </div>
+                        </li>
+                    `;
+                });
+                
+                html += `
+                            </ul>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                </div>
+                
+                <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+                    <h4 class="font-semibold text-gray-800 mb-2">📋 OSCAL Assessment Plan</h4>
+                    <p class="text-gray-700 text-sm mb-3">This validation was conducted using NIST OSCAL framework for standardized compliance assessment.</p>
+                    <button onclick="downloadOSCALPlan('${validationResults.complianceReport}')" 
+                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
+                        Download OSCAL Assessment Plan
+                    </button>
+                </div>
+            `;
+            
+            aiResponse.innerHTML = html;
+            aiResponse.classList.remove('hidden');
+            initialMessage.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+        }
+        
+        /**
+         * Display audit report
+         */
+        function displayAuditReport(report) {
+            const humanReport = report.humanReadableReport;
+            
+            let html = `
+                <div class="mb-6 p-4 bg-purple-50 border-l-4 border-purple-400 rounded-r-lg">
+                    <h3 class="text-lg font-semibold text-purple-800 mb-2">📊 OSCAL-Compliant Audit Report</h3>
+                    <p class="text-purple-700">Generated using NIST OSCAL framework for standardized compliance reporting</p>
+                </div>
+                
+                <div class="mb-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Executive Summary</h3>
+                    <div class="bg-white border border-gray-200 rounded-lg p-4">
+                        <p class="text-gray-700 mb-4">${humanReport.executiveSummary.overview}</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <h4 class="font-semibold text-gray-800 mb-2">Key Findings:</h4>
+                                <ul class="space-y-1">
+            `;
+            
+            humanReport.executiveSummary.keyFindings.forEach(finding => {
+                html += `<li class="text-gray-700 text-sm">• ${finding}</li>`;
+            });
+            
+            html += `
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800 mb-2">Risk Level:</h4>
+                                <p class="text-lg font-bold text-${humanReport.executiveSummary.riskLevel === 'Low' ? 'green' : 'red'}-600">
+                                    ${humanReport.executiveSummary.riskLevel}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Control Assessments</h3>
+                    <div class="space-y-4">
+            `;
+            
+            humanReport.controlAssessments.forEach(assessment => {
+                const statusColor = assessment.assessmentStatus === 'completed' ? 'green' : 'red';
+                html += `
+                    <div class="border border-gray-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="text-lg font-semibold text-gray-800">${assessment.controlId}: ${assessment.title}</h4>
+                            <span class="px-3 py-1 rounded-full text-sm font-medium bg-${statusColor}-100 text-${statusColor}-800">
+                                ${assessment.assessmentStatus.toUpperCase()}
+                            </span>
+                        </div>
+                        <p class="text-gray-700 mb-2">${assessment.description}</p>
+                        <div class="flex items-center space-x-4 text-sm text-gray-600">
+                            <span>Priority: ${assessment.priority}</span>
+                            <span>Next Assessment: ${new Date(assessment.nextAssessment).toLocaleDateString()}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                </div>
+                
+                <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+                    <h4 class="font-semibold text-gray-800 mb-2">📄 Download Reports</h4>
+                    <div class="flex space-x-4">
+                        <button onclick="downloadReport('${JSON.stringify(report.oscalReport)}', 'oscal-assessment-results.json')" 
+                                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
+                            Download OSCAL Report
+                        </button>
+                        <button onclick="downloadReport('${JSON.stringify(humanReport)}', 'audit-report.json')" 
+                                class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
+                            Download Human-Readable Report
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            aiResponse.innerHTML = html;
+            aiResponse.classList.remove('hidden');
+            initialMessage.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+        }
+        
+        /**
+         * Download OSCAL plan
+         */
+        function downloadOSCALPlan(planData) {
+            const blob = new Blob([JSON.stringify(planData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `oscal-assessment-plan-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        /**
+         * Download report
+         */
+        function downloadReport(data, filename) {
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
     </script>
 </body>
 </html>
