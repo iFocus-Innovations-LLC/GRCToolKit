@@ -29,6 +29,7 @@ jobs:
         context: .
         push: false
         tags: grc-toolkit:test
+        load: true
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
@@ -57,8 +58,17 @@ jobs:
         format: 'sarif'
         output: 'trivy-results.sarif'
 
+    - name: Check Trivy results exist
+      run: |
+        if [ -f trivy-results.sarif ]; then
+          echo "Trivy results found"
+        else
+          echo "No Trivy results found, creating empty file"
+          echo '{"version": "2.1.0", "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema.json", "runs": []}' > trivy-results.sarif
+        fi
+
     - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       if: always()
       with:
         sarif_file: 'trivy-results.sarif'
