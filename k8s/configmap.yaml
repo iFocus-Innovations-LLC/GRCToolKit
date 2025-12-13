@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grc-toolkit-config
+  namespace: grc-toolkit
+data:
+  # Environment-specific configurations can be added here
+  APP_NAME: "GRC Toolkit"
+  APP_VERSION: "1.0.0"
+  # Add any other configuration values as needed

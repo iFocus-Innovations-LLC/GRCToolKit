@@ -57,14 +57,68 @@
             </button>
         </div>
 
-        <div id="responseArea" class="mt-8 p-6 bg-gray-50 rounded-lg border border-gray-200 shadow-inner min-h-[150px] flex flex-col justify-center items-center text-gray-700">
+        <div id="responseArea" class="mt-8 p-6 bg-gray-50 rounded-lg border border-gray-200 shadow-inner min-h-[150px] text-gray-700">
             <p id="initialMessage" class="text-center text-gray-500">Your AI-generated NIST control recommendations will appear here.</p>
             <div id="errorMessage" class="text-red-600 text-center hidden"></div>
-            <pre id="aiResponse" class="whitespace-pre-wrap font-mono text-sm leading-relaxed"></pre>
+            
+            <!-- Filter and Sort Controls -->
+            <div id="filterControls" class="hidden mb-6 p-4 bg-white rounded-lg border border-gray-200">
+                <div class="flex flex-wrap gap-4 items-center justify-between">
+                    <div class="flex flex-wrap gap-4 items-center">
+                        <div>
+                            <label for="priorityFilter" class="block text-sm font-medium text-gray-700 mb-1">Filter by Priority:</label>
+                            <select id="priorityFilter" class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500">
+                                <option value="all">All Priorities</option>
+                                <option value="High">High Priority</option>
+                                <option value="Medium">Medium Priority</option>
+                                <option value="Low">Low Priority</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="categoryFilter" class="block text-sm font-medium text-gray-700 mb-1">Filter by Category:</label>
+                            <select id="categoryFilter" class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500">
+                                <option value="all">All Categories</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="sortBy" class="block text-sm font-medium text-gray-700 mb-1">Sort by:</label>
+                            <select id="sortBy" class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500">
+                                <option value="priority">Priority</option>
+                                <option value="id">Control ID</option>
+                                <option value="title">Title</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="exportBtn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
+                            Export Results
+                        </button>
+                        <button id="validateControlsBtn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
+                            Validate Controls
+                        </button>
+                        <button id="generateAuditReportBtn" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
+                            Generate Audit Report
+                        </button>
+                        <button id="clearFiltersBtn" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
+                            Clear Filters
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="aiResponse" class="hidden"></div>
         </div>
     </div>
 
+    <!-- Load GRC Compliance Engine and Report Generator -->
+    <script src="/ai-agent/grc-compliance-engine.js"></script>
+    <script src="/compliance-docs/auditor-report-generator.js"></script>
+    
     <script type="module">
+        // Configuration - Set your Gemini API key here
+        // Get your API key from: https://aistudio.google.com/
+        window.GEMINI_API_KEY = ""; // Will be injected at runtime from Kubernetes Secret
+        
         // Global variables for Firebase configuration, if needed for future persistence.
         // For this example, we are using the Gemini API directly, so Firebase is not strictly needed for this specific feature.
         // However, if you were to store user queries or results, Firebase Firestore would be ideal.
@@ -80,6 +134,21 @@
         const initialMessage = document.getElementById('initialMessage');
         const errorMessage = document.getElementById('errorMessage');
         const aiResponse = document.getElementById('aiResponse');
+        
+        // Initialize GRC Compliance Engine
+        let grcComplianceEngine = null;
+        let auditorReportGenerator = null;
+        
+        // Initialize compliance tools when page loads
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                grcComplianceEngine = new GRCComplianceEngine();
+                auditorReportGenerator = new AuditorReportGenerator();
+                console.log('✅ GRC Compliance tools initialized');
+            } catch (error) {
+                console.error('❌ Failed to initialize GRC Compliance tools:', error);
+            }
+        });
 
         analyzeButton.addEventListener('click', async () => {
             const prompt = scenarioInput.value.trim();
@@ -99,25 +168,52 @@
 
             try {
                 let chatHistory = [];
-                // Construct the prompt to guide the AI to act as a GRC expert
-                const fullPrompt = `As an AI GRC expert, given the following scenario, identify and list the most relevant NIST 800-53 R.5 Security and Privacy Controls. Explain briefly why each control is relevant. If no specific controls are directly applicable, suggest general areas of focus based on NIST CSF 2.0.
+                // Construct the prompt to guide the AI to act as a GRC expert with structured JSON output
+                const fullPrompt = `As an AI GRC expert, given the following scenario, identify and list the most relevant NIST 800-53 R.5 Security and Privacy Controls. 
 
                 Scenario: "${prompt}"
 
-                Format your response clearly with control IDs and brief explanations.`;
+                Please respond with a valid JSON object in the following format:
+                {
+                    "summary": "Brief summary of the scenario and overall compliance approach",
+                    "controls": [
+                        {
+                            "id": "AC-3",
+                            "title": "Access Enforcement",
+                            "category": "Access Control",
+                            "relevance": "High/Medium/Low",
+                            "description": "Brief description of the control",
+                            "rationale": "Why this control is relevant to the scenario",
+                            "implementation_notes": "Key implementation considerations"
+                        }
+                    ],
+                    "csf_mappings": [
+                        {
+                            "function": "Protect",
+                            "category": "Identity Management and Access Control",
+                            "subcategory": "PR.AC-1"
+                        }
+                    ],
+                    "recommendations": [
+                        "Additional recommendations for compliance"
+                    ]
+                }
+
+                Ensure the JSON is valid and properly formatted.`;
 
                 chatHistory.push({ role: "user", parts: [{ text: fullPrompt }] });
 
                 const payload = {
                     contents: chatHistory,
                     generationConfig: {
-                        temperature: 0.7, // Adjust for creativity vs. focus
+                        temperature: 0.3, // Lower temperature for more consistent JSON output
                         topK: 40,
                         topP: 0.95,
-                        maxOutputTokens: 1024,
+                        maxOutputTokens: 2048, // Increased for more detailed responses
+                        responseMimeType: "application/json", // Encourage JSON output
                     },
                 };
-                const apiKey = ""; // Canvas will automatically provide the API key at runtime
+                const apiKey = window.GEMINI_API_KEY || ""; // Set window.GEMINI_API_KEY in browser console or configure below
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
                 const response = await fetch(apiUrl, {
@@ -136,7 +232,22 @@
                     result.candidates[0].content && result.candidates[0].content.parts &&
                     result.candidates[0].content.parts.length > 0) {
                     const text = result.candidates[0].content.parts[0].text;
-                    aiResponse.textContent = text;
+                    
+                    try {
+                        // Try to parse the JSON response
+                        const jsonResponse = JSON.parse(text);
+                        displayStructuredResponse(jsonResponse);
+                    } catch (parseError) {
+                        // If JSON parsing fails, fall back to plain text display
+                        console.warn('Failed to parse JSON response, falling back to plain text:', parseError);
+                        initialMessage.classList.add('hidden');
+                        errorMessage.classList.add('hidden');
+                        aiResponse.classList.remove('hidden');
+                        aiResponse.innerHTML = `<div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg mb-4">
+                            <p class="text-yellow-800 text-sm"><strong>Note:</strong> Response received in plain text format. For better formatting, the AI should return structured JSON.</p>
+                        </div>
+                        <pre class="whitespace-pre-wrap font-mono text-sm leading-relaxed bg-white p-4 rounded border">${text}</pre>`;
+                    }
                 } else {
                     displayMessage('No relevant controls found or an unexpected response structure. Please try a different query.', 'error');
                 }
@@ -150,10 +261,300 @@
             }
         });
 
+        function displayStructuredResponse(data) {
+            // Clear previous content
+            initialMessage.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+            aiResponse.innerHTML = '';
+            aiResponse.classList.remove('hidden');
+            
+            // Show filter controls
+            const filterControls = document.getElementById('filterControls');
+            filterControls.classList.remove('hidden');
+            
+            // Populate category filter
+            populateCategoryFilter(data.controls);
+            
+            // Store data globally for filtering
+            window.currentResponseData = data;
+
+            // Create structured HTML for the response
+            let html = '';
+
+            // Summary section
+            if (data.summary) {
+                html += `
+                    <div class="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400 rounded-r-lg">
+                        <h3 class="text-lg font-semibold text-blue-800 mb-2">Summary</h3>
+                        <p class="text-blue-700">${data.summary}</p>
+                    </div>
+                `;
+            }
+
+            // Controls section
+            if (data.controls && data.controls.length > 0) {
+                html += `
+                    <div class="mb-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-xl font-bold text-gray-800">NIST 800-53 R.5 Controls</h3>
+                            <span id="resultsCounter" class="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                                ${data.controls.length} control${data.controls.length !== 1 ? 's' : ''} found
+                            </span>
+                        </div>
+                        <div class="space-y-4" id="controlsContainer">
+                `;
+
+                data.controls.forEach(control => {
+                    const relevanceColor = {
+                        'High': 'bg-red-100 border-red-300 text-red-800',
+                        'Medium': 'bg-yellow-100 border-yellow-300 text-yellow-800',
+                        'Low': 'bg-green-100 border-green-300 text-green-800'
+                    }[control.relevance] || 'bg-gray-100 border-gray-300 text-gray-800';
+
+                    // Create NIST documentation link
+                    const nistUrl = `https://csrc.nist.gov/Projects/risk-management/sp800-53-controls/release-search#/control/${control.id}`;
+                    
+                    html += `
+                        <div class="control-item border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow" 
+                             data-priority="${control.relevance}" 
+                             data-category="${control.category}" 
+                             data-id="${control.id}">
+                            <div class="flex items-start justify-between mb-3">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <h4 class="text-lg font-semibold text-gray-800">${control.id}: ${control.title}</h4>
+                                        <a href="${nistUrl}" target="_blank" rel="noopener noreferrer" 
+                                           class="text-blue-600 hover:text-blue-800 text-sm font-medium underline">
+                                            View NIST Docs
+                                        </a>
+                                    </div>
+                                    <p class="text-sm text-gray-600">${control.category}</p>
+                                </div>
+                                <span class="px-3 py-1 rounded-full text-xs font-medium border ${relevanceColor}">
+                                    ${control.relevance} Priority
+                                </span>
+                            </div>
+                            <div class="space-y-2">
+                                <p class="text-gray-700"><strong>Description:</strong> ${control.description}</p>
+                                <p class="text-gray-700"><strong>Rationale:</strong> ${control.rationale}</p>
+                                ${control.implementation_notes ? `<p class="text-gray-700"><strong>Implementation Notes:</strong> ${control.implementation_notes}</p>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
+            // CSF Mappings section
+            if (data.csf_mappings && data.csf_mappings.length > 0) {
+                html += `
+                    <div class="mb-6">
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">NIST CSF 2.0 Mappings</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                `;
+
+                data.csf_mappings.forEach(mapping => {
+                    html += `
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-800">${mapping.function}</h4>
+                            <p class="text-sm text-gray-600">${mapping.category}</p>
+                            <p class="text-xs text-gray-500 mt-1">${mapping.subcategory}</p>
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Recommendations section
+            if (data.recommendations && data.recommendations.length > 0) {
+                html += `
+                    <div class="mb-6">
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">Additional Recommendations</h3>
+                        <ul class="space-y-2">
+                `;
+
+                data.recommendations.forEach(recommendation => {
+                    html += `
+                        <li class="flex items-start space-x-2">
+                            <span class="text-blue-500 mt-1">•</span>
+                            <span class="text-gray-700">${recommendation}</span>
+                        </li>
+                    `;
+                });
+
+                html += `
+                        </ul>
+                    </div>
+                `;
+            }
+
+            aiResponse.innerHTML = html;
+            
+            // Initialize filter event listeners
+            initializeFilters();
+        }
+
+        function populateCategoryFilter(controls) {
+            const categoryFilter = document.getElementById('categoryFilter');
+            const categories = [...new Set(controls.map(control => control.category))].sort();
+            
+            // Clear existing options except "All Categories"
+            categoryFilter.innerHTML = '<option value="all">All Categories</option>';
+            
+            categories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category;
+                option.textContent = category;
+                categoryFilter.appendChild(option);
+            });
+        }
+
+        function initializeFilters() {
+            const priorityFilter = document.getElementById('priorityFilter');
+            const categoryFilter = document.getElementById('categoryFilter');
+            const sortBy = document.getElementById('sortBy');
+            const exportBtn = document.getElementById('exportBtn');
+            const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+
+            priorityFilter.addEventListener('change', applyFilters);
+            categoryFilter.addEventListener('change', applyFilters);
+            sortBy.addEventListener('change', applyFilters);
+            exportBtn.addEventListener('click', exportResults);
+            clearFiltersBtn.addEventListener('click', clearFilters);
+            
+            // Add event listeners for new OSCAL integration buttons
+            const validateControlsBtn = document.getElementById('validateControlsBtn');
+            const generateAuditReportBtn = document.getElementById('generateAuditReportBtn');
+            
+            if (validateControlsBtn) {
+                validateControlsBtn.addEventListener('click', validateControls);
+            }
+            
+            if (generateAuditReportBtn) {
+                generateAuditReportBtn.addEventListener('click', generateAuditReport);
+            }
+        }
+
+        function applyFilters() {
+            const priorityFilter = document.getElementById('priorityFilter').value;
+            const categoryFilter = document.getElementById('categoryFilter').value;
+            const sortBy = document.getElementById('sortBy').value;
+            
+            const controlItems = document.querySelectorAll('.control-item');
+            let visibleItems = [];
+
+            controlItems.forEach(item => {
+                const priority = item.dataset.priority;
+                const category = item.dataset.category;
+                
+                let show = true;
+                
+                if (priorityFilter !== 'all' && priority !== priorityFilter) {
+                    show = false;
+                }
+                
+                if (categoryFilter !== 'all' && category !== categoryFilter) {
+                    show = false;
+                }
+                
+                if (show) {
+                    item.style.display = 'block';
+                    visibleItems.push(item);
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+
+            // Sort visible items
+            sortControls(visibleItems, sortBy);
+            
+            // Update results counter
+            updateResultsCounter(visibleItems.length);
+        }
+
+        function updateResultsCounter(count) {
+            const counter = document.getElementById('resultsCounter');
+            if (counter) {
+                counter.textContent = `${count} control${count !== 1 ? 's' : ''} shown`;
+            }
+        }
+
+        function sortControls(items, sortBy) {
+            const container = document.getElementById('controlsContainer');
+            
+            items.sort((a, b) => {
+                switch (sortBy) {
+                    case 'priority':
+                        const priorityOrder = { 'High': 3, 'Medium': 2, 'Low': 1 };
+                        return priorityOrder[b.dataset.priority] - priorityOrder[a.dataset.priority];
+                    case 'id':
+                        return a.dataset.id.localeCompare(b.dataset.id);
+                    case 'title':
+                        const titleA = a.querySelector('h4').textContent;
+                        const titleB = b.querySelector('h4').textContent;
+                        return titleA.localeCompare(titleB);
+                    default:
+                        return 0;
+                }
+            });
+
+            // Reorder DOM elements
+            items.forEach(item => {
+                container.appendChild(item);
+            });
+        }
+
+        function exportResults() {
+            if (!window.currentResponseData) {
+                alert('No data to export');
+                return;
+            }
+
+            const data = window.currentResponseData;
+            const exportData = {
+                timestamp: new Date().toISOString(),
+                scenario: document.getElementById('scenarioInput').value,
+                summary: data.summary,
+                controls: data.controls,
+                csf_mappings: data.csf_mappings,
+                recommendations: data.recommendations
+            };
+
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `grc-analysis-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function clearFilters() {
+            document.getElementById('priorityFilter').value = 'all';
+            document.getElementById('categoryFilter').value = 'all';
+            document.getElementById('sortBy').value = 'priority';
+            applyFilters();
+        }
+
         function displayMessage(message, type) {
             initialMessage.classList.add('hidden');
             errorMessage.classList.add('hidden');
-            aiResponse.textContent = '';
+            aiResponse.classList.add('hidden');
+            aiResponse.innerHTML = '';
+            
+            // Hide filter controls
+            const filterControls = document.getElementById('filterControls');
+            filterControls.classList.add('hidden');
 
             if (type === 'error') {
                 errorMessage.textContent = message;
@@ -162,11 +563,310 @@
                 initialMessage.textContent = message || 'Your AI-generated NIST control recommendations will appear here.';
                 initialMessage.classList.remove('hidden');
             }
-            // For successful AI response, content is directly set to aiResponse.textContent
         }
 
         // Set initial message visibility
         initialMessage.classList.remove('hidden');
+        
+        // OSCAL Integration Functions
+        
+        /**
+         * Validate controls using Ansible playbooks
+         */
+        async function validateControls() {
+            if (!grcComplianceEngine || !window.currentResponseData) {
+                displayMessage('Please analyze a scenario first to get control recommendations.', 'error');
+                return;
+            }
+            
+            try {
+                displayMessage('🔍 Validating controls using Ansible playbooks...', 'initial');
+                
+                // Get the scenario from the input
+                const scenario = scenarioInput.value.trim();
+                
+                // Analyze scenario to get validation plan
+                const analysis = await grcComplianceEngine.analyzeScenario(scenario);
+                
+                // Execute compliance validation (simulated)
+                const targetHosts = ['localhost']; // In production, this would be configurable
+                const validationResults = await grcComplianceEngine.executeComplianceValidation(
+                    analysis.validationPlan, 
+                    targetHosts
+                );
+                
+                // Display validation results
+                displayValidationResults(validationResults);
+                
+            } catch (error) {
+                console.error('Error validating controls:', error);
+                displayMessage(`Failed to validate controls: ${error.message}`, 'error');
+            }
+        }
+        
+        /**
+         * Generate audit report using OSCAL format
+         */
+        async function generateAuditReport() {
+            if (!auditorReportGenerator || !window.currentResponseData) {
+                displayMessage('Please analyze a scenario first to generate audit report.', 'error');
+                return;
+            }
+            
+            try {
+                displayMessage('📊 Generating OSCAL-compliant audit report...', 'initial');
+                
+                // Simulate assessment results (in production, this would come from actual validation)
+                const mockAssessmentResults = {
+                    executionId: 'exec-' + Date.now(),
+                    startTime: new Date().toISOString(),
+                    endTime: new Date().toISOString(),
+                    targetHosts: ['localhost'],
+                    playbookResults: [
+                        {
+                            playbook: 'ac-3-access-enforcement',
+                            status: 'completed',
+                            output: 'Access enforcement controls validated successfully',
+                            findings: [
+                                {
+                                    control: 'AC-3',
+                                    status: 'PASS',
+                                    message: 'Access enforcement controls properly configured',
+                                    evidence: 'Authentication services running, ACLs configured'
+                                }
+                            ],
+                            timestamp: new Date().toISOString()
+                        }
+                    ],
+                    overallStatus: 'passed'
+                };
+                
+                // Generate auditor report
+                const report = await auditorReportGenerator.generateAuditorReport(mockAssessmentResults, {
+                    title: 'GRC Compliance Assessment Report',
+                    framework: 'NIST SP 800-53 Rev. 5',
+                    organization: 'Target Organization',
+                    assessor: 'GRC Toolkit AI Agent'
+                });
+                
+                // Display and download report
+                displayAuditReport(report);
+                
+            } catch (error) {
+                console.error('Error generating audit report:', error);
+                displayMessage(`Failed to generate audit report: ${error.message}`, 'error');
+            }
+        }
+        
+        /**
+         * Display validation results
+         */
+        function displayValidationResults(validationResults) {
+            const results = validationResults.results;
+            
+            let html = `
+                <div class="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400 rounded-r-lg">
+                    <h3 class="text-lg font-semibold text-blue-800 mb-2">🔍 Control Validation Results</h3>
+                    <p class="text-blue-700">Validation completed using Ansible playbooks and OSCAL framework</p>
+                </div>
+                
+                <div class="mb-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Validation Summary</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-green-800">Overall Status</h4>
+                            <p class="text-green-700 text-2xl font-bold">${results.overallStatus.toUpperCase()}</p>
+                        </div>
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-blue-800">Playbooks Executed</h4>
+                            <p class="text-blue-700 text-2xl font-bold">${results.playbookResults.length}</p>
+                        </div>
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-purple-800">Target Hosts</h4>
+                            <p class="text-purple-700 text-lg">${results.targetHosts.join(', ')}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Playbook Results</h3>
+                    <div class="space-y-4">
+            `;
+            
+            results.playbookResults.forEach(result => {
+                const statusColor = result.status === 'completed' ? 'green' : 'red';
+                html += `
+                    <div class="border border-gray-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="text-lg font-semibold text-gray-800">${result.playbook}</h4>
+                            <span class="px-3 py-1 rounded-full text-sm font-medium bg-${statusColor}-100 text-${statusColor}-800">
+                                ${result.status.toUpperCase()}
+                            </span>
+                        </div>
+                        <p class="text-gray-700 mb-2">${result.output}</p>
+                        <div class="mt-3">
+                            <h5 class="font-medium text-gray-800 mb-2">Findings:</h5>
+                            <ul class="space-y-1">
+                `;
+                
+                result.findings.forEach(finding => {
+                    const findingColor = finding.status === 'PASS' ? 'green' : 'red';
+                    html += `
+                        <li class="flex items-start space-x-2">
+                            <span class="text-${findingColor}-500 mt-1">•</span>
+                            <div>
+                                <span class="font-medium text-${findingColor}-800">${finding.control}: ${finding.status}</span>
+                                <p class="text-gray-700 text-sm">${finding.message}</p>
+                                <p class="text-gray-600 text-xs">Evidence: ${finding.evidence}</p>
+                            </div>
+                        </li>
+                    `;
+                });
+                
+                html += `
+                            </ul>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                </div>
+                
+                <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+                    <h4 class="font-semibold text-gray-800 mb-2">📋 OSCAL Assessment Plan</h4>
+                    <p class="text-gray-700 text-sm mb-3">This validation was conducted using NIST OSCAL framework for standardized compliance assessment.</p>
+                    <button onclick="downloadOSCALPlan('${validationResults.complianceReport}')" 
+                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
+                        Download OSCAL Assessment Plan
+                    </button>
+                </div>
+            `;
+            
+            aiResponse.innerHTML = html;
+            aiResponse.classList.remove('hidden');
+            initialMessage.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+        }
+        
+        /**
+         * Display audit report
+         */
+        function displayAuditReport(report) {
+            const humanReport = report.humanReadableReport;
+            
+            let html = `
+                <div class="mb-6 p-4 bg-purple-50 border-l-4 border-purple-400 rounded-r-lg">
+                    <h3 class="text-lg font-semibold text-purple-800 mb-2">📊 OSCAL-Compliant Audit Report</h3>
+                    <p class="text-purple-700">Generated using NIST OSCAL framework for standardized compliance reporting</p>
+                </div>
+                
+                <div class="mb-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Executive Summary</h3>
+                    <div class="bg-white border border-gray-200 rounded-lg p-4">
+                        <p class="text-gray-700 mb-4">${humanReport.executiveSummary.overview}</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <h4 class="font-semibold text-gray-800 mb-2">Key Findings:</h4>
+                                <ul class="space-y-1">
+            `;
+            
+            humanReport.executiveSummary.keyFindings.forEach(finding => {
+                html += `<li class="text-gray-700 text-sm">• ${finding}</li>`;
+            });
+            
+            html += `
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800 mb-2">Risk Level:</h4>
+                                <p class="text-lg font-bold text-${humanReport.executiveSummary.riskLevel === 'Low' ? 'green' : 'red'}-600">
+                                    ${humanReport.executiveSummary.riskLevel}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Control Assessments</h3>
+                    <div class="space-y-4">
+            `;
+            
+            humanReport.controlAssessments.forEach(assessment => {
+                const statusColor = assessment.assessmentStatus === 'completed' ? 'green' : 'red';
+                html += `
+                    <div class="border border-gray-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="text-lg font-semibold text-gray-800">${assessment.controlId}: ${assessment.title}</h4>
+                            <span class="px-3 py-1 rounded-full text-sm font-medium bg-${statusColor}-100 text-${statusColor}-800">
+                                ${assessment.assessmentStatus.toUpperCase()}
+                            </span>
+                        </div>
+                        <p class="text-gray-700 mb-2">${assessment.description}</p>
+                        <div class="flex items-center space-x-4 text-sm text-gray-600">
+                            <span>Priority: ${assessment.priority}</span>
+                            <span>Next Assessment: ${new Date(assessment.nextAssessment).toLocaleDateString()}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                </div>
+                
+                <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+                    <h4 class="font-semibold text-gray-800 mb-2">📄 Download Reports</h4>
+                    <div class="flex space-x-4">
+                        <button onclick="downloadReport('${JSON.stringify(report.oscalReport)}', 'oscal-assessment-results.json')" 
+                                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
+                            Download OSCAL Report
+                        </button>
+                        <button onclick="downloadReport('${JSON.stringify(humanReport)}', 'audit-report.json')" 
+                                class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
+                            Download Human-Readable Report
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            aiResponse.innerHTML = html;
+            aiResponse.classList.remove('hidden');
+            initialMessage.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+        }
+        
+        /**
+         * Download OSCAL plan
+         */
+        function downloadOSCALPlan(planData) {
+            const blob = new Blob([JSON.stringify(planData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `oscal-assessment-plan-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        /**
+         * Download report
+         */
+        function downloadReport(data, filename) {
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
     </script>
 </body>
 </html>

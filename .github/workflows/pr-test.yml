@@ -1,0 +1,107 @@
+name: Pull Request Tests
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: false
+        tags: grc-toolkit:pr-test
+        load: true
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Test container
+      run: |
+        # Start the container
+        docker run -d --name test-container -p 8080:8080 grc-toolkit:pr-test
+        
+        # Wait for container to be ready
+        sleep 10
+        
+        # Test health endpoint
+        curl -f http://localhost:8080/health || exit 1
+        
+        # Test main page loads
+        curl -f http://localhost:8080/ || exit 1
+        
+        # Test page content
+        curl -s http://localhost:8080/ | grep -q "GRC Toolkit AI Agent" || exit 1
+        
+        # Test security headers
+        curl -s -I http://localhost:8080/ | grep -q "X-Frame-Options" || exit 1
+        
+        # Clean up
+        docker stop test-container
+        docker rm test-container
+
+    - name: Security scan with Trivy
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'grc-toolkit:pr-test'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Check Trivy results exist
+      run: |
+        if [ -f trivy-results.sarif ]; then
+          echo "Trivy results found"
+        else
+          echo "No Trivy results found, creating empty file"
+          echo '{"version": "2.1.0", "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema.json", "runs": []}' > trivy-results.sarif
+        fi
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Validate Kubernetes manifests
+      run: |
+        # Install kubectl
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x kubectl
+        sudo mv kubectl /usr/local/bin/
+        
+        # Validate manifests
+        kubectl apply --dry-run=client -f k8s/namespace.yaml
+        kubectl apply --dry-run=client -f k8s/configmap.yaml
+        kubectl apply --dry-run=client -f k8s/deployment.yaml
+        kubectl apply --dry-run=client -f k8s/service.yaml
+        kubectl apply --dry-run=client -f k8s/ingress.yaml
+        kubectl apply --dry-run=client -f k8s/hpa.yaml
+
+    - name: Test deployment script syntax
+      run: |
+        bash -n scripts/deploy.sh
+        bash -n scripts/setup-gcp.sh
+        bash -n scripts/test-container.sh
+
+    - name: Check for security issues in scripts
+      run: |
+        # Check for hardcoded secrets or sensitive data
+        if grep -r "password\|secret\|key" scripts/ --include="*.sh" | grep -v "echo\|grep\|#"; then
+          echo "❌ Potential hardcoded secrets found in scripts"
+          exit 1
+        fi
+        
+        # Check for proper error handling
+        if ! grep -q "set -e" scripts/*.sh; then
+          echo "❌ Scripts should include 'set -e' for error handling"
+          exit 1
+        fi

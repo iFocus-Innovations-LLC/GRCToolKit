@@ -1,0 +1,121 @@
+---
+# Ansible Playbook: AC-6 Least Privilege
+# Validates that least privilege principle is implemented
+# Based on NIST 800-53 Rev. 5 Control AC-6
+
+- name: "AC-6: Least Privilege Validation"
+  hosts: all
+  become: yes
+  vars:
+    control_id: "AC-6"
+    control_title: "Least Privilege"
+    compliance_framework: "NIST 800-53 Rev. 5"
+    
+  tasks:
+    - name: "AC-6.1: Verify user account privileges"
+      block:
+        - name: "Check for unnecessary sudo privileges"
+          shell: "grep -E '^[^#]*NOPASSWD' /etc/sudoers"
+          register: nopasswd_sudoers
+          failed_when: false
+          
+        - name: "AC-6.1: WARN - NOPASSWD sudoers found"
+          debug:
+            msg: "NOPASSWD sudoers entries found - review for least privilege compliance"
+          when: nopasswd_sudoers.stdout != ""
+          
+        - name: "Check for users with excessive privileges"
+          shell: "awk -F: '$3==0 {print $1}' /etc/passwd"
+          register: root_users
+          
+        - name: "AC-6.1: FAIL - Multiple root users found"
+          fail:
+            msg: "Multiple root users found - AC-6.1 compliance failure"
+          when: root_users.stdout_lines | length > 1
+
+    - name: "AC-6.2: Verify service account privileges"
+      block:
+        - name: "Check for service accounts with shell access"
+          shell: "awk -F: '$3>=1000 && $7!="/bin/false" && $7!="/usr/sbin/nologin" {print $1}' /etc/passwd"
+          register: service_accounts_with_shell
+          
+        - name: "AC-6.2: WARN - Service accounts with shell access"
+          debug:
+            msg: "Service accounts with shell access found - review for least privilege"
+          when: service_accounts_with_shell.stdout != ""
+          
+        - name: "Verify service accounts have minimal permissions"
+          stat:
+            path: "/home/{{ item }}"
+          loop: "{{ service_accounts_with_shell.stdout_lines }}"
+          register: service_home_dirs
+          when: service_accounts_with_shell.stdout != ""
+
+    - name: "AC-6.3: Verify file and directory permissions"
+      block:
+        - name: "Check for world-writable files"
+          shell: "find / -type f -perm -002 2>/dev/null | head -20"
+          register: world_writable_files
+          failed_when: false
+          
+        - name: "AC-6.3: WARN - World-writable files found"
+          debug:
+            msg: "World-writable files found - review for security implications"
+          when: world_writable_files.stdout != ""
+          
+        - name: "Check for files with SUID/SGID bits"
+          shell: "find / -type f \\( -perm -4000 -o -perm -2000 \\) 2>/dev/null | head -20"
+          register: suid_sgid_files
+          failed_when: false
+          
+        - name: "AC-6.3: INFO - SUID/SGID files found"
+          debug:
+            msg: "SUID/SGID files found - verify necessity"
+          when: suid_sgid_files.stdout != ""
+
+    - name: "AC-6.4: Verify network service privileges"
+      block:
+        - name: "Check for services running as root"
+          shell: "ps aux | awk '$1==\"root\" && $11!~/\\[.*\\]/ {print $11}' | sort | uniq"
+          register: root_services
+          
+        - name: "AC-6.4: WARN - Services running as root"
+          debug:
+            msg: "Services running as root - consider privilege separation"
+          when: root_services.stdout != ""
+          
+        - name: "Check for unnecessary network services"
+          systemd:
+            name: "{{ item }}"
+            state: "stopped"
+            enabled: no
+          loop:
+            - "telnet"
+            - "rsh"
+            - "rlogin"
+            - "ftp"
+          register: unnecessary_services
+          failed_when: false
+
+    - name: "Generate AC-6 compliance report"
+      block:
+        - name: "Create compliance report directory"
+          file:
+            path: "/tmp/grc-compliance-reports"
+            state: "directory"
+            mode: "0755"
+            
+        - name: "Generate AC-6 compliance report"
+          template:
+            src: "ac-6-compliance-report.j2"
+            dest: "/tmp/grc-compliance-reports/ac-6-compliance-{{ ansible_date_time.epoch }}.json"
+            mode: "0644"
+          vars:
+            compliance_status: "{{ 'PASS' if not (root_users.stdout_lines | length > 1) else 'FAIL' }}"
+            validation_timestamp: "{{ ansible_date_time.iso8601 }}"
+            hostname: "{{ inventory_hostname }}"
+            findings:
+              nopasswd_sudoers: "{{ nopasswd_sudoers.stdout_lines }}"
+              world_writable_files: "{{ world_writable_files.stdout_lines }}"
+              suid_sgid_files: "{{ suid_sgid_files.stdout_lines }}"
+              root_services: "{{ root_services.stdout_lines }}"

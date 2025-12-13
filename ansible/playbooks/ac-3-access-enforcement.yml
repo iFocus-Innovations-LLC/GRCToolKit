@@ -1,0 +1,137 @@
+---
+# Ansible Playbook: AC-3 Access Enforcement
+# Validates that access control policies are properly enforced
+# Based on NIST 800-53 Rev. 5 Control AC-3
+
+- name: "AC-3: Access Enforcement Validation"
+  hosts: all
+  become: yes
+  vars:
+    control_id: "AC-3"
+    control_title: "Access Enforcement"
+    compliance_framework: "NIST 800-53 Rev. 5"
+    
+  tasks:
+    - name: "AC-3.1: Verify authentication mechanisms are in place"
+      block:
+        - name: "Check for authentication services"
+          systemd:
+            name: "{{ item }}"
+            state: "started"
+            enabled: yes
+          loop:
+            - "sshd"
+            - "pam"
+          register: auth_services
+          failed_when: auth_services.failed
+          
+        - name: "Verify PAM configuration exists"
+          stat:
+            path: "/etc/pam.d/system-auth"
+          register: pam_config
+          
+        - name: "AC-3.1: FAIL - PAM configuration missing"
+          fail:
+            msg: "PAM configuration not found - AC-3.1 compliance failure"
+          when: not pam_config.stat.exists
+          
+      rescue:
+        - name: "AC-3.1: FAIL - Authentication services not running"
+          fail:
+            msg: "Required authentication services not running - AC-3.1 compliance failure"
+
+    - name: "AC-3.2: Verify access control lists (ACLs) are configured"
+      block:
+        - name: "Check for ACL support on critical directories"
+          stat:
+            path: "{{ item }}"
+          loop:
+            - "/etc"
+            - "/var/log"
+            - "/home"
+          register: critical_dirs
+          
+        - name: "Verify ACL permissions on critical files"
+          acl:
+            path: "{{ item }}"
+            state: "present"
+          loop:
+            - "/etc/passwd"
+            - "/etc/shadow"
+            - "/etc/group"
+          register: acl_permissions
+          
+        - name: "AC-3.2: FAIL - ACL configuration issues"
+          fail:
+            msg: "ACL configuration not properly set - AC-3.2 compliance failure"
+          when: acl_permissions.failed
+          
+      rescue:
+        - name: "AC-3.2: WARN - ACL validation failed"
+          debug:
+            msg: "ACL validation encountered issues but continuing"
+
+    - name: "AC-3.3: Verify role-based access control (RBAC)"
+      block:
+        - name: "Check for sudo configuration"
+          stat:
+            path: "/etc/sudoers"
+          register: sudoers_config
+          
+        - name: "Verify sudoers file permissions"
+          file:
+            path: "/etc/sudoers"
+            mode: "0440"
+            owner: "root"
+            group: "root"
+          register: sudoers_perms
+          
+        - name: "AC-3.3: FAIL - Sudoers configuration invalid"
+          fail:
+            msg: "Sudoers configuration does not meet AC-3.3 requirements"
+          when: not sudoers_config.stat.exists or sudoers_perms.failed
+
+    - name: "AC-3.4: Verify access logging is enabled"
+      block:
+        - name: "Check auditd service status"
+          systemd:
+            name: "auditd"
+            state: "started"
+            enabled: yes
+          register: auditd_status
+          
+        - name: "Verify audit rules are configured"
+          stat:
+            path: "/etc/audit/rules.d/audit.rules"
+          register: audit_rules
+          
+        - name: "AC-3.4: FAIL - Access logging not properly configured"
+          fail:
+            msg: "Audit logging not enabled - AC-3.4 compliance failure"
+          when: auditd_status.failed or not audit_rules.stat.exists
+
+    - name: "Generate AC-3 compliance report"
+      block:
+        - name: "Create compliance report directory"
+          file:
+            path: "/tmp/grc-compliance-reports"
+            state: "directory"
+            mode: "0755"
+            
+        - name: "Generate AC-3 compliance report"
+          template:
+            src: "ac-3-compliance-report.j2"
+            dest: "/tmp/grc-compliance-reports/ac-3-compliance-{{ ansible_date_time.epoch }}.json"
+            mode: "0644"
+          vars:
+            compliance_status: "{{ 'PASS' if not (auth_services.failed or acl_permissions.failed or sudoers_perms.failed or auditd_status.failed) else 'FAIL' }}"
+            validation_timestamp: "{{ ansible_date_time.iso8601 }}"
+            hostname: "{{ inventory_hostname }}"
+            
+  handlers:
+    - name: "Notify compliance team"
+      mail:
+        to: "{{ compliance_notification_email | default('compliance@company.com') }}"
+        subject: "AC-3 Compliance Validation - {{ inventory_hostname }}"
+        body: "AC-3 Access Enforcement validation completed. Status: {{ compliance_status }}"
+      when: compliance_notification_email is defined

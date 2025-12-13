@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grc-toolkit-ingress
+  namespace: grc-toolkit
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "grc-toolkit-ip"
+    networking.gke.io/managed-certificates: "grc-toolkit-ssl-cert"
+    kubernetes.io/ingress.allow-http: "false"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  rules:
+  - host: grc-toolkit.yourdomain.com  # Replace with your actual domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grc-toolkit-service
+            port:
+              number: 80
+  tls:
+  - hosts:
+    - grc-toolkit.yourdomain.com  # Replace with your actual domain
+    secretName: grc-toolkit-tls
