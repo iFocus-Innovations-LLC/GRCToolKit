@@ -1,0 +1,92 @@
+---
+# Deploy ML-KEM (FIPS 203) Playbook
+# Implements Module-Lattice-Based Key-Encapsulation Mechanism
+# Part of GRCToolKit PQC Migration Framework
+
+- name: Deploy ML-KEM (FIPS 203) for PQC Migration
+  hosts: all
+  become: yes
+  vars:
+    control_id: "SC-12"
+    control_title: "Cryptographic Key Establishment and Management"
+    fips_standard: "FIPS-203"
+    pqc_algorithm: "ML-KEM"
+    pqc_migration: true
+    
+  tasks:
+    - name: Check System Requirements
+      shell: |
+        uname -a
+        openssl version 2>/dev/null || echo "OpenSSL not found"
+      register: system_info
+      changed_when: false
+      
+    - name: Verify PQC Library Availability
+      shell: |
+        # Check for PQC libraries (in production, this would check actual PQC libraries)
+        echo "Checking for PQC support..."
+        if command -v openssl >/dev/null 2>&1; then
+          openssl version
+        fi
+      register: pqc_lib_check
+      changed_when: false
+      
+    - name: Create PQC Configuration Directory
+      file:
+        path: /etc/pqc
+        state: directory
+        mode: '0755'
+        
+    - name: Generate ML-KEM Configuration
+      copy:
+        content: |
+          # ML-KEM (FIPS 203) Configuration
+          # Module-Lattice-Based Key-Encapsulation Mechanism
+          
+          algorithm: ML-KEM
+          standard: FIPS-203
+          key_size: 768  # ML-KEM-768
+          quantum_resistant: true
+          deployment_date: "{{ ansible_date_time.iso8601 }}"
+          migration_status: "in_progress"
+        dest: /etc/pqc/mlkem.conf
+        mode: '0644'
+        
+    - name: Validate ML-KEM Configuration
+      command: cat /etc/pqc/mlkem.conf
+      register: mlkem_config
+      changed_when: false
+      
+    - name: Display Deployment Status
+      debug:
+        msg:
+          - "ML-KEM (FIPS 203) Deployment Initiated"
+          - "Host: {{ inventory_hostname }}"
+          - "Standard: {{ fips_standard }}"
+          - "Algorithm: {{ pqc_algorithm }}"
+          - "Configuration: /etc/pqc/mlkem.conf"
+          - "Status: Configuration created (simulated deployment)"
+          
+    - name: Save Deployment Report
+      copy:
+        content: |
+          {
+            "deployment": {
+              "hostname": "{{ inventory_hostname }}",
+              "timestamp": "{{ ansible_date_time.iso8601 }}",
+              "algorithm": "{{ pqc_algorithm }}",
+              "standard": "{{ fips_standard }}",
+              "status": "configured",
+              "configuration_path": "/etc/pqc/mlkem.conf",
+              "next_steps": [
+                "Install PQC libraries",
+                "Update application configurations",
+                "Test ML-KEM implementation",
+                "Validate quantum resistance"
+              ]
+            }
+          }
+        dest: "/tmp/pqc-deploy-mlkem-{{ inventory_hostname }}.json"
+        mode: '0644'
+
+
