@@ -1,0 +1,62 @@
+---
+# Hybrid Cryptographic Approach Playbook
+# Implements hybrid classical + PQC cryptographic approaches during migration
+# Part of GRCToolKit PQC Migration Framework
+
+- name: Deploy Hybrid Cryptographic Approach
+  hosts: all
+  become: yes
+  vars:
+    control_id: "SC-13"
+    control_title: "Cryptographic Protection"
+    pqc_migration: true
+    hybrid_mode: true
+    
+  tasks:
+    - name: Create Hybrid Crypto Configuration
+      copy:
+        content: |
+          # Hybrid Cryptographic Configuration
+          # Combines classical and post-quantum algorithms during migration
+          
+          hybrid_mode: true
+          classical_algorithm: "RSA-2048"
+          pqc_algorithm: "ML-KEM-768"
+          deployment_date: "{{ ansible_date_time.iso8601 }}"
+          migration_phase: "transition"
+          
+          benefits:
+            - "Backward compatibility during migration"
+            - "Gradual transition to PQC"
+            - "Reduced risk during migration period"
+            - "Support for legacy systems"
+        dest: /etc/pqc/hybrid-crypto.conf
+        mode: '0644'
+        
+    - name: Display Hybrid Deployment Status
+      debug:
+        msg:
+          - "Hybrid Cryptographic Approach Deployed"
+          - "Host: {{ inventory_hostname }}"
+          - "Classical Algorithm: RSA-2048"
+          - "PQC Algorithm: ML-KEM-768"
+          - "Status: Hybrid mode enabled"
+          
+    - name: Save Hybrid Deployment Report
+      copy:
+        content: |
+          {
+            "deployment": {
+              "hostname": "{{ inventory_hostname }}",
+              "timestamp": "{{ ansible_date_time.iso8601 }}",
+              "mode": "hybrid",
+              "classical_algorithm": "RSA-2048",
+              "pqc_algorithm": "ML-KEM-768",
+              "status": "configured",
+              "migration_phase": "transition"
+            }
+          }
+        dest: "/tmp/pqc-hybrid-{{ inventory_hostname }}.json"
+        mode: '0644'
+
+

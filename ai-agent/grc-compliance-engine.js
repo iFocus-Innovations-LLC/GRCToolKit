@@ -49,6 +49,7 @@ class GRCComplianceEngine {
      * Load available Ansible playbooks
      */
     async loadAnsiblePlaybooks() {
+        // Standard GRC playbooks
         const playbooks = [
             'ac-3-access-enforcement',
             'ac-6-least-privilege',
@@ -61,6 +62,26 @@ class GRCComplianceEngine {
                 name: playbook,
                 path: `/ansible/playbooks/${playbook}.yml`,
                 controls: this.extractControlsFromPlaybook(playbook)
+            });
+        }
+
+        // PQC-specific playbooks
+        const pqcPlaybooks = [
+            'pqc/inventory',
+            'pqc/assess',
+            'pqc/deploy-mlkem',
+            'pqc/deploy-mldsa',
+            'pqc/deploy-slhdsa',
+            'pqc/hybrid-crypto',
+            'pqc/validate'
+        ];
+
+        for (const playbook of pqcPlaybooks) {
+            const playbookName = playbook.replace('pqc/', '');
+            this.ansiblePlaybooks.set(playbook, {
+                name: playbook,
+                path: `/ansible/playbooks/${playbook}.yml`,
+                controls: this.extractPQCControlsFromPlaybook(playbookName)
             });
         }
     }
@@ -91,6 +112,19 @@ class GRCComplianceEngine {
             keywords: ['data', 'encryption', 'privacy', 'sensitive', 'confidential'],
             controls: ['SC-28', 'SC-29', 'SC-30', 'SC-31'],
             playbooks: ['sc-28-data-protection']
+        });
+
+        // PQC-specific scenario mappings
+        this.scenarioMappings.set('pqc_migration', {
+            keywords: ['post-quantum', 'quantum', 'pqc', 'cryptography', 'cryptographic', 'migration', 'fips 203', 'fips 204', 'fips 205', 'ml-kem', 'ml-dsa', 'slh-dsa', 'rsa', 'ecc', 'elliptic curve', 'harvest now decrypt later'],
+            controls: ['SC-12', 'SC-13', 'SC-17', 'SC-28'],
+            playbooks: ['pqc/inventory', 'pqc/assess', 'pqc/deploy-mlkem', 'pqc/deploy-mldsa', 'pqc/deploy-slhdsa']
+        });
+
+        this.scenarioMappings.set('quantum_risk', {
+            keywords: ['quantum risk', 'quantum threat', 'quantum computing', 'quantum vulnerability', 'quantum resistant', 'quantum safe'],
+            controls: ['SC-12', 'SC-13', 'SC-17'],
+            playbooks: ['pqc/assess', 'pqc/validate']
         });
     }
 
@@ -441,7 +475,15 @@ class GRCComplianceEngine {
             'ac-3-access-enforcement': 3,
             'ac-6-least-privilege': 5,
             'au-2-audit-events': 2,
-            'sc-7-boundary-protection': 4
+            'sc-7-boundary-protection': 4,
+            // PQC playbook runtime estimates
+            'pqc/inventory': 5,
+            'pqc/assess': 3,
+            'pqc/deploy-mlkem': 10,
+            'pqc/deploy-mldsa': 10,
+            'pqc/deploy-slhdsa': 10,
+            'pqc/hybrid-crypto': 8,
+            'pqc/validate': 5
         };
         return runtimeMap[playbookName] || 5;
     }
@@ -466,6 +508,24 @@ class GRCComplianceEngine {
             return [parts[0].toUpperCase() + '-' + parts[1]];
         }
         return [];
+    }
+
+    /**
+     * Extract PQC controls from playbook name
+     */
+    extractPQCControlsFromPlaybook(playbookName) {
+        // Map PQC playbooks to their associated NIST controls
+        const pqcControlMap = {
+            'inventory': ['SC-12', 'SC-13'],
+            'assess': ['SC-12', 'SC-13', 'SC-17'],
+            'deploy-mlkem': ['SC-12', 'SC-13'],
+            'deploy-mldsa': ['SC-17', 'SI-7'],
+            'deploy-slhdsa': ['SC-17', 'SI-7'],
+            'hybrid-crypto': ['SC-12', 'SC-13'],
+            'validate': ['SC-13', 'CA-7']
+        };
+        
+        return pqcControlMap[playbookName] || [];
     }
 }
 

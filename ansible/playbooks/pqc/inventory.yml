@@ -1,0 +1,98 @@
+---
+# PQC Cryptographic Asset Inventory Playbook
+# Discovers and catalogs cryptographic implementations across infrastructure
+# Part of GRCToolKit PQC Migration Framework
+
+- name: Discover Cryptographic Assets for PQC Migration
+  hosts: all
+  become: yes
+  vars:
+    control_id: "SC-12"
+    control_title: "Cryptographic Key Establishment and Management"
+    pqc_migration: true
+    
+  tasks:
+    - name: Discover TLS/SSL Certificates
+      shell: |
+        find /etc/ssl /etc/pki -name "*.crt" -o -name "*.pem" 2>/dev/null | head -20
+      register: tls_certificates
+      changed_when: false
+      
+    - name: Discover SSH Keys
+      shell: |
+        find /etc/ssh /root/.ssh /home/*/.ssh -name "*.pub" -o -name "id_*" 2>/dev/null | head -20
+      register: ssh_keys
+      changed_when: false
+      
+    - name: Check OpenSSL Configuration
+      shell: |
+        openssl version -a 2>/dev/null || echo "OpenSSL not found"
+      register: openssl_info
+      changed_when: false
+      
+    - name: Discover Certificate Stores
+      shell: |
+        find /usr/share/ca-certificates /etc/ssl/certs -type f 2>/dev/null | wc -l
+      register: cert_store_count
+      changed_when: false
+      
+    - name: Check Cryptographic Libraries
+      shell: |
+        for lib in libssl libcrypto libgnutls; do
+          find /usr/lib* /lib* -name "${lib}*" 2>/dev/null | head -5
+        done
+      register: crypto_libraries
+      changed_when: false
+      
+    - name: Analyze TLS Configuration
+      shell: |
+        if command -v openssl >/dev/null 2>&1; then
+          openssl ciphers -v 2>/dev/null | grep -E "(RSA|ECDSA|DSA)" | head -10
+        else
+          echo "OpenSSL not available"
+        fi
+      register: tls_ciphers
+      changed_when: false
+      
+    - name: Generate Asset Inventory Report
+      set_fact:
+        asset_inventory:
+          hostname: "{{ inventory_hostname }}"
+          timestamp: "{{ ansible_date_time.iso8601 }}"
+          tls_certificates: "{{ tls_certificates.stdout_lines | default([]) }}"
+          ssh_keys: "{{ ssh_keys.stdout_lines | default([]) }}"
+          openssl_version: "{{ openssl_info.stdout | default('Unknown') }}"
+          certificate_stores: "{{ cert_store_count.stdout | default('0') }}"
+          crypto_libraries: "{{ crypto_libraries.stdout_lines | default([]) }}"
+          tls_ciphers: "{{ tls_ciphers.stdout_lines | default([]) }}"
+          
+    - name: Display Inventory Summary
+      debug:
+        msg:
+          - "PQC Asset Inventory Complete"
+          - "Host: {{ inventory_hostname }}"
+          - "TLS Certificates Found: {{ tls_certificates.stdout_lines | length | default(0) }}"
+          - "SSH Keys Found: {{ ssh_keys.stdout_lines | length | default(0) }}"
+          - "OpenSSL Version: {{ openssl_info.stdout | default('Unknown') }}"
+          
+    - name: Save Inventory to File
+      copy:
+        content: |
+          {
+            "inventory": {
+              "hostname": "{{ inventory_hostname }}",
+              "timestamp": "{{ ansible_date_time.iso8601 }}",
+              "assets": {
+                "tls_certificates": {{ tls_certificates.stdout_lines | default([]) | to_json }},
+                "ssh_keys": {{ ssh_keys.stdout_lines | default([]) | to_json }},
+                "openssl_version": "{{ openssl_info.stdout | default('Unknown') }}",
+                "certificate_stores": {{ cert_store_count.stdout | default('0') }},
+                "crypto_libraries": {{ crypto_libraries.stdout_lines | default([]) | to_json }},
+                "tls_ciphers": {{ tls_ciphers.stdout_lines | default([]) | to_json }}
+              }
+            }
+          }
+        dest: "/tmp/pqc-inventory-{{ inventory_hostname }}.json"
+        mode: '0644'
+
+

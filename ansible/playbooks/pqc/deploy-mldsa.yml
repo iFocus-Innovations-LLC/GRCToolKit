@@ -1,0 +1,95 @@
+---
+# Deploy ML-DSA (FIPS 204) Playbook
+# Implements Module-Lattice-Based Digital Signature Algorithm
+# Part of GRCToolKit PQC Migration Framework
+
+- name: Deploy ML-DSA (FIPS 204) for PQC Migration
+  hosts: all
+  become: yes
+  vars:
+    control_id: "SC-17"
+    control_title: "Public Key Infrastructure Certificates"
+    fips_standard: "FIPS-204"
+    pqc_algorithm: "ML-DSA"
+    pqc_migration: true
+    
+  tasks:
+    - name: Check System Requirements
+      shell: |
+        uname -a
+        openssl version 2>/dev/null || echo "OpenSSL not found"
+      register: system_info
+      changed_when: false
+      
+    - name: Verify PQC Library Availability
+      shell: |
+        echo "Checking for PQC signature support..."
+        if command -v openssl >/dev/null 2>&1; then
+          openssl version
+        fi
+      register: pqc_lib_check
+      changed_when: false
+      
+    - name: Create PQC Configuration Directory
+      file:
+        path: /etc/pqc
+        state: directory
+        mode: '0755'
+        
+    - name: Generate ML-DSA Configuration
+      copy:
+        content: |
+          # ML-DSA (FIPS 204) Configuration
+          # Module-Lattice-Based Digital Signature Algorithm
+          
+          algorithm: ML-DSA
+          standard: FIPS-204
+          key_size: 44  # ML-DSA-44
+          quantum_resistant: true
+          deployment_date: "{{ ansible_date_time.iso8601 }}"
+          migration_status: "in_progress"
+          use_cases:
+            - "Code signing"
+            - "Certificate signing"
+            - "Document signing"
+        dest: /etc/pqc/mldsa.conf
+        mode: '0644'
+        
+    - name: Validate ML-DSA Configuration
+      command: cat /etc/pqc/mldsa.conf
+      register: mldsa_config
+      changed_when: false
+      
+    - name: Display Deployment Status
+      debug:
+        msg:
+          - "ML-DSA (FIPS 204) Deployment Initiated"
+          - "Host: {{ inventory_hostname }}"
+          - "Standard: {{ fips_standard }}"
+          - "Algorithm: {{ pqc_algorithm }}"
+          - "Configuration: /etc/pqc/mldsa.conf"
+          - "Status: Configuration created (simulated deployment)"
+          
+    - name: Save Deployment Report
+      copy:
+        content: |
+          {
+            "deployment": {
+              "hostname": "{{ inventory_hostname }}",
+              "timestamp": "{{ ansible_date_time.iso8601 }}",
+              "algorithm": "{{ pqc_algorithm }}",
+              "standard": "{{ fips_standard }}",
+              "status": "configured",
+              "configuration_path": "/etc/pqc/mldsa.conf",
+              "next_steps": [
+                "Install PQC signature libraries",
+                "Update PKI configurations",
+                "Test ML-DSA signatures",
+                "Validate quantum resistance"
+              ]
+            }
+          }
+        dest: "/tmp/pqc-deploy-mldsa-{{ inventory_hostname }}.json"
+        mode: '0644'
+
+

@@ -1,6 +1,11 @@
 # Use nginx as the base image for serving static files
 FROM nginx:alpine
 
+# Set version label
+LABEL version="2.0.0-dev" \
+      maintainer="iFocus Innovations LLC" \
+      description="GRC Toolkit with OSCAL and PQC Migration Features"
+
 # Set working directory
 WORKDIR /usr/share/nginx/html
 
