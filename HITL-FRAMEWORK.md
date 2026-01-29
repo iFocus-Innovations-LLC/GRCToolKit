@@ -10,6 +10,38 @@ This document outlines the Human-in-the-Loop (HITL) framework integration for GR
 
 ---
 
+## 🧭 Research Synthesis: HITL Guardrails (LinkedIn Article)
+
+This section incorporates the core themes from the HITL guardrail article to ground the framework in public-sector PQC defense realities.
+
+### 1. Sentinel Architecture: HITL as the Gatekeeper
+- **Sovereign Authority**: HITL is the final authority over AI optimization in high-stakes environments.
+- **Policy Anchor**: Human oversight defines the "Threshold of Necessity" where systems must halt to prevent breaches.
+- **Context Filter**: Humans interpret intent behind anomalies (e.g., NTT power spikes vs. SCA attempts).
+
+### 2. Purple Team Shield Against AI Swarms
+- **Oracle Anomaly Detection**: A monitoring AI flags "algorithmic drift" across encryption modules.
+- **Gatekeeper Kill-Switch**: Drift triggers a deterministic state with manual override for key issuance.
+- **Low-and-Slow Defense**: HITL emphasizes detection of stealthy metadata exfiltration patterns.
+
+### 3. Telemetry-Driven Integrity Check (TDIC)
+- **Phase 1: Metadata Harvest**
+  - **Latency Jitter**: Detects timing anomalies in ML-KEM encapsulation.
+  - **Entropy Variance**: Flags RNG degradation or manipulation.
+- **Phase 2: HITL Validation**
+  - **Risk Heatmap**: AI summarizes telemetry for human decision-making.
+  - **Human Action Options**: isolate node, rotate to code-based backup (e.g., HQC), or deploy honey-lattices.
+
+### 4. "Shields Up" Mathematical Guardrail
+- **Failure-to-Safety Coefficient**: Ensures the system defaults to safe shutdown over risky optimization.
+
+### 5. Honey-Lattice Strategy
+- **Contextual Cipher Swap**: HITL sentinel deploys synthetic keys to misdirect adversaries.
+- **Resource Sink**: Adversaries expend compute on decoy LWE problems.
+- **Telemetry Harvesting**: Defender learns adversary behavior and algorithmic fingerprints.
+
+---
+
 ## 🎯 HITL Framework Objectives
 
 ### Core Principles
@@ -372,6 +404,13 @@ calculateConfidenceScore(analysis) {
 - [ ] Personalized confidence thresholds
 - [ ] Advanced analytics and reporting
 - [ ] Enterprise-grade review workflows
+
+---
+
+## ✅ QA Alignment
+
+- **QA Guide**: HITL guardrails tests are captured in `QA-TESTING-GUIDE.md` (Section 5).
+- **Roadmap**: Guardrails implementation aligns with Phase 1 AI Guardrails Foundation in `ROADMAP.md`.
 
 ---
 
