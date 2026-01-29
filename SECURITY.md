@@ -92,6 +92,12 @@ Dockerfile              # Updated to use startup script
 - Temporary file cleanup on exit
 - Kubernetes termination grace period
 
+### 5. Secure Coding Rules (Version Hygiene)
+- **Pin base images and runners**: Use specific versions (e.g., `ubuntu-24.04`, `nginx:alpine`) instead of floating tags.
+- **Track CVE exposure**: Run container scans on every PR and on a scheduled cadence.
+- **Stay ahead of industry**: Prefer newest stable LTS/patch releases unless blocked by compatibility.
+- **No unpinned dependencies**: Avoid `latest` or wildcard dependency versions in build/test tooling.
+
 ## 🔍 Verification
 
 ### Check Secret Status
@@ -121,6 +127,12 @@ docker run -d -p 8080:8080 -e GEMINI_API_KEY="test-key" --name test-container gr
 docker stop test-container
 docker logs test-container
 # Should show graceful shutdown messages
+```
+
+### Verify CI runner pinning
+```bash
+# Confirm pinned runners in workflows
+grep -R "runs-on: ubuntu-" .github/workflows
 ```
 
 ## 🛡️ Security Considerations
