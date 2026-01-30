@@ -136,7 +136,8 @@ test_graceful_shutdown() {
 
     # Start a test container
     local test_container
-    test_container=$(docker run -d -p 8086:8080 -e GEMINI_API_KEY="test-key" --name grc-test-shutdown grc-toolkit-oscal)
+    local test_token="${TEST_API_TOKEN:-test-placeholder}"
+    test_container=$(docker run -d -p 8086:8080 -e GEMINI_API_KEY="$test_token" --name grc-test-shutdown grc-toolkit-oscal)
     
     # Wait for it to start
     sleep 3

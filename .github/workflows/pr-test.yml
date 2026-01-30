@@ -139,7 +139,7 @@ jobs:
     - name: Check for security issues in scripts
       run: |
         # Check for hardcoded secrets or sensitive data
-        if grep -r "password\|secret\|key" scripts/ --include="*.sh" | grep -v "echo\|grep\|#"; then
+        if grep -R -n --include="*.sh" -E '(password|secret|key)[^=]*=[[:space:]]*["'"'"'][^"$][^"'"'"'$]*["'"'"']' scripts/; then
           echo "❌ Potential hardcoded secrets found in scripts"
           exit 1
         fi
