@@ -118,12 +118,12 @@ jobs:
         sudo mv kubectl /usr/local/bin/
         
         # Validate manifests
-        kubectl apply --dry-run=client --validate=false --kubeconfig="$KUBECONFIG" -f k8s/namespace.yaml
-        kubectl apply --dry-run=client --validate=false --kubeconfig="$KUBECONFIG" -f k8s/configmap.yaml
-        kubectl apply --dry-run=client --validate=false --kubeconfig="$KUBECONFIG" -f k8s/deployment.yaml
-        kubectl apply --dry-run=client --validate=false --kubeconfig="$KUBECONFIG" -f k8s/service.yaml
-        kubectl apply --dry-run=client --validate=false --kubeconfig="$KUBECONFIG" -f k8s/ingress.yaml
-        kubectl apply --dry-run=client --validate=false --kubeconfig="$KUBECONFIG" -f k8s/hpa.yaml
+        kubectl create --dry-run=client --validate=false --kubeconfig="$KUBECONFIG" -o yaml -f k8s/namespace.yaml >/dev/null
+        kubectl create --dry-run=client --validate=false --kubeconfig="$KUBECONFIG" -o yaml -f k8s/configmap.yaml >/dev/null
+        kubectl create --dry-run=client --validate=false --kubeconfig="$KUBECONFIG" -o yaml -f k8s/deployment.yaml >/dev/null
+        kubectl create --dry-run=client --validate=false --kubeconfig="$KUBECONFIG" -o yaml -f k8s/service.yaml >/dev/null
+        kubectl create --dry-run=client --validate=false --kubeconfig="$KUBECONFIG" -o yaml -f k8s/ingress.yaml >/dev/null
+        kubectl create --dry-run=client --validate=false --kubeconfig="$KUBECONFIG" -o yaml -f k8s/hpa.yaml >/dev/null
 
     - name: Test deployment script syntax
       run: |
