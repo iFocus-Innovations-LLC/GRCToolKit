@@ -16,6 +16,8 @@ env:
 jobs:
   test:
     runs-on: ubuntu-24.04
+    env:
+      DOCKER_SCOUT_TOKEN: ${{ secrets.DOCKER_SCOUT_TOKEN }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -62,6 +64,7 @@ jobs:
         docker rm test-container
 
     - name: Docker Scout image scan
+      if: ${{ env.DOCKER_SCOUT_TOKEN != '' }}
       uses: docker/scout-action@v1
       with:
         command: cves
@@ -70,6 +73,12 @@ jobs:
         format: sarif
         output: docker-scout.sarif
         exit-code: 1
+
+    - name: Ensure Docker Scout results exist
+      if: ${{ env.DOCKER_SCOUT_TOKEN == '' }}
+      run: |
+        echo "Docker Scout token not configured; skipping scan."
+        echo '{"version":"2.1.0","$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema.json","runs":[]}' > docker-scout.sarif
 
     - name: Security scan with Trivy
       uses: aquasecurity/trivy-action@master
@@ -88,10 +97,16 @@ jobs:
         fi
 
     - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v3
-      if: always()
+      uses: github/codeql-action/upload-sarif@v4
+      if: always() && hashFiles('trivy-results.sarif') != ''
       with:
         sarif_file: 'trivy-results.sarif'
+
+    - name: Upload Docker Scout results
+      uses: github/codeql-action/upload-sarif@v4
+      if: always() && hashFiles('docker-scout.sarif') != ''
+      with:
+        sarif_file: 'docker-scout.sarif'
 
     - name: Upload Docker Scout results
       uses: github/codeql-action/upload-sarif@v3
