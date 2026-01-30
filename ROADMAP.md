@@ -35,18 +35,7 @@ GRCToolKit is evolving into a comprehensive Post-Quantum Cryptography (PQC) migr
 
 ## Planned Enhancements (Core Platform)
 
-### 1. AI Guardrails & HITL Framework
-- **Objective**: Ensure human authority and safe operation under adversarial conditions
-- **Features**:
-  - Sentinel architecture for policy anchoring and context filtering
-  - Confidence gating with tiered review (automated / review / guided)
-  - Oracle anomaly detection for algorithmic drift
-  - Telemetry-Driven Integrity Checks (latency jitter, entropy variance)
-  - Deterministic state and kill-switch for key issuance
-  - Honey-lattice deception and telemetry harvesting
-  - Failure-to-safety coefficient for safe shutdown
-
-### 2. Refine AI Prompting
+### 1. Refine AI Prompting
 - **Objective**: More detailed prompts for precise responses
 - **Features**:
   - Enhanced prompt templates with CSF 2.0 mappings
@@ -54,7 +43,7 @@ GRCToolKit is evolving into a comprehensive Post-Quantum Cryptography (PQC) migr
   - Multi-turn conversation support
   - Domain-specific knowledge injection
 
-### 3. Structured Output with JSON Schema
+### 2. Structured Output with JSON Schema
 - **Objective**: Consistent, parseable AI responses
 - **Features**:
   - JSON schema validation for AI responses
@@ -62,7 +51,7 @@ GRCToolKit is evolving into a comprehensive Post-Quantum Cryptography (PQC) migr
   - CSF 2.0 mapping integration
   - Error handling and fallback mechanisms
 
-### 4. Actual GRC Data Integration
+### 3. Actual GRC Data Integration
 - **Objective**: Database-backed control mapping
 - **Features**:
   - Firestore integration for NIST 800-53 data
@@ -70,7 +59,7 @@ GRCToolKit is evolving into a comprehensive Post-Quantum Cryptography (PQC) migr
   - Real-time control catalog updates
   - Offline capability with local caching
 
-### 5. User Authentication & Data Persistence
+### 4. User Authentication & Data Persistence
 - **Objective**: Multi-user support with data persistence
 - **Features**:
   - Firebase Authentication integration
@@ -78,7 +67,7 @@ GRCToolKit is evolving into a comprehensive Post-Quantum Cryptography (PQC) migr
   - User preferences and saved scenarios
   - Audit trail for compliance activities
 
-### 6. Advanced UI Features
+### 5. Advanced UI Features
 - **Objective**: Enhanced user experience
 - **Features**:
   - Advanced filtering and sorting
@@ -87,7 +76,7 @@ GRCToolKit is evolving into a comprehensive Post-Quantum Cryptography (PQC) migr
   - Interactive compliance dashboards
   - Real-time collaboration features
 
-### 7. Backend AI Logic
+### 6. Backend AI Logic
 - **Objective**: Sophisticated AI capabilities
 - **Features**:
   - Fine-tuned models for GRC scenarios
@@ -95,7 +84,7 @@ GRCToolKit is evolving into a comprehensive Post-Quantum Cryptography (PQC) migr
   - Integration with other GRC tools
   - Custom model training capabilities
 
-### 8. Integration with Other GRC Tools
+### 7. Integration with Other GRC Tools
 - **Objective**: Ecosystem connectivity
 - **Features**:
   - RESTful APIs for external integrations
@@ -122,15 +111,6 @@ GRCToolKit's existing capabilities provide an ideal foundation for PQC migration
 ## MVP Development Priorities
 
 ### Phase 1: Core PQC Capabilities (Q1 2026)
-
-#### 1.0 AI Guardrails Foundation
-- **Objective**: Implement HITL guardrails for PQC and AI swarm defense
-- **Features**:
-  - Sentinel policy anchor and context filter
-  - Oracle anomaly detection for drift
-  - TDIC telemetry pipeline for PQC modules
-  - Deterministic state and manual override workflows
-  - Honey-lattice deployment playbook (deception strategy)
 
 #### 1.1 PQC Scenario Analysis Module
 - **Objective**: Extend AI agent to recognize PQC migration scenarios

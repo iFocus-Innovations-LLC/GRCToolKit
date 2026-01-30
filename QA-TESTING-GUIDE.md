@@ -8,8 +8,6 @@ This guide provides comprehensive testing procedures for GRCToolKit v2.0.0-dev i
 **Testing Date**: _________________  
 **Tester**: _________________  
 
-**Guardrails Alignment**: HITL guardrails tests align with `HITL-FRAMEWORK.md` and the Phase 1 AI Guardrails Foundation in `ROADMAP.md`.
-
 ---
 
 ## Pre-Testing Checklist
@@ -252,94 +250,7 @@ curl http://EXTERNAL_IP/health
 
 ---
 
-### 5. HITL Guardrails Tests (Phase 1 Foundation)
-
-#### Test 5.1: Confidence Gating (Tier Routing)
-**Objective**: Verify tier routing based on confidence thresholds
-
-**Steps**:
-1. Submit a standard scenario expected to be high confidence
-2. Submit a complex or ambiguous scenario expected to be medium confidence
-3. Submit a high-risk scenario expected to be low confidence
-
-**Expected Results**:
-- ✅ Tier 1: Automated path for high confidence (>90%)
-- ✅ Tier 2: Human review required for medium confidence (70-90%)
-- ✅ Tier 3: Human-guided flow for low confidence (<70%)
-
-**Status**: ⬜ Pass / ⬜ Fail / ⬜ N/A  
-**Notes**: _________________
-
----
-
-#### Test 5.2: Human Review Workflow
-**Objective**: Verify review panel and approval workflow
-
-**Steps**:
-1. Trigger a medium-confidence scenario
-2. Open human review panel
-3. Approve, reject, and modify at least one control
-
-**Expected Results**:
-- ✅ Review panel appears with confidence score
-- ✅ Approve/reject/modify actions recorded
-- ✅ Feedback field captured
-
-**Status**: ⬜ Pass / ⬜ Fail / ⬜ N/A  
-**Notes**: _________________
-
----
-
-#### Test 5.3: Oracle Drift Detection (TDIC)
-**Objective**: Validate anomaly detection for algorithmic drift
-
-**Steps**:
-1. Simulate telemetry anomaly (latency jitter or entropy variance)
-2. Verify anomaly is flagged in UI/logs
-
-**Expected Results**:
-- ✅ Drift flagged and escalated
-- ✅ Tactical snapshot created for human review
-
-**Status**: ⬜ Pass / ⬜ Fail / ⬜ N/A  
-**Notes**: _________________
-
----
-
-#### Test 5.4: Deterministic State & Manual Override
-**Objective**: Verify kill-switch behavior and manual override
-
-**Steps**:
-1. Trigger drift detection event
-2. Verify system enters deterministic state
-3. Attempt key issuance without manual override
-
-**Expected Results**:
-- ✅ Key issuance blocked until manual override
-- ✅ Manual override restores normal operation
-
-**Status**: ⬜ Pass / ⬜ Fail / ⬜ N/A  
-**Notes**: _________________
-
----
-
-#### Test 5.5: Honey-Lattice Trigger
-**Objective**: Verify honey-lattice deployment flow
-
-**Steps**:
-1. Simulate adversarial swarm or SCA attempt
-2. Trigger contextual cipher swap
-
-**Expected Results**:
-- ✅ Honey-lattice deployment initiated
-- ✅ Telemetry capture activated for attacker fingerprinting
-
-**Status**: ⬜ Pass / ⬜ Fail / ⬜ N/A  
-**Notes**: _________________
-
----
-
-### 6. Error Handling Tests
+### 5. Error Handling Tests
 
 #### Test 5.1: API Failure Handling
 **Objective**: Test graceful handling of API failures
@@ -377,7 +288,7 @@ curl http://EXTERNAL_IP/health
 
 ---
 
-### 7. Performance Tests
+### 6. Performance Tests
 
 #### Test 6.1: Response Time
 **Objective**: Measure AI response times
@@ -415,7 +326,7 @@ curl http://EXTERNAL_IP/health
 
 ---
 
-### 8. Security Tests
+### 7. Security Tests
 
 #### Test 7.1: Container Security
 **Objective**: Verify security best practices
@@ -453,7 +364,7 @@ curl http://EXTERNAL_IP/health
 
 ---
 
-### 9. Integration Tests
+### 8. Integration Tests
 
 #### Test 8.1: Gemini API Integration
 **Objective**: Verify Gemini API integration works correctly
@@ -494,7 +405,7 @@ curl http://EXTERNAL_IP/health
 ## Test Results Summary
 
 ### Overall Status
-- **Total Tests**: 25
+- **Total Tests**: 20
 - **Passed**: _____
 - **Failed**: _____
 - **Blocked**: _____

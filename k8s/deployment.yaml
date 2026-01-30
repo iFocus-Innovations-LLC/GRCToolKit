@@ -22,8 +22,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
       - name: grc-toolkit
-        image: grc-toolkit-oscal:2.0.0-dev
-        imagePullPolicy: IfNotPresent
+        image: gcr.io/PROJECT_ID/grc-toolkit:2.0.0-dev
         ports:
         - containerPort: 8080
         env:
