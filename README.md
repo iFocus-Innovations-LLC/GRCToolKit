@@ -10,7 +10,7 @@ A comprehensive Governance, Risk, and Compliance (GRC) toolkit that provides AI-
 ## 🚀 Quick Start
 
 ### Local Development
-1. Open `[grctoolkit.html](http://localhost:8085/)` in your web browser
+1. Open `http://localhost:8085/` in your web browser
 2. Enter a GRC scenario in the text area
 3. Click "Analyze Scenario" to get AI-powered NIST control recommendations
 
