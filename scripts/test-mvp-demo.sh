@@ -10,6 +10,7 @@ echo "=================================="
 
 # Configuration
 BASE_URL="http://localhost:8085"
+SKIP_GRACEFUL_SHUTDOWN_TEST="${SKIP_GRACEFUL_SHUTDOWN_TEST:-0}"
 DEMO_SCENARIOS=(
     "How do I secure access to our cloud database?"
     "What controls are needed for protecting patient health information?"
@@ -288,7 +289,11 @@ main() {
     test_oscal_files || ((failed_tests++))
     test_ai_agent_files || ((failed_tests++))
     test_ui_components || ((failed_tests++))
-    test_graceful_shutdown || ((failed_tests++))
+    if [ "$SKIP_GRACEFUL_SHUTDOWN_TEST" = "1" ]; then
+        echo -e "${YELLOW}⚠️  Skipping graceful shutdown test (SKIP_GRACEFUL_SHUTDOWN_TEST=1)${NC}"
+    else
+        test_graceful_shutdown || ((failed_tests++))
+    fi
     test_demo_scenarios || ((failed_tests++))
     test_security_features || ((failed_tests++))
     
