@@ -72,6 +72,15 @@ jobs:
         output: docker-scout.sarif
         exit-code: 1
 
+    - name: Check Docker Scout results file
+      id: scout_sarif
+      run: |
+        if [ -f docker-scout.sarif ]; then
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Security scan with Trivy
       uses: aquasecurity/trivy-action@master
       with:
@@ -96,7 +105,7 @@ jobs:
 
     - name: Upload Docker Scout results
       uses: github/codeql-action/upload-sarif@v4
-      if: env.DOCKER_SCOUT_TOKEN != '' && hashFiles('docker-scout.sarif') != ''
+      if: env.DOCKER_SCOUT_TOKEN != '' && steps.scout_sarif.outputs.exists == 'true'
       with:
         sarif_file: 'docker-scout.sarif'
 
