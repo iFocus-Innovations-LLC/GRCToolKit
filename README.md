@@ -1,78 +1,66 @@
 # GRCToolKit
 
-**Version**: 2.0.0-dev  
+**Version**: 2.1.0-dev  
 **Status**: Development/QA Ready  
-**Last Updated**: 2025-01-XX
+**Last Updated**: 2026-01-29
+**$ifocus1776
 
-A comprehensive Governance, Risk, and Compliance (GRC) toolkit that provides AI-powered analysis of compliance scenarios and suggests relevant NIST 800-53 R.5 controls. The application features OSCAL integration, Ansible automation, and is evolving into a Post-Quantum Cryptography (PQC) migration management platform. Containerized and ready for deployment to Google Cloud Platform (GCP) Kubernetes environments.
+A comprehensive Governance, Risk, and Compliance (GRC) toolkit that provides AI-powered analysis of compliance scenarios and suggests relevant NIST SP 800-53 Rev. 5 Security and Privacy Controls. The application features OSCAL integration, Ansible automation, and a robust Post-Quantum Cryptography (PQC) migration management platform with Human-in-the-Loop (HITL) guardrails. Containerized and ready for deployment to Google Cloud Platform (GCP) Kubernetes environments.
 
 ## 🚀 Quick Start
 
 ### Local Development
-1. Open `grctoolkit.html` in your web browser
-2. Enter a GRC scenario in the text area
-3. Click "Analyze Scenario" to get AI-powered NIST control recommendations
+1. Set your `GEMINI_API_KEY` environment variable
+2. Build and run with Docker:
+   ```bash
+   docker build -t grc-toolkit .
+   docker run -p 8085:80 -e GEMINI_API_KEY=$GEMINI_API_KEY grc-toolkit
+   ```
+3. Open `http://localhost:8085/` in your web browser
+4. Enter a GRC scenario and click "Analyze Scenario"
 
 ### Containerized Deployment
-For production deployment to GCP Kubernetes, see the [Deployment Guide](DEPLOYMENT.md).
+For production deployment to GCP Kubernetes, see the [Deployment Guide](DEPLOYMENT.md) and [GCP Deployment Checklist](GCP-DEPLOYMENT-CHECKLIST.md).
 
 ```bash
-# Quick deployment to GCP
+# Setup and deploy to GCP
 ./scripts/setup-gcp.sh
 ./scripts/deploy.sh production
 ```
 
 ## 🏗️ Architecture
 
-This web application provides a user interface for interacting with a simulated AI GRC agent. When you enter a scenario and click "Analyze Scenario," it will send your prompt to the gemini-2.0-flash model, which is instructed to act as a GRC expert and return relevant NIST 800-53 R.5 controls.
+This application provides a modern UI for interacting with a GRC Compliance Engine. It uses the Gemini 1.5 Flash model (stable v1 API) to analyze scenarios against NIST SP 800-53 Rev. 5 controls. The engine integrates with Ansible playbooks for automated control validation and generates OSCAL-compliant documentation.
 
 ## ✨ Key Features
 
-### Enhanced User Interface
-- **Responsive Design**: Clean, mobile-first layout using Tailwind CSS
-- **Structured JSON Output**: AI responses formatted as structured data for better parsing
-- **Advanced Filtering**: Filter controls by priority and category
-- **Smart Sorting**: Sort by priority, control ID, or title
-- **NIST Documentation Links**: Direct links to official NIST 800-53 documentation
-- **Export Functionality**: Download analysis results as JSON
+### 🤖 AI Compliance Engine
+- **Gemini 1.5 Flash Integration**: Uses stable v1 API for reliable GRC analysis.
+- **Scenario Recognition**: Automatically detects PQC migration, quantum risk, and standard GRC scenarios.
+- **Structured JSON Output**: AI responses include controls, CSF mappings, and implementation recommendations.
 
-### AI Integration
-- **Gemini 2.0 Flash**: Advanced AI model for GRC analysis
-- **Structured Responses**: JSON-formatted output with controls, CSF mappings, and recommendations
-- **Context-Aware Analysis**: AI acts as a GRC expert with domain-specific knowledge
-- **Error Handling**: Graceful fallback for API failures
+### 🛡️ Human-in-the-Loop (HITL) Guardrails
+- **Three-Tier Model**: Automated, Human-Reviewed, and Human-Guided decision paths.
+- **Confidence Scoring**: AI-generated recommendations include confidence levels to trigger human review.
+- **Sentinel Architecture**: Policy Anchors and Context Filters ensure AI responses remain within safety boundaries.
+- **Audit Trails**: Complete history of human overrides and approvals for compliance.
 
-### v1.1 OSCAL Integration Features
-- **OSCAL Compliance**: Full NIST 800-53 R5 OSCAL catalog integration
-- **AI Compliance Engine**: Automated assessment and control mapping
-- **Ansible Automation**: Automated compliance control implementation
-- **Auditor Reports**: Automated compliance documentation generation
-- **Enterprise Security**: Enhanced security documentation and best practices
+### 🔐 PQC Migration Management
+- **Cryptographic Asset Inventory**: Automated discovery and cataloging of cryptographic implementations.
+- **Quantum Risk Assessment**: Scoring based on algorithm vulnerability and data sensitivity.
+- **Migration Roadmap**: Four-phase planning (Preparation, Baseline, Execution, Monitoring).
+- **PQC Ansible Automation**: Playbooks for deploying ML-KEM (FIPS 203), ML-DSA (FIPS 204), and SLH-DSA (FIPS 205).
+- **Compliance Timeline**: Tracking 2030/2035 deadlines for quantum readiness.
 
-### v2.0 New Features (In Development)
+### 📄 OSCAL & Automation
+- **OSCAL Integration**: Full NIST 800-53 R5 OSCAL catalog integration.
+- **Ansible Playbooks**: Automated validation for AC-3, AC-6, AU-2, SC-7, and PQC controls.
+- **Auditor Reports**: Automated generation of compliance test reports.
 
-#### Human-in-the-Loop (HITL) Framework
-- **Confidence Scoring**: AI recommendation confidence calculation
-- **Three-Tier Review**: Automated/Review/Guided decision model
-- **Human Review Interface**: Approval workflows for critical recommendations
-- **Feedback Loop System**: Continuous AI improvement from human feedback
-- **Audit Trail**: Complete review history with OSCAL compliance
-
-### v2.0 PQC Migration Features (In Development)
-- **PQC Scenario Analysis**: AI-powered PQC migration scenario recognition
-- **Cryptographic Asset Inventory**: Automated discovery and cataloging of cryptographic implementations
-- **Quantum Risk Assessment**: Risk scoring based on algorithm vulnerability and data sensitivity
-- **Migration Roadmap Tracking**: Four-phase PQC migration planning and progress monitoring
-- **PQC Ansible Automation**: Automated deployment of ML-KEM, ML-DSA, and SLH-DSA algorithms
-- **Compliance Timeline Management**: 2030/2035 deadline tracking and automated alerts
-
-### Production-Ready Deployment
-- **Containerized**: Docker-based deployment with nginx
-- **Kubernetes Ready**: Complete K8s manifests for GCP deployment
-- **CI/CD Pipeline**: Automated testing and deployment with GitHub Actions
-- **Auto-scaling**: Horizontal Pod Autoscaler for dynamic scaling
-- **Security**: Non-root containers, security headers, and vulnerability scanning
-- **Monitoring**: Health checks, logging, and observability features
+### 🚀 Cloud-Native Deployment
+- **Hardened Containers**: Pinned base images, non-root users, and security headers.
+- **Kubernetes Ready**: Manifests for GKE including HPA, Ingress, and Graceful Shutdown.
+- **CI/CD Pipeline**: GitHub Actions with Docker Scout security scanning and SARIF reporting.
 
 ## 🔮 Planned Enhancements & Roadmap
 

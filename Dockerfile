@@ -1,8 +1,13 @@
-# Use nginx as the base image for serving static files
-FROM nginx:alpine
+# Use a pinned, reproducible nginx base image (avoid floating tags)
+FROM nginx:alpine@sha256:b2e814d28359e77bd0aa5fed1939620075e4ffa0eb20423cc557b375bd5c14ad
 
 # Set version label
-LABEL version="2.0.0-dev" \
+LABEL version="2.1.0-dev" \
+      maintainer="iFocus Innovations LLC" \
+      description="GRC Toolkit with OSCAL and PQC Migration Features"
+
+# Set version label
+LABEL version="2.1.0-dev" \
       maintainer="iFocus Innovations LLC" \
       description="GRC Toolkit with OSCAL and PQC Migration Features"
 

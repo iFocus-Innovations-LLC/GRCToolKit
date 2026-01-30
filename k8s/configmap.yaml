@@ -6,7 +6,7 @@ metadata:
 data:
   # Environment-specific configurations can be added here
   APP_NAME: "GRC Toolkit"
-  APP_VERSION: "2.0.0-dev"
+  APP_VERSION: "2.1.0-dev"
   APP_BUILD_DATE: "2025-01-XX"
   FEATURE_PQC: "enabled"
   # Add any other configuration values as needed

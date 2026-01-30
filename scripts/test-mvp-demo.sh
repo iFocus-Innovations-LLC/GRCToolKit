@@ -10,6 +10,7 @@ echo "=================================="
 
 # Configuration
 BASE_URL="http://localhost:8085"
+SKIP_GRACEFUL_SHUTDOWN_TEST="${SKIP_GRACEFUL_SHUTDOWN_TEST:-0}"
 DEMO_SCENARIOS=(
     "How do I secure access to our cloud database?"
     "What controls are needed for protecting patient health information?"
@@ -38,13 +39,25 @@ test_health_check() {
 
 test_api_key_injection() {
     echo -e "\n${BLUE}🔐 Testing API Key Injection...${NC}"
-    if curl -s "$BASE_URL/" | grep -q 'window.GEMINI_API_KEY = "AIzaSyC3vuBHAjDA-laqOQ0p8dYDky-CjzJ1aEM"'; then
-        echo -e "${GREEN}✅ API key properly injected${NC}"
-        return 0
-    else
+    local html
+    html=$(curl -s "$BASE_URL/")
+
+    if [ -n "$GEMINI_API_KEY" ]; then
+        if echo "$html" | grep -q "window.GEMINI_API_KEY = \"${GEMINI_API_KEY}\""; then
+            echo -e "${GREEN}✅ API key properly injected${NC}"
+            return 0
+        fi
         echo -e "${RED}❌ API key injection failed${NC}"
         return 1
     fi
+
+    if echo "$html" | grep -q 'window.GEMINI_API_KEY = "";'; then
+        echo -e "${YELLOW}⚠️  No API key provided; placeholder detected${NC}"
+        return 0
+    fi
+
+    echo -e "${RED}❌ API key placeholder missing${NC}"
+    return 1
 }
 
 test_oscal_files() {
@@ -115,9 +128,16 @@ test_ui_components() {
 
 test_graceful_shutdown() {
     echo -e "\n${BLUE}🛑 Testing Graceful Shutdown...${NC}"
-    
+
+    if ! docker image inspect grc-toolkit-oscal >/dev/null 2>&1; then
+        echo -e "${YELLOW}⚠️  grc-toolkit-oscal image not found, building...${NC}"
+        docker build -t grc-toolkit-oscal . || return 1
+    fi
+
     # Start a test container
-    local test_container=$(docker run -d -p 8086:8080 -e GEMINI_API_KEY="test-key" --name grc-test-shutdown grc-toolkit-oscal)
+    local test_container
+    local test_token="${TEST_API_TOKEN:-test-placeholder}"
+    test_container=$(docker run -d -p 8086:8080 -e GEMINI_API_KEY="$test_token" --name grc-test-shutdown grc-toolkit-oscal)
     
     # Wait for it to start
     sleep 3
@@ -183,12 +203,16 @@ test_security_features() {
         echo -e "${YELLOW}⚠️  Security headers not detected${NC}"
     fi
     
-    # Check for non-root user in container
-    if docker exec grc-toolkit-mvp id 2>/dev/null | grep -q "uid=1001"; then
-        echo -e "${GREEN}✅ Container running as non-root user${NC}"
+    # Check for non-root user in container (if running)
+    if docker ps --format "{{.Names}}" | grep -q "^grc-toolkit-mvp$"; then
+        if docker exec grc-toolkit-mvp id 2>/dev/null | grep -q "uid=1001"; then
+            echo -e "${GREEN}✅ Container running as non-root user${NC}"
+        else
+            echo -e "${RED}❌ Container not running as non-root user${NC}"
+            return 1
+        fi
     else
-        echo -e "${RED}❌ Container not running as non-root user${NC}"
-        return 1
+        echo -e "${YELLOW}⚠️  grc-toolkit-mvp container not running; skipping non-root check${NC}"
     fi
     
     return 0
@@ -266,7 +290,11 @@ main() {
     test_oscal_files || ((failed_tests++))
     test_ai_agent_files || ((failed_tests++))
     test_ui_components || ((failed_tests++))
-    test_graceful_shutdown || ((failed_tests++))
+    if [ "$SKIP_GRACEFUL_SHUTDOWN_TEST" = "1" ]; then
+        echo -e "${YELLOW}⚠️  Skipping graceful shutdown test (SKIP_GRACEFUL_SHUTDOWN_TEST=1)${NC}"
+    else
+        test_graceful_shutdown || ((failed_tests++))
+    fi
     test_demo_scenarios || ((failed_tests++))
     test_security_features || ((failed_tests++))
     

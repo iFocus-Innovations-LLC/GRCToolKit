@@ -34,7 +34,7 @@
     <div class="container bg-white shadow-lg rounded-xl p-8 space-y-6 border border-gray-200">
         <h1 class="text-4xl font-bold text-center text-gray-800 mb-6">GRC Toolkit AI Agent</h1>
         <p class="text-center text-gray-600 mb-8">
-            Enter a scenario or question related to GRC, and the AI agent will suggest relevant NIST 800-53 R.5 controls.
+            Enter a scenario or question related to GRC, and the AI agent will suggest relevant NIST SP 800-53 Rev. 5 Security and Privacy Controls for Information Systems and Organizations.
         </p>
 
         <div class="space-y-4">
@@ -214,7 +214,7 @@
                     },
                 };
                 const apiKey = window.GEMINI_API_KEY || ""; // Set window.GEMINI_API_KEY in browser console or configure below
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
                 const response = await fetch(apiUrl, {
                     method: 'POST',
