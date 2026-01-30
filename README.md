@@ -1,8 +1,9 @@
 # GRCToolKit
 
-**Version**: 2.0.0-dev  
+**Version**: 2.1.0-dev  
 **Status**: Development/QA Ready  
-**Last Updated**: 2025-01-XX
+**Last Updated**: 2026-01-27
+**$ifocus1776
 
 A comprehensive Governance, Risk, and Compliance (GRC) toolkit that provides AI-powered analysis of compliance scenarios and suggests relevant NIST 800-53 R.5 controls. The application features OSCAL integration, Ansible automation, and is evolving into a Post-Quantum Cryptography (PQC) migration management platform. Containerized and ready for deployment to Google Cloud Platform (GCP) Kubernetes environments.
 

@@ -74,12 +74,6 @@ jobs:
         output: docker-scout.sarif
         exit-code: 1
 
-    - name: Ensure Docker Scout results exist
-      if: ${{ env.DOCKER_SCOUT_TOKEN == '' }}
-      run: |
-        echo "Docker Scout token not configured; skipping scan."
-        echo '{"version":"2.1.0","$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema.json","runs":[]}' > docker-scout.sarif
-
     - name: Security scan with Trivy
       uses: aquasecurity/trivy-action@master
       with:
@@ -104,7 +98,7 @@ jobs:
 
     - name: Upload Docker Scout results
       uses: github/codeql-action/upload-sarif@v4
-      if: always() && hashFiles('docker-scout.sarif') != ''
+      if: env.DOCKER_SCOUT_TOKEN != '' && hashFiles('docker-scout.sarif') != ''
       with:
         sarif_file: 'docker-scout.sarif'
 
