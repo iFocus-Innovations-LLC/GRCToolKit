@@ -325,7 +325,7 @@ kubectl apply -f k8s/
 
 - **GCP Documentation**: https://cloud.google.com/docs
 - **Kubernetes Documentation**: https://kubernetes.io/docs/
-- **Project README**: [README.md](README.md)
+- **Project README**: [README.md](../README.md)
 - **Deployment Guide**: [DEPLOYMENT.md](DEPLOYMENT.md)
 - **Troubleshooting**: Check logs and events first, then consult documentation
 
