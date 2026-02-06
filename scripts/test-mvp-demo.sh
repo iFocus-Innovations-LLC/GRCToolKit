@@ -221,7 +221,7 @@ test_security_features() {
 generate_demo_report() {
     echo -e "\n${BLUE}📊 Generating Demo Report...${NC}"
     
-    local report_file="mvp-demo-test-report-$(date +%Y%m%d-%H%M%S).md"
+    local report_file="docs/test-reports/mvp-demo-test-report-$(date +%Y%m%d-%H%M%S).md"
     
     cat > "$report_file" << EOF
 # GRC Toolkit MVP Demo Test Report

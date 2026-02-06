@@ -20,13 +20,38 @@ A comprehensive Governance, Risk, and Compliance (GRC) toolkit that provides AI-
 4. Enter a GRC scenario and click "Analyze Scenario"
 
 ### Containerized Deployment
-For production deployment to GCP Kubernetes, see the [Deployment Guide](DEPLOYMENT.md) and [GCP Deployment Checklist](GCP-DEPLOYMENT-CHECKLIST.md).
+For production deployment to GCP Kubernetes, see the [Deployment Guide](docs/DEPLOYMENT.md) and [GCP Deployment Checklist](docs/GCP-DEPLOYMENT-CHECKLIST.md).
 
 ```bash
 # Setup and deploy to GCP
 ./scripts/setup-gcp.sh
 ./scripts/deploy.sh production
 ```
+
+## 📚 Documentation
+
+Detailed documentation for the GRCToolKit can be found in the `docs/` directory:
+
+- **Frameworks & Architecture**:
+  - [HITL Framework](docs/HITL-FRAMEWORK.md) - Human-in-the-Loop guardrails and sentinel architecture.
+  - [PQC Integration Summary](docs/PQC-INTEGRATION-SUMMARY.md) - Post-Quantum Cryptography migration strategy.
+  - [OSCAL Integration](docs/OSCAL-INTEGRATION.md) - Open Security Controls Assessment Language implementation.
+  - [Roadmap](docs/ROADMAP.md) - Project development phases and future enhancements.
+
+- **Deployment & Operations**:
+  - [Deployment Guide](docs/DEPLOYMENT.md) - General deployment instructions.
+  - [GCP Deployment Checklist](docs/GCP-DEPLOYMENT-CHECKLIST.md) - Specific steps for Google Cloud Platform.
+  - [Security Policy](docs/SECURITY.md) - Security practices and reporting.
+  - [Secrets Management](docs/SECRETS.md) - How to handle API keys and sensitive data.
+
+- **Testing & QA**:
+  - [QA Testing Guide](docs/QA-TESTING-GUIDE.md) - Comprehensive testing procedures.
+  - [Conference Demo Guide](docs/CONFERENCE-DEMO-GUIDE.md) - Script for live demonstrations.
+  - [GCP Demo Guide](docs/GCP-DEMO-GUIDE.md) - Setting up a cloud-based demo environment.
+
+- **Releases**:
+  - [Changelog](docs/CHANGELOG.md) - History of changes and versions.
+  - [Release Notes v2.0.0-dev](docs/RELEASE-NOTES-v2.0.0-dev.md) - Specific notes for the previous development release.
 
 ## 🏗️ Architecture
 
@@ -107,7 +132,7 @@ GRCToolKit is evolving into a comprehensive PQC migration management platform, b
 - **API Integration**: RESTful APIs, webhooks, and SDK for third-party integrations
 - **Mobile Application**: iOS and Android apps for executive access and reporting
 
-For detailed roadmap information, see [ROADMAP.md](ROADMAP.md).
+For detailed roadmap information, see [ROADMAP.md](docs/ROADMAP.md).
 
 ## 🎯 Use Cases
 
