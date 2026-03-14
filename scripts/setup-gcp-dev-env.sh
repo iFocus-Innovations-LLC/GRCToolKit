@@ -220,7 +220,7 @@ create_secrets() {
     # Check if GEMINI_API_KEY is provided
     if [ -z "$GEMINI_API_KEY" ]; then
         warning "GEMINI_API_KEY not provided. You'll need to create the secret manually."
-        echo "Run: kubectl create secret generic grc-toolkit-secrets --from-literal=gemini-api-key='your-key' -n grc-toolkit"
+        echo "Run: kubectl create secret generic grc-toolkit-secrets --from-literal=gemini-api-key=\$GEMINI_API_KEY -n grc-toolkit"
         return
     fi
     
@@ -436,7 +436,7 @@ kubectl logs -f deployment/grc-toolkit -n grc-toolkit
 kubectl scale deployment grc-toolkit --replicas=3 -n grc-toolkit
 
 # Update secret
-kubectl create secret generic grc-toolkit-secrets --from-literal=gemini-api-key='new-key' -n grc-toolkit --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic grc-toolkit-secrets --from-literal=gemini-api-key=\$GEMINI_API_KEY -n grc-toolkit --dry-run=client -o yaml | kubectl apply -f -
 \`\`\`
 
 ## Cleanup

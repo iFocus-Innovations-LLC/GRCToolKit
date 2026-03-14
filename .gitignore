@@ -54,3 +54,4 @@ config.local.yaml
 local-config.json
 
 
+SECRETS.md
