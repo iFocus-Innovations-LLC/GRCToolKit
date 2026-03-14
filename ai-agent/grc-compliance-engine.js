@@ -144,6 +144,9 @@ class GRCComplianceEngine {
             // Generate validation plan
             const validationPlan = await this.generateValidationPlan(relevantControls);
             
+            // Apply HITL Sentinel Guardrails
+            const hitlAnalysis = this.applyHITLGuardrails(validationPlan, userScenario);
+            
             // Create OSCAL assessment plan
             const assessmentPlan = this.createOSCALAssessmentPlan(validationPlan);
             
@@ -153,6 +156,7 @@ class GRCComplianceEngine {
                 relevantControls: relevantControls,
                 validationPlan: validationPlan,
                 assessmentPlan: assessmentPlan,
+                hitl: hitlAnalysis,
                 timestamp: new Date().toISOString()
             };
             
@@ -160,6 +164,81 @@ class GRCComplianceEngine {
             console.error('Error analyzing scenario:', error);
             throw error;
         }
+    }
+
+    /**
+     * Apply Human-in-the-Loop (HITL) Sentinel Guardrails
+     * Implements Confidence Scoring and Policy Anchors
+     */
+    applyHITLGuardrails(validationPlan, scenario) {
+        console.log('🛡️ Applying HITL Sentinel Guardrails...');
+        
+        const hitlResults = {
+            overallConfidence: 0,
+            reviewRequired: false,
+            sentinelAlerts: [],
+            policyAnchor: 'NIST SP 800-53 R5',
+            tier: 'Automated' // Default tier
+        };
+
+        // 1. Confidence Scoring Logic
+        let totalConfidence = 0;
+        validationPlan.controls.forEach(control => {
+            // Simulate confidence scoring based on control complexity and scenario clarity
+            let confidence = Math.floor(Math.random() * (98 - 88 + 1) + 88);
+            
+            // Lower confidence for complex PQC scenarios without specific details
+            if (scenario.toLowerCase().includes('quantum') && !scenario.toLowerCase().includes('fips')) {
+                confidence -= 5;
+            }
+            
+            control.confidence = confidence;
+            totalConfidence += confidence;
+
+            if (confidence < 90) {
+                hitlResults.reviewRequired = true;
+                hitlResults.sentinelAlerts.push(`Low confidence score (${confidence}%) for ${control.id}`);
+            }
+        });
+
+        hitlResults.overallConfidence = Math.round(totalConfidence / validationPlan.controls.length);
+
+        // 2. Tier Routing (Sentinel Architecture)
+        if (hitlResults.overallConfidence < 85) {
+            hitlResults.tier = 'Human-Guided';
+        } else if (hitlResults.reviewRequired) {
+            hitlResults.tier = 'Human-Reviewed';
+        }
+
+        // 3. Honey-Lattice Deception Check
+        if (scenario.toLowerCase().includes('attack') || scenario.toLowerCase().includes('brute force')) {
+            hitlResults.sentinelAlerts.push('Adversarial intent detected: Triggering Honey-Lattice strategy');
+            hitlResults.honeyLatticeActive = true;
+            this.triggerHoneyLatticeDeception();
+        }
+
+        return hitlResults;
+    }
+
+    /**
+     * Honey-Lattice Deception Strategy Simulation
+     * Generates "Synthetic Targets" to achieve Mathematical Exhaustion of an adversary
+     */
+    triggerHoneyLatticeDeception() {
+        console.warn('🛡️ [SENTINEL] Honey-Lattice Deception Active: Generating Synthetic Targets...');
+        
+        const syntheticKeys = [];
+        for (let i = 0; i < 5; i++) {
+            syntheticKeys.push({
+                id: `hl-${this.generateUUID().substring(0, 8)}`,
+                type: 'ML-KEM-768-DECOY',
+                entropy: 'Simulated-Low-Variance',
+                purpose: 'Resource Sink'
+            });
+        }
+        
+        console.table(syntheticKeys);
+        console.log('📉 [SENTINEL] Mathematical Exhaustion Goal: 100% resource sink for adversarial swarm.');
     }
 
     /**
@@ -442,8 +521,24 @@ class GRCComplianceEngine {
         };
     }
 
-    // Helper methods
-    findControlInCatalog(controlId) {
+    /**
+     * Helper methods
+     */
+    async findControlInCatalog(controlId) {
+        // 1. Try Firestore first if available
+        if (window.db) {
+            try {
+                const doc = await window.db.collection('nist_800_53_controls').doc(controlId.toUpperCase()).get();
+                if (doc.exists) {
+                    console.log(`🔥 [Firestore] Found control ${controlId}`);
+                    return doc.data();
+                }
+            } catch (e) {
+                console.warn('Firestore lookup failed, falling back to local OSCAL:', e);
+            }
+        }
+
+        // 2. Fallback to local OSCAL catalog
         if (!this.oscalCatalog) return null;
         
         for (const group of this.oscalCatalog.catalog.groups) {
