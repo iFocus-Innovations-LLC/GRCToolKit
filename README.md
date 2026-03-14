@@ -2,8 +2,7 @@
 
 **Version**: 2.1.0-dev  
 **Status**: Development/QA Ready  
-**Last Updated**: 2026-01-29
-**
+**Last Updated**: 2026-03-14
 
 A comprehensive Governance, Risk, and Compliance (GRC) toolkit that provides AI-powered analysis of compliance scenarios and suggests relevant NIST SP 800-53 Rev. 5 Security and Privacy Controls. The application features OSCAL integration, Ansible automation, and a robust Post-Quantum Cryptography (PQC) migration management platform with Human-in-the-Loop (HITL) guardrails. Containerized and ready for deployment to Google Cloud Platform (GCP) Kubernetes environments.
 
@@ -14,9 +13,9 @@ A comprehensive Governance, Risk, and Compliance (GRC) toolkit that provides AI-
 2. Build and run with Docker:
    ```bash
    docker build -t grc-toolkit .
-   docker run -p 8085:80 -e GEMINI_API_KEY=$GEMINI_API_KEY grc-toolkit
+   docker run -p 8080:8080 -e GEMINI_API_KEY=$GEMINI_API_KEY grc-toolkit
    ```
-3. Open `http://localhost:8085/` in your web browser
+3. Open `http://localhost:8080/` in your web browser
 4. Enter a GRC scenario and click "Analyze Scenario"
 
 ### Containerized Deployment
@@ -41,6 +40,7 @@ Detailed documentation for the GRCToolKit can be found in the `docs/` directory:
 - **Deployment & Operations**:
   - [Deployment Guide](docs/DEPLOYMENT.md) - General deployment instructions.
   - [GCP Deployment Checklist](docs/GCP-DEPLOYMENT-CHECKLIST.md) - Specific steps for Google Cloud Platform.
+  - [Secrets Setup](docs/SECRETS-SETUP.md) - API keys and secrets (GitHub Actions, GCP Secret Manager, local).
   - [Security Policy](docs/SECURITY.md) - Security practices and reporting.
   - [Zero-Trust Agentic AI](ai-agent/openclaw/SOUL.md) - Our shift to autonomous, secret-less compliance auditing.
 
@@ -83,9 +83,10 @@ This application provides a modern UI for interacting with a GRC Compliance Engi
 - **Auditor Reports**: Automated generation of compliance test reports.
 
 ### 🚀 Cloud-Native Deployment
-- **Hardened Containers**: Pinned base images, non-root users, and security headers.
+- **Hardened Containers**: Pinned nginx base image (port 8080), non-root user, and security headers.
 - **Kubernetes Ready**: Manifests for GKE including HPA, Ingress, and Graceful Shutdown.
-- **CI/CD Pipeline**: GitHub Actions with Docker Scout security scanning and SARIF reporting.
+- **CI/CD Pipeline**: GitHub Actions with Docker Scout and Trivy scanning, image pin checks, and SARIF reporting.
+- **Secrets**: No hardcoded keys; [SECRETS-SETUP.md](docs/SECRETS-SETUP.md) for GitHub Actions, GCP Secret Manager, and local dev.
 
 ## 🔮 Planned Enhancements & Roadmap
 
