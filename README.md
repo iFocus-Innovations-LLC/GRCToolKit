@@ -42,7 +42,7 @@ Detailed documentation for the GRCToolKit can be found in the `docs/` directory:
   - [Deployment Guide](docs/DEPLOYMENT.md) - General deployment instructions.
   - [GCP Deployment Checklist](docs/GCP-DEPLOYMENT-CHECKLIST.md) - Specific steps for Google Cloud Platform.
   - [Security Policy](docs/SECURITY.md) - Security practices and reporting.
-  - [Secrets Management](docs/SECRETS.md) - How to handle API keys and sensitive data.
+  - [Zero-Trust Agentic AI](ai-agent/openclaw/SOUL.md) - Our shift to autonomous, secret-less compliance auditing.
 
 - **Testing & QA**:
   - [QA Testing Guide](docs/QA-TESTING-GUIDE.md) - Comprehensive testing procedures.
