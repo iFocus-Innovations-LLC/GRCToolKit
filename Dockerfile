@@ -2,7 +2,7 @@
 # Goal: Protect the data at all costs through container hardening and zero-trust principles.
 
 # Stage 1: Build & Dependency Verification
-FROM node@sha256:a82f40540f5959e0003fb7b3c0f80490def2927be8bdbee7e3e0ac65cce3be92 AS builder
+FROM node:20-slim AS builder
 WORKDIR /app
 
 # Install build dependencies and security scanners
@@ -16,7 +16,7 @@ COPY package*.json ./
 RUN npm ci --only=production
 
 # Stage 2: Final Hardened Runtime
-FROM node@sha256:a82f40540f5959e0003fb7b3c0f80490def2927be8bdbee7e3e0ac65cce3be92
+FROM node:20-slim
 WORKDIR /app
 
 # 1. Install minimal runtime dependencies (gcloud, ansible)
