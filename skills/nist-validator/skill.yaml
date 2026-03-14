@@ -1,0 +1,44 @@
+name: nist-control-validator
+version: 1.0.0
+description: "Validates the implementation status of a specific NIST 800-53 control using cluster data."
+
+# The inputs the Agent passes to this skill
+inputs:
+  control_id:
+    type: string
+    description: "The NIST Control ID (e.g., AC-3, SC-7)"
+    required: true
+  target_scope:
+    type: string
+    description: "The K8s namespace or GCP project to audit"
+    default: "current-cluster"
+
+# The credentials this skill needs (mapped to Secret Manager)
+secrets:
+  - name: ANTHROPIC_API_KEY
+    secret_ref: anthropic-api-key
+  - name: GCP_SERVICE_ACCOUNT_KEY
+    secret_ref: firebase-service-account
+  - name: CLOUD_API_KEY
+    secret_ref: grc-api-key
+
+# The logic this skill executes
+execution:
+  type: script
+  runtime: nodejs20
+  entrypoint: "validate.js"
+  tools:
+    - ansible-playbook
+    - gcloud-sdk
+
+# What the skill returns to the Agent
+outputs:
+  status:
+    type: string
+    enum: [PASS, FAIL, UNKNOWN]
+  evidence:
+    type: object
+    description: "Structured evidence data for OSCAL reporting"
+  remediation_steps:
+    type: array
+    description: "Suggested steps if the status is FAIL"
