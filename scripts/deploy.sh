@@ -55,7 +55,24 @@ echo "🚀 Applying Kubernetes manifests..."
 # Apply base resources
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/configmap.yaml
-kubectl apply -f k8s/secret.yaml
+
+# Secret: use GEMINI_API_KEY env, or k8s/secret.yaml, or fail with instructions
+if [ -n "$GEMINI_API_KEY" ]; then
+    echo "🔐 Creating secret from GEMINI_API_KEY..."
+    kubectl create secret generic grc-toolkit-secrets \
+        --from-literal=gemini-api-key="$GEMINI_API_KEY" \
+        --namespace=grc-toolkit \
+        --dry-run=client -o yaml | kubectl apply -f -
+elif [ -f k8s/secret.yaml ] && ! grep -q "REPLACE_ME" k8s/secret.yaml 2>/dev/null; then
+    kubectl apply -f k8s/secret.yaml
+else
+    echo "❌ No secret configured. Run one of:"
+    echo "   export GEMINI_API_KEY='your-key' && ./scripts/deploy.sh $ENVIRONMENT"
+    echo "   ./scripts/update-secret.sh \"YOUR_GEMINI_API_KEY\""
+    echo "   ./scripts/sync-secret-from-gcp.sh  # if using GCP Secret Manager"
+    exit 1
+fi
+
 kubectl apply -f k8s/deployment.yaml
 kubectl apply -f k8s/service.yaml
 

@@ -10,7 +10,7 @@ A comprehensive Governance, Risk, and Compliance (GRC) toolkit that provides AI-
 ## 🚀 Quick Start
 
 ### Local Development
-1. Set your `GEMINI_API_KEY` environment variable
+1. Set up secrets (see [docs/SECRETS-SETUP.md](docs/SECRETS-SETUP.md)) – e.g. `export GEMINI_API_KEY`
 2. Build and run with Docker:
    ```bash
    docker build -t grc-toolkit .
