@@ -56,3 +56,4 @@ local-config.json
 
 
 SECRETS.md
+k8s/secret.yaml
