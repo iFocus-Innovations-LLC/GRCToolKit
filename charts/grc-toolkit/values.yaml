@@ -1,0 +1,92 @@
+# Default values — set image.registry/repository/tag for your environment.
+
+nameOverride: ""
+fullnameOverride: ""
+
+namespace:
+  create: true
+  name: grc-toolkit
+
+image:
+  # Option A: set full reference (overrides registry/repository/tag)
+  full: ""
+  # Option B: registry + repository + tag (e.g. ECR: 123.dkr.ecr.region.amazonaws.com/myapp / grc-toolkit)
+  registry: ""
+  repository: grc-toolkit
+  tag: "2.1.0-dev"
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+replicaCount: 3
+
+podAnnotations: {}
+
+# Match your container image user (official nginx:alpine uses 101)
+podSecurityContext:
+  fsGroup: 101
+
+securityContext:
+  allowPrivilegeEscalation: false
+  runAsNonRoot: true
+  runAsUser: 101
+  capabilities:
+    drop:
+      - ALL
+
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "50m"
+  limits:
+    memory: "128Mi"
+    cpu: "100m"
+
+# App metadata (ConfigMap)
+config:
+  appName: "GRC Toolkit"
+  appVersion: "2.1.0-dev"
+  appBuildDate: ""
+  featurePqc: "enabled"
+
+# Gemini API — requires a Kubernetes Secret (see secret.*)
+gemini:
+  enabled: true
+  secretName: grc-toolkit-secrets
+  secretKey: gemini-api-key
+
+# Create Secret from Helm (not recommended for production; prefer External Secrets / kubectl)
+secret:
+  create: false
+  # If create=true, set at install time: --set secret.geminiApiKey=... (exposes in shell history)
+  geminiApiKey: ""
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  # Example profiles (pick one cloud; set ingress.annotations in your values file):
+  # GKE: kubernetes.io/ingress.class: gce
+  # NGINX: kubernetes.io/ingress.class: nginx
+  # AWS ALB: alb.ingress.kubernetes.io/scheme: internet-facing
+  hosts:
+    - host: grc-toolkit.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    enabled: false
+    secretName: grc-toolkit-tls
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+terminationGracePeriodSeconds: 30

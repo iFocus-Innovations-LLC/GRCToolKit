@@ -1,0 +1,9 @@
+{{- if .Values.namespace.create }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ include "grc-toolkit.namespace" . }}
+  labels:
+    {{- include "grc-toolkit.labels" . | nindent 4 }}
+    name: {{ include "grc-toolkit.namespace" . }}
+{{- end }}

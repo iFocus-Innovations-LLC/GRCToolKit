@@ -1,0 +1,19 @@
+# Do not commit real values. Use one of the following:
+#
+# 1) Environment variables (recommended for CI — inject from your secret store):
+#    export TF_VAR_project_id="<from-secrets>"
+#    export TF_VAR_region="us-central1"   # optional; has default
+#    terraform plan
+#
+# 2) Local file (gitignored): copy to terraform.tfvars and never commit:
+#    cp terraform.tfvars.example terraform.tfvars
+#    # Edit terraform.tfvars locally only; add terraform.tfvars to .gitignore (already listed)
+#
+# 3) Google Secret Manager — load before terraform (see load-vars-from-secret.sh):
+#    source ./load-vars-from-secret.sh
+#    terraform plan
+#
+# Example local-only terraform.tfvars (DO NOT COMMIT):
+#   project_id    = "my-real-project"
+#   region        = "us-central1"
+#   repository_id = "grc-toolkit"

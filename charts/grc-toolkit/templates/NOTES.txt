@@ -1,0 +1,16 @@
+1. Get the application URL by running these commands:
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls.enabled }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- else }}
+  kubectl --namespace {{ include "grc-toolkit.namespace" . }} port-forward service/grc-toolkit-service 8080:{{ .Values.service.port }}
+  Then open http://localhost:8080
+{{- end }}
+
+2. Ensure the Gemini API secret exists (unless gemini.enabled is false):
+   kubectl create secret generic {{ .Values.gemini.secretName }} \
+     --namespace {{ include "grc-toolkit.namespace" . }} \
+     --from-literal={{ .Values.gemini.secretKey }}='YOUR_KEY'
+
+Image in use: {{ include "grc-toolkit.image" . }}

@@ -19,7 +19,8 @@ A comprehensive Governance, Risk, and Compliance (GRC) toolkit that provides AI-
 4. Enter a GRC scenario and click "Analyze Scenario"
 
 ### Containerized Deployment
-For production deployment to GCP Kubernetes, see the [Deployment Guide](docs/DEPLOYMENT.md) and [GCP Deployment Checklist](docs/GCP-DEPLOYMENT-CHECKLIST.md).
+- **Helm (any Kubernetes / CSP)**: [Helm & Terraform guide](docs/HELM-TERRAFORM.md) — chart in `charts/grc-toolkit/`.
+- **GCP**: [Deployment Guide](docs/DEPLOYMENT.md) and [GCP Deployment Checklist](docs/GCP-DEPLOYMENT-CHECKLIST.md).
 
 ```bash
 # Setup and deploy to GCP
@@ -38,6 +39,7 @@ Detailed documentation for the GRCToolKit can be found in the `docs/` directory:
   - [Roadmap](docs/ROADMAP.md) - Project development phases and future enhancements.
 
 - **Deployment & Operations**:
+  - [Helm & Terraform](docs/HELM-TERRAFORM.md) - Helm chart for any Kubernetes; optional GCP Terraform bootstrap.
   - [Deployment Guide](docs/DEPLOYMENT.md) - General deployment instructions.
   - [GCP Deployment Checklist](docs/GCP-DEPLOYMENT-CHECKLIST.md) - Specific steps for Google Cloud Platform.
   - [Secrets Setup](docs/SECRETS-SETUP.md) - API keys and secrets (GitHub Actions, GCP Secret Manager, local).
