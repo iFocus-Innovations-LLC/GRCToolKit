@@ -2,6 +2,16 @@
 
 Creates Artifact Registry and enables APIs. **Do not commit `project_id`** — pass it from your secret store or from Secret Manager.
 
+## Prerequisites (sys admin)
+
+- **Project**: A GCP project ID and **billing** enabled.
+- **Who runs Terraform**: Your user (`gcloud auth application-default login`) or a **service account** whose key JSON is used via `GOOGLE_APPLICATION_CREDENTIALS`.
+- **IAM (least privilege for this module)** on that project:
+  - `roles/serviceusage.serviceUsageAdmin` — enable APIs
+  - `roles/artifactregistry.admin` — create the Docker repository  
+  Broader roles such as **Editor** or **Owner** also work for small dev tenants.
+- **Not created here**: GKE clusters, VPC/firewalls, or workload identities. After `apply`, create a dev cluster (Console or `gcloud`) and install with Helm per [`docs/HELM-TERRAFORM.md`](../../docs/HELM-TERRAFORM.md).
+
 ## Variables
 
 | Input | Sensitive | How to set |
