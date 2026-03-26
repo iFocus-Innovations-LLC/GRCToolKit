@@ -1,0 +1,16 @@
+# Google GKE Ingress + managed cert (adjust names to your project)
+ingress:
+  enabled: true
+  className: "gce"
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "grc-toolkit-ip"
+    networking.gke.io/managed-certificates: "grc-toolkit-ssl-cert"
+  hosts:
+    - host: grc-toolkit.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    enabled: true
+    secretName: grc-toolkit-tls
