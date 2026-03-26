@@ -19,14 +19,23 @@ A comprehensive Governance, Risk, and Compliance (GRC) toolkit that provides AI-
 4. Enter a GRC scenario and click "Analyze Scenario"
 
 ### Containerized Deployment
-- **Helm (any Kubernetes / CSP)**: [Helm & Terraform guide](docs/HELM-TERRAFORM.md) — chart in `charts/grc-toolkit/`.
-- **GCP**: [Deployment Guide](docs/DEPLOYMENT.md) and [GCP Deployment Checklist](docs/GCP-DEPLOYMENT-CHECKLIST.md).
+- **Helm (recommended)**: [Helm & Terraform guide](docs/HELM-TERRAFORM.md) — chart in `charts/grc-toolkit/`.
+- **GCP reference**: [Deployment Guide](docs/DEPLOYMENT.md), [GCP Deployment Checklist](docs/GCP-DEPLOYMENT-CHECKLIST.md) (GKE + secrets; use Terraform + Helm below for registry/bootstrap).
+- **Legacy scripts** (flat `k8s/` manifests): `./scripts/setup-gcp.sh` then `./scripts/deploy.sh production`.
 
-```bash
-# Setup and deploy to GCP
-./scripts/setup-gcp.sh
-./scripts/deploy.sh production
-```
+### GCP lower environment (sys admin)
+
+Use this order so you do not duplicate Artifact Registry setup (Terraform already creates the Docker repo and enables core APIs).
+
+1. **Org / project** — Create or choose a **non-production** GCP project, attach **billing**, and set a default region (e.g. `us-central1`). Resolve any **org policies** that block GKE, Artifact Registry, or Secret Manager.
+2. **Terraform identity** — Decide who runs Terraform (your user or a dedicated SA). Grant at least **Service Usage Admin** and **Artifact Registry Admin** on that project (or broader **Editor** / **Owner** for a small dev tenant). Details: [`terraform/gcp-bootstrap/README.md`](terraform/gcp-bootstrap/README.md).
+3. **Bootstrap with Terraform** — From [`terraform/gcp-bootstrap`](terraform/gcp-bootstrap): `terraform init` / `plan` / `apply` using `TF_VAR_project_id` or Secret Manager as documented there. Note the output **`artifact_registry_repository`** / **`helm_image_registry_hint`** (default repo id is `grc-toolkit`, not `grc-toolkit-repo`).
+4. **GKE** — Terraform does **not** create a cluster. Create a **dev GKE** cluster (Console or `gcloud`; see [GCP Deployment Checklist](docs/GCP-DEPLOYMENT-CHECKLIST.md) “GKE Cluster Creation”), then `gcloud container clusters get-credentials …`.
+5. **Registry auth** — `gcloud auth configure-docker REGION-docker.pkg.dev`, then build and push the image to the path from step 3 (same flow as [Helm & Terraform](docs/HELM-TERRAFORM.md)).
+6. **App secrets** — Store **Gemini** (and any other keys) in **Secret Manager** or create a Kubernetes secret; follow [Secrets Setup](docs/SECRETS-SETUP.md). Do not commit keys.
+7. **Install** — `helm upgrade --install` per [Helm & Terraform](docs/HELM-TERRAFORM.md) (use `examples/values-ingress-gke.yaml` or your ingress class).
+
+CI/CD to this project uses GitHub secrets (e.g. `GCP_PROJECT_ID`, service account key or WIF) as described in [Secrets Setup](docs/SECRETS-SETUP.md).
 
 ## 📚 Documentation
 
