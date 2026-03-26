@@ -13,7 +13,7 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Enforce pinned image versions
       run: |
@@ -26,10 +26,10 @@ jobs:
         scripts/check-container-hardening.sh
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@v4
 
     - name: Build Docker image
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v7
       with:
         context: .
         push: false
@@ -64,7 +64,7 @@ jobs:
 
     - name: Docker Scout image scan
       if: ${{ env.DOCKER_SCOUT_TOKEN != '' }}
-      uses: docker/scout-action@v1
+      uses: docker/scout-action@v1.20.3
       with:
         command: cves
         image: grc-toolkit:pr-test

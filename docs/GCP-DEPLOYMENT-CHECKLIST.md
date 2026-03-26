@@ -4,6 +4,8 @@
 ## Target Environment: GCP Development/QA
 ## Date: 2025-01-XX
 
+**Preferred path for new lower environments:** use Terraform bootstrap ([`terraform/gcp-bootstrap/README.md`](../terraform/gcp-bootstrap/README.md)) for Artifact Registry + API enablement, then Helm ([`docs/HELM-TERRAFORM.md`](HELM-TERRAFORM.md)) to deploy. Skip the manual “Artifact Registry Setup” section below if Terraform already created the repo (default id `grc-toolkit`). This checklist remains useful for **GKE creation**, **kubectl** steps, and operational verification.
+
 ---
 
 ## Pre-Deployment Requirements
