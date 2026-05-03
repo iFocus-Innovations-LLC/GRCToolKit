@@ -21,8 +21,31 @@ The application is containerized using Docker and deployed on Google Kubernetes 
 - [Docker](https://docs.docker.com/get-docker/)
 - [Git](https://git-scm.com/downloads)
 
+### Docker Hub: `docker build --push` and image names
+
+Docker Hub expects **`docker.io/<namespace>/<repository>:<tag>`** where **`<repository>` is a single path segment** (no extra `/`). A tag like `cryptotronbot/grctoolkit-ai/grctoolkit-demo:v1` is interpreted as an invalid or non-existent repository and often fails with **`insufficient_scope: authorization failed`** even when you are logged in.
+
+**Use one of:**
+
+```bash
+docker login   # as a user with push access to namespace cryptotronbot
+docker build --push -t cryptotronbot/grctoolkit-demo:v1 .
+# or a single-segment name that encodes both parts:
+docker build --push -t cryptotronbot/grctoolkit-ai-demo:v1 .
+```
+
+Create the repository under **https://hub.docker.com/repositories** for that `namespace/repository` before the first push.
+
+To avoid mistyping the image reference, use the helper script (from repo root):
+
+```bash
+chmod +x scripts/build-push-dockerhub.sh
+DOCKERHUB_USER=cryptotronbot DOCKERHUB_REPO=grctoolkit-demo DOCKERHUB_TAG=v1 ./scripts/build-push-dockerhub.sh
+```
+
 ### GCP Requirements
 - GCP Project with billing enabled
+- **Billing budget (recommended for dev):** a budget scoped to this project with alert thresholds; see [Billing budget and spend alerts](#billing-budget-and-spend-alerts-lower-environments) for setup and who receives email.
 - Required APIs enabled (handled by setup script)
 - Domain name for production deployment (optional for staging)
 
@@ -35,14 +58,29 @@ git clone <your-repo-url>
 cd GRCToolKit
 ```
 
-### 2. Configure Environment Variables
+### 2. Configure environment
+
+**Do not** use the placeholder `your-project-id` as `GCP_PROJECT_ID`; set a real project ID on your machine (GitHub secrets do not apply to your shell).
+
+**Option A — export in the shell**
 
 ```bash
-export GCP_PROJECT_ID="your-project-id"
+export GCP_PROJECT_ID="YOUR_REAL_PROJECT_ID"
 export GKE_CLUSTER_NAME="grc-toolkit-cluster"
 export GCP_REGION="us-central1"
-export GCP_ZONE="us-central1-a"
 ```
+
+**Option B — secrets file for deploy (recommended; never commit)**
+
+```bash
+cp scripts/grc-deploy.env.example grc-deploy.env
+# edit values; chmod 600 grc-deploy.env
+export GRC_DEPLOY_ENV_FILE=./grc-deploy.env   # or: ./scripts/deploy.sh --env-file ./grc-deploy.env staging
+```
+
+For **CI/non-interactive** local runs, authenticate once (`gcloud auth login` or ADC), then use `GRC_DEPLOY_SILENT=1` (or `./scripts/deploy.sh --silent staging`) so the script skips interactive `gcloud auth login`.
+
+See [Secrets Setup](SECRETS-SETUP.md) for GitHub Actions: **Workload Identity Federation** replaces long-lived JSON keys where configured.
 
 ### 3. Setup GCP Resources
 
@@ -53,7 +91,7 @@ export GCP_ZONE="us-central1-a"
 This script will:
 - Enable required GCP APIs
 - Create Google Artifact Registry repository
-- Create GKE cluster with auto-scaling
+- Create a **regional** GKE cluster (Standard) with auto-scaling (`--region`; matches CI `get-credentials --region`)
 - Create static IP address
 - Setup managed SSL certificate
 - Create Kubernetes namespace
@@ -121,10 +159,17 @@ The GitHub Actions workflow automatically:
 - Runs comprehensive tests
 - Sends deployment notifications
 
-### Required GitHub Secrets:
-- `GCP_PROJECT_ID`: Your GCP project ID
-- `GCP_SA_KEY`: Service account key JSON
-- `GKE_CLUSTER_NAME`: Name of your GKE cluster
+### Required GitHub secrets (Workload Identity Federation)
+
+Configure **OIDC federation** so Actions never stores a long-lived service account JSON key. Add:
+
+- **`GCP_PROJECT_ID`**: GCP project ID
+- **`WORKLOAD_IDENTITY_PROVIDER`**: Full WIF provider resource name
+- **`GCP_SA_EMAIL`**: Deploy service account email (workflow passes this as `service_account`)
+
+The workflow uses `google-github-actions/auth@v3` with `workload_identity_provider` + `service_account`; ensure job **`permissions`** include **`id-token: write`**. Detail: [Secrets Setup](SECRETS-SETUP.md).
+
+Also set **`GKE_CLUSTER_NAME`** (cluster name used by kubectl).
 
 ## 📊 Monitoring and Observability
 
@@ -263,6 +308,24 @@ kubectl rollout undo deployment/grc-toolkit -n grc-toolkit
 ```
 
 ## 💰 Cost Optimization
+
+### Billing budget and spend alerts (lower environments)
+
+Create a **monthly budget** scoped to your **dev (or lower-env) GCP project** so you get notified before spend surprises. This does **not** automatically stop all usage—alerts fire at the thresholds you configure; cutting off spend requires extra automation (for example Pub/Sub + a function) or operational response.
+
+**Create in Google Cloud Console**
+
+1. Open [Billing → Budgets & alerts](https://console.cloud.google.com/billing/budgets).
+2. **Create budget** → choose the **billing account** that owns the dev project.
+3. Under **Projects**, scope the budget to **only** that project (not the whole billing account, unless you intentionally want account-wide tracking).
+4. Set a **monthly budget amount** appropriate for dev (for example aligned with the rough figures in [GCP-DEPLOYMENT-CHECKLIST.md](GCP-DEPLOYMENT-CHECKLIST.md) “Expected Monthly Costs”).
+5. **Alert thresholds:** add **percentage** or **absolute** spend triggers—for dev, common defaults are **50%**, **90%**, and **100%** of the budget so you get early warning and a final alert at the cap.
+6. **Alert recipients (who receives email):** in the budget’s notification settings, add the **explicit email addresses** that should receive alerts. Google sends budget alert mail **only to addresses you configure** on the budget (and any channels you wire, for example Pub/Sub)—not automatically to every project member. **Record in your team runbook** who is listed, for example:
+   - Primary: **_________________** (role: e.g. dev project on-call / engineering lead)
+   - Secondary: **_________________** (role: e.g. FinOps / manager)
+   - Billing visibility: **_________________** (role: e.g. billing account admin, if they need copies)
+
+For authoritative UI steps and API links, see [Create, edit, or delete budgets](https://cloud.google.com/billing/docs/how-to/budgets).
 
 ### Resource Optimization
 - Use appropriate machine types (e2-medium)

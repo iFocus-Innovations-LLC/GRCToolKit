@@ -152,8 +152,9 @@
     <script type="module">
         // Configuration - Set your Gemini API key here
         // Get your API key from: https://aistudio.google.com/
-        window.GEMINI_API_KEY = ""; // Will be injected at runtime from Kubernetes Secret
-        
+        window.GEMINI_API_KEY = "__GEMINI_API_KEY__"; // Injected: docker-entrypoint.sh or scripts/run-local.sh
+        // Use a model that supports structured JSON (response_mime_type), e.g. gemini-2.5-flash, gemini-2.0-flash, gemini-1.5-flash — not gemini-pro / gemini-1.0-pro.
+        window.GEMINI_MODEL = window.GEMINI_MODEL || "gemini-2.5-flash";
         // Firebase Configuration
         const firebaseConfig = {
             apiKey: "YOUR_FIREBASE_API_KEY",
@@ -252,31 +253,89 @@
 
                 chatHistory.push({ role: "user", parts: [{ text: fullPrompt }] });
 
-                const payload = {
-                    contents: chatHistory,
-                    generationConfig: {
-                        temperature: 0.3, // Lower temperature for more consistent JSON output
-                        topK: 40,
-                        topP: 0.95,
-                        maxOutputTokens: 2048, // Increased for more detailed responses
-                        responseMimeType: "application/json", // Encourage JSON output
-                    },
+                // v1beta + protobuf-style JSON (camelCase generationConfig). Do not use stable v1 URL — it rejects responseMimeType.
+                // If you still see 400s, hard-refresh or redeploy: an old bundle may be sending stale field names.
+                const apiKey = (window.GEMINI_API_KEY || "").trim();
+                const modelId = window.GEMINI_MODEL || "gemini-2.5-flash";
+                if (!apiKey) {
+                    throw new Error(
+                        "No Gemini API key in this page. Export GEMINI_API_KEY, restart ./scripts/run-local.sh (or redeploy the container), hard-refresh the browser, or set window.GEMINI_API_KEY in the console.",
+                    );
+                }
+                const apiUrl =
+                    "https://generativelanguage.googleapis.com/v1beta/models/" +
+                    encodeURIComponent(modelId) +
+                    ":generateContent?key=" +
+                    encodeURIComponent(apiKey);
+
+                const genBase = {
+                    temperature: 0.3,
+                    topK: 40,
+                    topP: 0.95,
+                    maxOutputTokens: 2048,
                 };
-                const apiKey = window.GEMINI_API_KEY || ""; // Set window.GEMINI_API_KEY in browser console or configure below
-                const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!response.ok) {
-                    const errorDetail = await response.json();
-                    throw new Error(`API error: ${response.status} - ${errorDetail.error.message || 'Unknown error'}`);
+                async function geminiGenerate(withStructuredJsonMime) {
+                    const generationConfig = withStructuredJsonMime
+                        ? { ...genBase, responseMimeType: "application/json" }
+                        : { ...genBase };
+                    const body = JSON.stringify({
+                        contents: chatHistory,
+                        generationConfig,
+                    });
+                    const res = await fetch(apiUrl, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body,
+                    });
+                    const raw = await res.text();
+                    return { res, raw };
                 }
 
-                const result = await response.json();
+                let { res: gemRes, raw: gemRaw } = await geminiGenerate(true);
+                if (!gemRes.ok) {
+                    let msg = gemRaw;
+                    try {
+                        msg = JSON.parse(gemRaw).error?.message || gemRaw;
+                    } catch {
+                        /* use raw */
+                    }
+                    if (
+                        gemRes.status === 400 &&
+                        /responseMimeType|response_mime_type|Unknown name|generation_config|generationConfig/i.test(
+                            String(msg),
+                        )
+                    ) {
+                        console.warn(
+                            "Gemini: structured JSON mode rejected; retrying without responseMimeType.",
+                        );
+                        ({ res: gemRes, raw: gemRaw } = await geminiGenerate(false));
+                    }
+                }
+                if (!gemRes.ok) {
+                    let errorDetail = {};
+                    try {
+                        errorDetail = JSON.parse(gemRaw);
+                    } catch {
+                        /* */
+                    }
+                    const apiMsg = errorDetail.error?.message || gemRaw || "Unknown error";
+                    let detail = apiMsg;
+                    const s = String(apiMsg);
+                    if (
+                        gemRes.status === 400 &&
+                        /API key expired|API key|api key|invalid.*key|PERMISSION_DENIED/i.test(s)
+                    ) {
+                        detail =
+                            s +
+                            " Note: Google often returns “API key expired” for any rejected key (revoked, wrong project, HTTP referrer / API restrictions, or stale HTML). " +
+                            "Create or copy a current key from https://aistudio.google.com/ , check GCP Credentials → key restrictions (Generative Language API; referrer rules must match how you open the app), " +
+                            "then set GEMINI_API_KEY, restart run-local.sh or redeploy, and hard-refresh.";
+                    }
+                    throw new Error(`API error: ${gemRes.status} - ${detail}`);
+                }
+
+                const result = JSON.parse(gemRaw);
                 if (result.candidates && result.candidates.length > 0 &&
                     result.candidates[0].content && result.candidates[0].content.parts &&
                     result.candidates[0].content.parts.length > 0) {

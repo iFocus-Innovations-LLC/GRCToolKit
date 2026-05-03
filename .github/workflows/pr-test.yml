@@ -2,7 +2,7 @@ name: Pull Request Tests
 
 on:
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, develop, qa ]
 
 jobs:
   test:
@@ -133,6 +133,8 @@ jobs:
     - name: Test deployment script syntax
       run: |
         bash -n scripts/deploy.sh
+        bash -n scripts/run-local.sh
+        bash -n scripts/test-mvp-demo.sh
         bash -n scripts/setup-gcp.sh
         bash -n scripts/test-container.sh
 

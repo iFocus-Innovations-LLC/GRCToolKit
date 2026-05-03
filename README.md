@@ -9,14 +9,20 @@ A comprehensive Governance, Risk, and Compliance (GRC) toolkit that provides AI-
 ## 🚀 Quick Start
 
 ### Local Development
-1. Set up secrets (see [docs/SECRETS-SETUP.md](docs/SECRETS-SETUP.md)) – e.g. `export GEMINI_API_KEY`
-2. Build and run with Docker:
+1. Set up secrets (see [docs/SECRETS-SETUP.md](docs/SECRETS-SETUP.md)) – e.g. `export GEMINI_API_KEY` from [Google AI Studio](https://aistudio.google.com/).
+2. **Quick local server (no Docker)** — serves the repo so `/ai-agent/` paths work; writes gitignored `local-index.html`:
+   ```bash
+   export GEMINI_API_KEY="your-key"
+   ./scripts/run-local.sh
+   ```
+   Open **http://127.0.0.1:8080/local-index.html** (override port: `PORT=8090 ./scripts/run-local.sh`).
+3. **Docker** — build and run:
    ```bash
    docker build -t grc-toolkit .
    docker run -p 8080:8080 -e GEMINI_API_KEY=$GEMINI_API_KEY grc-toolkit
    ```
-3. Open `http://localhost:8080/` in your web browser
-4. Enter a GRC scenario and click "Analyze Scenario"
+4. Open `http://localhost:8080/` in your web browser (Docker) or the `local-index.html` URL above.
+5. Enter a GRC scenario and click "Analyze Scenario"
 
 ### Containerized Deployment
 - **Helm (recommended)**: [Helm & Terraform guide](docs/HELM-TERRAFORM.md) — chart in `charts/grc-toolkit/`.
@@ -66,12 +72,12 @@ Detailed documentation for the GRCToolKit can be found in the `docs/` directory:
 
 ## 🏗️ Architecture
 
-This application provides a modern UI for interacting with a GRC Compliance Engine. It uses the Gemini 1.5 Flash model (stable v1 API) to analyze scenarios against NIST SP 800-53 Rev. 5 controls. The engine integrates with Ansible playbooks for automated control validation and generates OSCAL-compliant documentation.
+This application provides a modern UI for interacting with a GRC Compliance Engine. It uses the **Gemini API** (`generateContent` on **v1beta**) with a default model such as **`gemini-2.5-flash`** (supports structured JSON / `response_mime_type`). Avoid legacy IDs like **`gemini-pro`** for JSON mode. The engine integrates with Ansible playbooks for automated control validation and generates OSCAL-compliant documentation.
 
 ## ✨ Key Features
 
 ### 🤖 AI Compliance Engine
-- **Gemini 1.5 Flash Integration**: Uses stable v1 API for reliable GRC analysis.
+- **Gemini API integration**: **v1beta** `generateContent` with **`gemini-2.5-flash`** by default (configurable via `window.GEMINI_MODEL`); structured JSON output for GRC analysis.
 - **Scenario Recognition**: Automatically detects PQC migration, quantum risk, and standard GRC scenarios.
 - **Structured JSON Output**: AI responses include controls, CSF mappings, and implementation recommendations.
 

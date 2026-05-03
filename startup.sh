@@ -1,20 +1,15 @@
 #!/bin/sh
+# Legacy/local helper: same rendering as scripts/docker-entrypoint.sh (Docker image entrypoint).
+# Expects index.html.template next to this script or under /usr/share/nginx/html in a container.
 
-# Startup script to inject environment variables into HTML
-# This ensures the GEMINI_API_KEY is securely injected at runtime
-
-echo "🔐 Injecting GEMINI_API_KEY into HTML..."
-
-# Create a temporary HTML file with the API key injected
-if [ -n "$GEMINI_API_KEY" ]; then
-    echo "✅ API key found, injecting into HTML..."
-    sed "s/window.GEMINI_API_KEY = \"\";/window.GEMINI_API_KEY = \"${GEMINI_API_KEY}\";/g" /usr/share/nginx/html/grctoolkit.html > /usr/share/nginx/html/index.html
-else
-    echo "⚠️  No API key provided, using original HTML..."
-    cp /usr/share/nginx/html/grctoolkit.html /usr/share/nginx/html/index.html
+set -e
+TEMPLATE="${GRC_HTML_TEMPLATE:-/usr/share/nginx/html/index.html.template}"
+OUT="${GRC_HTML_OUT:-/usr/share/nginx/html/index.html}"
+if [ ! -f "$TEMPLATE" ]; then
+  echo "error: template not found: $TEMPLATE" >&2
+  exit 1
 fi
-
-echo "🚀 Starting nginx with graceful shutdown support..."
-
-# Start the graceful shutdown script
-exec /usr/local/bin/graceful-shutdown.sh
+k="${GEMINI_API_KEY:-}"
+k=$(printf '%s' "$k" | sed -e 's/[\\|&]/\\&/g')
+sed -e "s|__GEMINI_API_KEY__|${k}|g" "$TEMPLATE" > "$OUT"
+echo "Rendered ${OUT} from ${TEMPLATE}."

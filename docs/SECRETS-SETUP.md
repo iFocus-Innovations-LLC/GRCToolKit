@@ -4,15 +4,18 @@ Zero-trust secrets management for GRC Toolkit. **Never commit API keys, tokens, 
 
 ## Required Secrets by Environment
 
-| Secret | Used By | Purpose |
+| Secret / variable | Used By | Purpose |
 |--------|---------|---------|
 | **GEMINI_API_KEY** | App (Docker, K8s) | Gemini AI API for GRC recommendations |
-| **DOCKER_SCOUT_TOKEN** | GitHub Actions | Docker image vulnerability scanning |
+| **DOCKER_SCOUT_TOKEN** | GitHub Actions | Docker image vulnerability scanning (optional) |
 | **GCP_PROJECT_ID** | GitHub Actions, scripts | GCP project identifier |
-| **GCP_SA_KEY** | GitHub Actions | Service account JSON for GAR push, GKE deploy |
+| **WORKLOAD_IDENTITY_PROVIDER** | GitHub Actions | WIF provider resource name for OIDC federation |
+| **GCP_SA_EMAIL** | GitHub Actions | GCP service account that GitHub impersonates via WIF |
 | **GKE_CLUSTER_NAME** | GitHub Actions | GKE cluster name for deploy |
 | **ANTHROPIC_API_KEY** | nist-validator skill | Anthropic API (optional) |
 | **Firebase config** | grctoolkit.html | Firebase (optional, for future features) |
+
+Prefer **Workload Identity Federation (OIDC)** for Actions so you do **not** store long‑lived `GCP_SA_KEY` JSON keys in GitHub. Legacy setups may still reference `GCP_SA_KEY`; migrate to WIF when possible (see [`.github/workflows/ci-cd.yml`](../.github/workflows/ci-cd.yml)).
 
 ---
 
@@ -20,16 +23,21 @@ Zero-trust secrets management for GRC Toolkit. **Never commit API keys, tokens, 
 
 Add these in **Settings → Secrets and variables → Actions**:
 
-| Secret Name | How to Create |
-|-------------|---------------|
-| `DOCKER_SCOUT_TOKEN` | [Docker Scout](https://scout.docker.com/) → Account → Access Tokens |
-| `GCP_PROJECT_ID` | Your GCP project ID (e.g. `bionic-kiln-466119-u3`) |
-| `GCP_SA_KEY` | Service account JSON key with Artifact Registry + GKE permissions |
-| `GKE_CLUSTER_NAME` | Your GKE cluster name (e.g. `grc-toolkit-cluster`) |
+| Name | Kind | How to create |
+|------|------|---------------|
+| `DOCKER_SCOUT_TOKEN` | Secret | [Docker Scout](https://scout.docker.com/) → Account → Access Tokens (optional) |
+| `GCP_PROJECT_ID` | Secret | Your GCP project ID |
+| `WORKLOAD_IDENTITY_PROVIDER` | Secret | Full provider resource string from GCP WIF (see Google doc [Workload Identity Federation with GitHub](https://cloud.google.com/iam/docs/workload-identity-federation-with-deployment-providers)) |
+| `GCP_SA_EMAIL` | Secret | Deploy SA email (e.g. `grc-deploy@YOUR_PROJECT_ID.iam.gserviceaccount.com`) |
+| `GKE_CLUSTER_NAME` | Secret | Your GKE cluster name (e.g. `grc-toolkit-cluster`) |
+
+The Actions workflow authenticates via `google-github-actions/auth@v3` using **`workload_identity_provider`** + **`service_account`** (matches `GCP_SA_EMAIL`). Ensure the workflow **`permissions`** include **`id-token: write`** for OIDC.
 
 ### GCP Service Account Permissions
 
-The `GCP_SA_KEY` service account needs:
+**Workload Identity Federation does not replace this service account** — Actions still obtains credentials **as** that SA; WIF only removes the need for a downloaded **JSON key** in GitHub (`GCP_SA_KEY`).
+
+The impersonated GCP service account needs:
 
 - `roles/artifactregistry.writer` (push images)
 - `roles/container.developer` (deploy to GKE)
@@ -45,6 +53,8 @@ The `GCP_SA_KEY` service account needs:
 export GEMINI_API_KEY="your-gemini-api-key"
 docker run -p 8080:8080 -e GEMINI_API_KEY=$GEMINI_API_KEY grc-toolkit
 ```
+
+**If the app shows `API error: 400 - API key expired`:** Google uses that wording for several failures—not only clock expiry. Typical causes: key deleted or rotated in [Google AI Studio](https://aistudio.google.com/); API key **restrictions** in GCP (Credentials) blocking **Generative Language API** or the wrong **HTTP referrer** (browser vs `file://`); or the page still has an **old embedded key** (restart `./scripts/run-local.sh` or the container, then hard-refresh). Verify the value the browser uses: DevTools → Console → `window.GEMINI_API_KEY` (check length/prefix only; do not paste the full key into chat).
 
 ### Option B: Kubernetes Secret (for K8s deploy)
 
@@ -72,7 +82,7 @@ echo -n "YOUR_GEMINI_API_KEY" | gcloud secrets create gemini-api-key \
 ### Sync to Kubernetes
 
 ```bash
-export GCP_PROJECT_ID="your-project-id"
+export GCP_PROJECT_ID="YOUR_REAL_PROJECT_ID"
 ./scripts/sync-secret-from-gcp.sh gemini-api-key
 ./scripts/deploy.sh staging
 ```

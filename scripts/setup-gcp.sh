@@ -8,9 +8,13 @@ set -e
 PROJECT_ID=${GCP_PROJECT_ID:-"your-project-id"}
 CLUSTER_NAME=${GKE_CLUSTER_NAME:-"grc-toolkit-cluster"}
 REGION=${GCP_REGION:-"us-central1"}
-ZONE=${GCP_ZONE:-"us-central1-a"}
 GAR_LOCATION=${GAR_LOCATION:-"us-central1"}
 REPOSITORY=${REPOSITORY:-"grc-toolkit"}
+
+if [[ "${PROJECT_ID}" == "your-project-id" ]]; then
+    echo "error: Set GCP_PROJECT_ID to your real project id before running this script."
+    exit 1
+fi
 
 echo "🏗️  Setting up GCP resources for GRC Toolkit..."
 
@@ -27,23 +31,26 @@ gcloud config set project $PROJECT_ID
 
 # Enable required APIs
 echo "🔌 Enabling required GCP APIs..."
-gcloud services enable container.googleapis.com
-gcloud services enable artifactregistry.googleapis.com
-gcloud services enable compute.googleapis.com
-gcloud services enable dns.googleapis.com
+gcloud services enable container.googleapis.com --project="$PROJECT_ID"
+gcloud services enable artifactregistry.googleapis.com --project="$PROJECT_ID"
+gcloud services enable compute.googleapis.com --project="$PROJECT_ID"
+gcloud services enable dns.googleapis.com --project="$PROJECT_ID"
 
 # Create Google Artifact Registry repository
 echo "📦 Creating Google Artifact Registry repository..."
 gcloud artifacts repositories create $REPOSITORY \
     --repository-format=docker \
     --location=$GAR_LOCATION \
+    --project="$PROJECT_ID" \
     --description="GRC Toolkit Docker repository" \
     --quiet || echo "Repository already exists"
 
-# Create GKE cluster
+# Create GKE cluster (regional Standard — matches ci-cd get-credentials --region)
 echo "☸️  Creating GKE cluster..."
-gcloud container clusters create $CLUSTER_NAME \
-    --zone=$ZONE \
+gcloud container clusters create "$CLUSTER_NAME" \
+    --project="$PROJECT_ID" \
+    --region="$REGION" \
+    --release-channel=regular \
     --num-nodes=3 \
     --enable-autoscaling \
     --min-nodes=1 \
@@ -51,24 +58,35 @@ gcloud container clusters create $CLUSTER_NAME \
     --enable-autorepair \
     --enable-autoupgrade \
     --machine-type=e2-medium \
-    --disk-size=20GB \
+    --disk-size=20 \
     --disk-type=pd-standard \
     --enable-network-policy \
     --enable-ip-alias \
+    --addons=HttpLoadBalancing,HorizontalPodAutoscaling \
     --quiet || echo "Cluster already exists"
 
 # Get cluster credentials
 echo "🔑 Getting cluster credentials..."
-gcloud container clusters get-credentials $CLUSTER_NAME --zone=$ZONE --project=$PROJECT_ID
+gcloud container clusters get-credentials "$CLUSTER_NAME" \
+    --region="$REGION" --project="$PROJECT_ID"
+
+# Configure kubectl
+echo "⚙️  Configuring kubectl..."
+kubectl config current-context
+
+# Namespace required before GKE ManagedCertificate in that namespace
+echo "📁 Creating namespace..."
+kubectl create namespace grc-toolkit || echo "Namespace already exists"
 
 # Create static IP for production
 echo "🌐 Creating static IP address..."
 gcloud compute addresses create grc-toolkit-ip \
     --global \
+    --project="$PROJECT_ID" \
     --quiet || echo "Static IP already exists"
 
 # Get the static IP address
-STATIC_IP=$(gcloud compute addresses describe grc-toolkit-ip --global --format="value(address)")
+STATIC_IP=$(gcloud compute addresses describe grc-toolkit-ip --global --project="$PROJECT_ID" --format="value(address)")
 echo "📍 Static IP address: $STATIC_IP"
 
 # Create managed SSL certificate
@@ -84,14 +102,6 @@ spec:
     - grc-toolkit.yourdomain.com  # Replace with your actual domain
 EOF
 
-# Configure kubectl
-echo "⚙️  Configuring kubectl..."
-kubectl config current-context
-
-# Create namespace
-echo "📁 Creating namespace..."
-kubectl create namespace grc-toolkit || echo "Namespace already exists"
-
 echo "✅ GCP setup completed successfully!"
 echo ""
 echo "📋 Next steps:"
@@ -100,7 +110,7 @@ echo "2. Point your domain's DNS to the static IP: $STATIC_IP"
 echo "3. Run './scripts/deploy.sh production' to deploy the application"
 echo ""
 echo "🔧 Useful commands:"
-echo "- View cluster: gcloud container clusters describe $CLUSTER_NAME --zone=$ZONE"
-echo "- Get credentials: gcloud container clusters get-credentials $CLUSTER_NAME --zone=$ZONE"
+echo "- View cluster: gcloud container clusters describe $CLUSTER_NAME --region=$REGION --project=$PROJECT_ID"
+echo "- Get credentials: gcloud container clusters get-credentials $CLUSTER_NAME --region=$REGION --project=$PROJECT_ID"
 echo "- View pods: kubectl get pods -n grc-toolkit"
 echo "- View services: kubectl get services -n grc-toolkit"
