@@ -26,6 +26,15 @@ API_KEY=$(gcloud secrets versions access latest --secret="$SECRET_NAME" --projec
     exit 1
 }
 
+API_KEY_TRIM="${API_KEY#"${API_KEY%%[![:space:]]*}"}"
+API_KEY_TRIM="${API_KEY_TRIM%"${API_KEY_TRIM##*[![:space:]]}"}"
+if [ -z "$API_KEY_TRIM" ]; then
+    echo "❌ Error: Secret Manager version for '$SECRET_NAME' is empty or whitespace only." >&2
+    echo "   Add a new version: echo -n 'YOUR_KEY' | gcloud secrets versions add $SECRET_NAME --data-file=- --project=$PROJECT_ID"
+    exit 1
+fi
+API_KEY="$API_KEY_TRIM"
+
 # Ensure namespace exists
 kubectl get namespace "$NAMESPACE" >/dev/null 2>&1 || kubectl create namespace "$NAMESPACE"
 

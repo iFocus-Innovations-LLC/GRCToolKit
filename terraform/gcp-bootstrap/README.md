@@ -12,6 +12,25 @@ Creates Artifact Registry and enables APIs. **Do not commit `project_id`** — p
   Broader roles such as **Editor** or **Owner** also work for small dev tenants.
 - **Not created here**: GKE clusters, VPC/firewalls, or workload identities. After `apply`, create a dev cluster (Console or `gcloud`) and install with Helm per [`docs/HELM-TERRAFORM.md`](../../docs/HELM-TERRAFORM.md).
 
+### API enablement fails (`AUTH_PERMISSION_DENIED`, Service Usage)
+
+The identity running Terraform (`gcloud auth application-default login`, or the service account behind `GOOGLE_APPLICATION_CREDENTIALS`) needs the roles above. A project **Owner** or **Project IAM Admin** can grant them from the repo root:
+
+```bash
+export GCP_PROJECT_ID=YOUR_PROJECT_ID
+./scripts/grant-bootstrap-iam.sh
+```
+
+Then retry bootstrap:
+
+```bash
+cd terraform/gcp-bootstrap
+terraform init
+terraform apply
+```
+
+Broader **Editor** or **Owner** on the project also satisfies API enablement for small dev tenants.
+
 ## Variables
 
 | Input | Sensitive | How to set |

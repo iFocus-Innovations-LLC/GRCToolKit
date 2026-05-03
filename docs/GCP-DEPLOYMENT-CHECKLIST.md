@@ -13,6 +13,12 @@
 ### GCP Account Setup
 - [ ] GCP Project created with project ID: `_________________`
 - [ ] Billing account linked and active
+- [ ] **Billing budget** created for this **project** only (Console: [Billing → Budgets & alerts](https://console.cloud.google.com/billing/budgets)): monthly amount `_________________`; threshold alerts at (recommended) **50%**, **90%**, **100%** (adjust as needed)
+- [ ] **Budget alert email recipients** configured and recorded below (Google emails **only** the addresses you add on the budget):
+  - Primary recipient(s): `_________________` (e.g. dev on-call / lead)
+  - Secondary / FinOps: `_________________`
+  - Billing admin copy (optional): `_________________`
+  - Note: budgets **notify**; they do not automatically stop spend—see [DEPLOYMENT.md — Billing budget and spend alerts](DEPLOYMENT.md#billing-budget-and-spend-alerts-lower-environments)
 - [ ] Required APIs enabled (see below)
 - [ ] Service account created with appropriate permissions
 - [ ] IAM roles configured for deployment
@@ -42,18 +48,19 @@
 
 ## Deployment Steps
 
-### Step 1: GKE Cluster Creation
+### Step 1: GKE Cluster Creation (regional Standard)
+
+Use a **regional** cluster so `gcloud … get-credentials --region REGION` matches [`.github/workflows/ci-cd.yml`](../.github/workflows/ci-cd.yml) deploy jobs.
+
 ```bash
-# Set variables
-export PROJECT_ID="your-project-id"
+export PROJECT_ID="YOUR_REAL_PROJECT_ID"
 export REGION="us-central1"
-export ZONE="us-central1-a"
 export CLUSTER_NAME="grc-toolkit-dev"
 
-# Create GKE cluster
-gcloud container clusters create $CLUSTER_NAME \
-    --project=$PROJECT_ID \
-    --zone=$ZONE \
+gcloud container clusters create "$CLUSTER_NAME" \
+    --project="$PROJECT_ID" \
+    --region="$REGION" \
+    --release-channel=regular \
     --num-nodes=2 \
     --machine-type=e2-standard-2 \
     --enable-autoscaling \
@@ -61,10 +68,11 @@ gcloud container clusters create $CLUSTER_NAME \
     --max-nodes=5 \
     --enable-autorepair \
     --enable-autoupgrade \
-    --addons=HorizontalPodAutoscaling,HttpLoadBalancing
+    --addons=HorizontalPodAutoscaling,HttpLoadBalancing \
+    --enable-ip-alias
 
-# Get cluster credentials
-gcloud container clusters get-credentials $CLUSTER_NAME --zone=$ZONE
+gcloud container clusters get-credentials "$CLUSTER_NAME" \
+    --region="$REGION" --project="$PROJECT_ID"
 ```
 
 - [ ] GKE cluster created successfully
@@ -293,7 +301,7 @@ kubectl describe ingress grc-toolkit-ingress -n grc-toolkit
 ### Cost Optimization Tips
 - Use preemptible nodes for non-critical workloads (60-80% savings)
 - Enable auto-scaling to scale down during low usage
-- Set up billing alerts
+- Keep the **project-scoped billing budget** and **alert recipient** list up to date (see Pre-Deployment and [DEPLOYMENT.md — Billing budget and spend alerts](DEPLOYMENT.md#billing-budget-and-spend-alerts-lower-environments))
 - Review and optimize resource requests/limits
 
 ---

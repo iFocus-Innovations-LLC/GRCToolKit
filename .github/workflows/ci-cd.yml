@@ -2,9 +2,14 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, qa ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop, qa ]
+
+permissions:
+  contents: read
+  id-token: write
+  security-events: write
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
@@ -124,7 +129,8 @@ jobs:
       id: auth
       uses: 'google-github-actions/auth@v3'
       with:
-        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+        workload_identity_provider: '${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}'
+        service_account: '${{ secrets.GCP_SA_EMAIL }}'
 
     - name: Set up Cloud SDK
       uses: 'google-github-actions/setup-gcloud@v3'
@@ -171,7 +177,8 @@ jobs:
       id: auth
       uses: 'google-github-actions/auth@v3'
       with:
-        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+        workload_identity_provider: '${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}'
+        service_account: '${{ secrets.GCP_SA_EMAIL }}'
 
     - name: Set up Cloud SDK
       uses: 'google-github-actions/setup-gcloud@v3'
@@ -220,7 +227,8 @@ jobs:
       id: auth
       uses: 'google-github-actions/auth@v3'
       with:
-        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+        workload_identity_provider: '${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}'
+        service_account: '${{ secrets.GCP_SA_EMAIL }}'
 
     - name: Set up Cloud SDK
       uses: 'google-github-actions/setup-gcloud@v3'

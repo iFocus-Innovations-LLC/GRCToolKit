@@ -7,9 +7,11 @@ RUN rm -f /etc/nginx/conf.d/default.conf
 # Copy our nginx config (listens on 8080, /health, security headers)
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# Copy static assets to nginx html root
+# Static assets: template is rendered to index.html on container start (API key injection).
 WORKDIR /usr/share/nginx/html
-COPY grctoolkit.html ./index.html
+COPY grctoolkit.html ./index.html.template
+COPY scripts/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chown nginx:nginx /docker-entrypoint.sh && chmod 550 /docker-entrypoint.sh
 COPY ai-agent ./ai-agent/
 COPY compliance-docs ./compliance-docs/
 COPY oscal ./oscal/
@@ -25,4 +27,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s \
   CMD wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1
 
-CMD ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["/docker-entrypoint.sh"]
