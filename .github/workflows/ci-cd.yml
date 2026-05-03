@@ -119,7 +119,10 @@ jobs:
   build-and-push:
     needs: test
     runs-on: ubuntu-24.04
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    # Requires WIF + GCP secrets (see docs/BRANCH-PROTECTION.md). Opt in with repo variable ENABLE_GCP_GAR_DEPLOY=true.
+    if: |
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') &&
+      vars.ENABLE_GCP_GAR_DEPLOY == 'true'
     
     steps:
     - name: Checkout code

@@ -80,12 +80,24 @@ Ensure all of these are set under **Settings → Secrets and variables → Actio
 
 | Name | Used by | Notes |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | ai-pr-review.yml | Anthropic Console → API Keys |
+| `ANTHROPICAPI` | ai-pr-review.yml | Anthropic Console → API Keys (repository secret name) |
 | `GCP_PROJECT_ID` | ci-cd.yml | Your GCP project ID |
 | `WORKLOAD_IDENTITY_PROVIDER` | ci-cd.yml | WIF OIDC provider resource (no long-lived JSON key) |
 | `GCP_SA_EMAIL` | ci-cd.yml | Service account Actions impersonates |
 | `GKE_CLUSTER_NAME` | ci-cd.yml | Your GKE cluster name |
 | `DOCKER_SCOUT_TOKEN` | ci-cd.yml | Optional — Docker Scout token |
+| `DOCKER_PAT` | build.yml (`ci` workflow) | Docker Hub — only if `ENABLE_DOCKERHUB_CI` is enabled |
+
+### Variables (optional — keep `main` green without registry secrets)
+
+If unset or not `true`, the matching jobs are **skipped** so pushes to `main` do not fail on missing Docker Hub or GCP WIF configuration.
+
+| Name | Set to | Effect |
+|---|---|---|
+| `ENABLE_DOCKERHUB_CI` | `true` | Runs `build.yml` Docker Hub login + build on `main` (needs `DOCKER_PAT`, `DOCKER_USER` var). |
+| `ENABLE_GCP_GAR_DEPLOY` | `true` | Runs `ci-cd.yml` `build-and-push` and deploy jobs (needs GCP/WIF secrets below). |
+
+Configure under **Settings → Secrets and variables → Actions → Variables**.
 
 ---
 
