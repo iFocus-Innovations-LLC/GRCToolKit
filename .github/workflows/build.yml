@@ -1,5 +1,7 @@
 name: ci
 
+# Optional Docker Hub + Build Cloud push. Requires Actions secrets DOCKER_PAT and vars DOCKER_USER.
+# Enable with repo variable ENABLE_DOCKERHUB_CI=true (Settings → Secrets and variables → Actions → Variables).
 on:
   push:
     branches:
@@ -10,6 +12,7 @@ permissions:
 
 jobs:
   docker:
+    if: ${{ vars.ENABLE_DOCKERHUB_CI == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
