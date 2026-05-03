@@ -1,10 +1,8 @@
 # Static GRC Toolkit - nginx serves the app on port 8080 for CI/CD compatibility
-# Zero-trust: pinned base image, non-root user, minimal attack surface
-FROM nginx:1.26-alpine@sha256:1eadbb07820339e8bbfed18c771691970baee292ec4ab2558f1453d26153e22d
+# Zero-trust: pinned multi-arch index digest, non-root user, slim Alpine 3.23 base (fewer pkgs/CVEs vs full alpine + curl install)
+FROM nginx:1.30.0-alpine-slim@sha256:2fb5d772cea6ef1a8dab525df1b9485289eee167d26af9613fce27a12c060caa
 
-# Install curl for HEALTHCHECK (Alpine minimal image may not include it)
-RUN apk add --no-cache curl \
-    && rm -f /etc/nginx/conf.d/default.conf
+RUN rm -f /etc/nginx/conf.d/default.conf
 
 # Copy our nginx config (listens on 8080, /health, security headers)
 COPY nginx.conf /etc/nginx/nginx.conf
@@ -25,6 +23,6 @@ USER nginx
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=3s \
-  CMD curl -f http://127.0.0.1:8080/health || exit 1
+  CMD wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]
