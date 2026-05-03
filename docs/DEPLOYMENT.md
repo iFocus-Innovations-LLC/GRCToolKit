@@ -21,6 +21,28 @@ The application is containerized using Docker and deployed on Google Kubernetes 
 - [Docker](https://docs.docker.com/get-docker/)
 - [Git](https://git-scm.com/downloads)
 
+### Docker Hub: `docker build --push` and image names
+
+Docker Hub expects **`docker.io/<namespace>/<repository>:<tag>`** where **`<repository>` is a single path segment** (no extra `/`). A tag like `cryptotronbot/grctoolkit-ai/grctoolkit-demo:v1` is interpreted as an invalid or non-existent repository and often fails with **`insufficient_scope: authorization failed`** even when you are logged in.
+
+**Use one of:**
+
+```bash
+docker login   # as a user with push access to namespace cryptotronbot
+docker build --push -t cryptotronbot/grctoolkit-demo:v1 .
+# or a single-segment name that encodes both parts:
+docker build --push -t cryptotronbot/grctoolkit-ai-demo:v1 .
+```
+
+Create the repository under **https://hub.docker.com/repositories** for that `namespace/repository` before the first push.
+
+To avoid mistyping the image reference, use the helper script (from repo root):
+
+```bash
+chmod +x scripts/build-push-dockerhub.sh
+DOCKERHUB_USER=cryptotronbot DOCKERHUB_REPO=grctoolkit-demo DOCKERHUB_TAG=v1 ./scripts/build-push-dockerhub.sh
+```
+
 ### GCP Requirements
 - GCP Project with billing enabled
 - Required APIs enabled (handled by setup script)
