@@ -1,0 +1,185 @@
+name: AI Peer Review Agent
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  ai-review:
+    name: Agentic Code Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # full history so we can diff against base branch
+
+      # ── 2. Build diff payload ─────────────────────────────────────────────────
+      - name: Generate PR diff
+        id: diff
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          DIFF=$(git diff origin/${{ github.base_ref }}...HEAD -- \
+            '*.js' '*.html' '*.sh' '*.yml' '*.yaml' '*.json' \
+            '*.md' '*.py' '*.txt' 'Dockerfile' \
+            | head -c 28000)          # stay well within token limits
+
+          # Escape for JSON
+          DIFF_ESCAPED=$(echo "$DIFF" | python3 -c "
+          import sys, json
+          print(json.dumps(sys.stdin.read()))
+          ")
+          echo "diff_json=$DIFF_ESCAPED" >> $GITHUB_OUTPUT
+
+      # ── 3. Collect PR metadata ────────────────────────────────────────────────
+      - name: Collect PR metadata
+        id: meta
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_TITLE=$(gh pr view ${{ github.event.pull_request.number }} --json title -q .title)
+          PR_BODY=$(gh pr view ${{ github.event.pull_request.number }} --json body -q .body | head -c 2000)
+          FILES=$(gh pr view ${{ github.event.pull_request.number }} --json files -q '[.files[].path] | join(", ")')
+          echo "title=$PR_TITLE" >> $GITHUB_OUTPUT
+          echo "body=$PR_BODY" >> $GITHUB_OUTPUT
+          echo "files=$FILES" >> $GITHUB_OUTPUT
+
+      # ── 4. Call Claude API ────────────────────────────────────────────────────
+      # Fork PRs and repos without Actions secrets do not receive ANTHROPICAPI;
+      # calling the API with an empty header yields Anthropic's "x-api-key header is required".
+      - name: Run Claude AI Review
+        id: claude_review
+        env:
+          ANTHROPICAPI: ${{ secrets.ANTHROPICAPI }}
+        run: |
+          if [ -z "${ANTHROPICAPI:-}" ]; then
+            cat > /tmp/review_output.md << 'SKIP_MSG'
+          ### AI review unavailable
+
+          **Cause:** The repository secret `ANTHROPICAPI` is not available for this workflow run.
+
+          **Typical reasons**
+
+          - The secret is not defined: add it under **Settings → Secrets and variables → Actions** (see [docs/BRANCH-PROTECTION.md](https://github.com/${{ github.repository }}/blob/${{ github.event.repository.default_branch }}/docs/BRANCH-PROTECTION.md)).
+          - **Pull requests from forks** do not receive repository secrets in `pull_request` workflows, so automated Claude review cannot run for those PRs from this job.
+
+          **Overall recommendation:** COMMENT_ONLY
+          SKIP_MSG
+            echo "review_file=/tmp/review_output.md" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          cat > /tmp/review_request.json << 'PAYLOAD_EOF'
+          {
+            "model": "claude-sonnet-4-20250514",
+            "max_tokens": 2048,
+            "system": "You are a senior security engineer and GRC (Governance, Risk, and Compliance) expert reviewing code for the GRCToolKit.ai open source project.\n\nGRCToolKit.ai is an AI-powered GRC platform that:\n- Analyzes compliance scenarios against NIST SP 800-53 Rev. 5 controls\n- Provides a PQC (Post-Quantum Cryptography) migration management platform\n- Integrates OSCAL (Open Security Controls Assessment Language)\n- Uses Ansible for automated control validation\n- Deploys to GCP Kubernetes environments\n- Has Human-in-the-Loop (HITL) guardrails with confidence scoring\n- Tracks NIST FIPS 203/204/205 (ML-KEM, ML-DSA, SLH-DSA) compliance\n\nYour review must cover these dimensions in order:\n\n1. **Security & Secrets** — Any hardcoded API keys, tokens, credentials, or secrets. Flag CRITICAL if found.\n2. **GRC Domain Correctness** — Accuracy of NIST 800-53 control references, OSCAL structure, PQC algorithm references (FIPS 203/204/205), CSF 2.0 mappings.\n3. **HITL Guardrails** — Does the change preserve or correctly modify Human-in-the-Loop logic, confidence thresholds, and audit trails?\n4. **Code Quality** — Bugs, error handling gaps, async/await issues, missing input validation.\n5. **Security Posture** — OWASP Top 10 issues, injection risks, insecure dependencies, container hardening concerns.\n6. **Open Source Readiness** — Is the code well-commented? Are there any internal-only references, TODO items, or developer shortcuts that shouldn't be in a public release?\n7. **Overall Recommendation** — One of: APPROVE / REQUEST_CHANGES / COMMENT_ONLY\n\nFormat your response as structured markdown with clear section headers. Be concise — highlight the most important issues only. End with a one-line summary suitable for a PR comment header.",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Please review this pull request for GRCToolKit.ai.\n\n**PR Title**: ${{ steps.meta.outputs.title }}\n\n**PR Description**: ${{ steps.meta.outputs.body }}\n\n**Files Changed**: ${{ steps.meta.outputs.files }}\n\n**Diff**:\n```diff\n${{ steps.diff.outputs.diff_json }}\n```"
+              }
+            ]
+          }
+          PAYLOAD_EOF
+
+          RESPONSE=$(curl -sS -X POST https://api.anthropic.com/v1/messages \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $ANTHROPICAPI" \
+            -H "anthropic-version: 2023-06-01" \
+            -d @/tmp/review_request.json)
+
+          # Extract text content; surface API errors as readable markdown (not raw JSON in PRs)
+          REVIEW=$(echo "$RESPONSE" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          if 'content' in data:
+              print(data['content'][0]['text'])
+          elif 'error' in data:
+              err = data.get('error') or {}
+              msg = err.get('message', json.dumps(data))
+              et = err.get('type', 'error')
+              print('### Claude API error\\n\\n'
+                    f'**{et}:** {msg}\\n\\n'
+                    'Check that the ANTHROPICAPI repository secret is valid and not revoked. '
+                    'Then push a new commit or comment `/re-review`.\\n\\n'
+                    '**Overall recommendation:** COMMENT_ONLY')
+          else:
+              print('### Unexpected API response\\n\\n```json\\n' + json.dumps(data) + '\\n```\\n\\n**Overall recommendation:** COMMENT_ONLY')
+          ")
+
+          # Write to file to avoid env var size limits
+          echo "$REVIEW" > /tmp/review_output.md
+          echo "review_file=/tmp/review_output.md" >> $GITHUB_OUTPUT
+
+      # ── 5. Determine recommendation label ─────────────────────────────────────
+      - name: Parse recommendation
+        id: recommendation
+        run: |
+          REVIEW=$(cat /tmp/review_output.md)
+          if echo "$REVIEW" | grep -qi "APPROVE"; then
+            echo "label=✅ AI Review: Approved" >> $GITHUB_OUTPUT
+            echo "event=APPROVE" >> $GITHUB_OUTPUT
+          elif echo "$REVIEW" | grep -qi "REQUEST_CHANGES"; then
+            echo "label=🔴 AI Review: Changes Requested" >> $GITHUB_OUTPUT
+            echo "event=REQUEST_CHANGES" >> $GITHUB_OUTPUT
+          else
+            echo "label=💬 AI Review: Comments" >> $GITHUB_OUTPUT
+            echo "event=COMMENT" >> $GITHUB_OUTPUT
+          fi
+
+      # ── 6. Post review as PR comment ──────────────────────────────────────────
+      - name: Post AI review comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REVIEW=$(cat /tmp/review_output.md)
+          LABEL="${{ steps.recommendation.outputs.label }}"
+
+          COMMENT="## 🤖 GRCToolKit.ai — Agentic Code Review
+          > **$LABEL**
+          > *Reviewed by Claude AI · [GRCToolKit.ai CI](https://github.com/iFocus-Innovations-LLC/GRCToolKit)*
+          > ⚠️ This is an automated review. Human approval is still required before merging to \`main\`.
+
+          ---
+
+          $REVIEW
+
+          ---
+          *To request a re-review after addressing feedback, push a new commit or comment \`/re-review\`.*"
+
+          gh pr comment ${{ github.event.pull_request.number }} --body "$COMMENT"
+
+      # ── 7. Add labels to PR ───────────────────────────────────────────────────
+      - name: Label PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EVENT="${{ steps.recommendation.outputs.event }}"
+          if [ "$EVENT" = "REQUEST_CHANGES" ]; then
+            gh pr edit ${{ github.event.pull_request.number }} \
+              --add-label "ai-review: changes-needed" 2>/dev/null || true
+          elif [ "$EVENT" = "APPROVE" ]; then
+            gh pr edit ${{ github.event.pull_request.number }} \
+              --add-label "ai-review: approved" 2>/dev/null || true
+          fi
+
+      # ── 8. Block merge on CRITICAL security findings ─────────────────────────
+      - name: Fail on CRITICAL security issues
+        run: |
+          if grep -qi "CRITICAL" /tmp/review_output.md; then
+            echo "::error::Claude AI review flagged a CRITICAL security issue. Review the PR comment and resolve before merging."
+            exit 1
+          fi
+          echo "No CRITICAL issues detected. Human reviewer may proceed."

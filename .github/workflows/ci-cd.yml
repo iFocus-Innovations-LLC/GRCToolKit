@@ -2,9 +2,14 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, qa ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop, qa ]
+
+permissions:
+  contents: read
+  id-token: write
+  security-events: write
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
@@ -15,16 +20,28 @@ env:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    env:
+      DOCKER_SCOUT_TOKEN: ${{ secrets.DOCKER_SCOUT_TOKEN }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
+
+    - name: Enforce pinned image versions
+      run: |
+        chmod +x scripts/check-image-pins.sh
+        scripts/check-image-pins.sh
+
+    - name: Validate container hardening
+      run: |
+        chmod +x scripts/check-container-hardening.sh
+        scripts/check-container-hardening.sh
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@v4
 
     - name: Build Docker image for testing
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v7
       with:
         context: .
         push: false
@@ -51,6 +68,26 @@ jobs:
         docker stop test-container
         docker rm test-container
 
+    - name: Docker Scout image scan
+      if: ${{ env.DOCKER_SCOUT_TOKEN != '' }}
+      uses: docker/scout-action@v1.20.3
+      with:
+        command: cves
+        image: grc-toolkit:test
+        only-severities: critical,high
+        format: sarif
+        output: docker-scout.sarif
+        exit-code: 1
+
+    - name: Check Docker Scout results file
+      id: scout_sarif
+      run: |
+        if [ -f docker-scout.sarif ]; then
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Security scan with Trivy
       uses: aquasecurity/trivy-action@master
       with:
@@ -68,38 +105,48 @@ jobs:
         fi
 
     - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v3
-      if: always()
+      uses: github/codeql-action/upload-sarif@v4
+      if: always() && hashFiles('trivy-results.sarif') != ''
       with:
         sarif_file: 'trivy-results.sarif'
 
+    - name: Upload Docker Scout results
+      uses: github/codeql-action/upload-sarif@v4
+      if: env.DOCKER_SCOUT_TOKEN != '' && steps.scout_sarif.outputs.exists == 'true'
+      with:
+        sarif_file: 'docker-scout.sarif'
+
   build-and-push:
     needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-24.04
+    # Requires WIF + GCP secrets (see docs/BRANCH-PROTECTION.md). Opt in with repo variable ENABLE_GCP_GAR_DEPLOY=true.
+    if: |
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') &&
+      vars.ENABLE_GCP_GAR_DEPLOY == 'true'
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Google Auth
       id: auth
-      uses: 'google-github-actions/auth@v2'
+      uses: 'google-github-actions/auth@v3'
       with:
-        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+        workload_identity_provider: '${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}'
+        service_account: '${{ secrets.GCP_SA_EMAIL }}'
 
     - name: Set up Cloud SDK
-      uses: 'google-github-actions/setup-gcloud@v2'
+      uses: 'google-github-actions/setup-gcloud@v3'
 
     - name: Configure Docker to use gcloud as a credential helper
       run: gcloud auth configure-docker $GAR_LOCATION-docker.pkg.dev
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@v4
 
     - name: Extract metadata
       id: meta
-      uses: docker/metadata-action@v5
+      uses: docker/metadata-action@v6
       with:
         images: $GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$SERVICE
         tags: |
@@ -109,7 +156,7 @@ jobs:
           type=raw,value=latest,enable={{is_default_branch}}
 
     - name: Build and push Docker image
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v7
       with:
         context: .
         push: true
@@ -121,22 +168,23 @@ jobs:
 
   deploy-staging:
     needs: build-and-push
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: github.ref == 'refs/heads/develop'
     environment: staging
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Google Auth
       id: auth
-      uses: 'google-github-actions/auth@v2'
+      uses: 'google-github-actions/auth@v3'
       with:
-        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+        workload_identity_provider: '${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}'
+        service_account: '${{ secrets.GCP_SA_EMAIL }}'
 
     - name: Set up Cloud SDK
-      uses: 'google-github-actions/setup-gcloud@v2'
+      uses: 'google-github-actions/setup-gcloud@v3'
 
     - name: Configure kubectl
       run: gcloud container clusters get-credentials ${{ secrets.GKE_CLUSTER_NAME }} --region $REGION --project $PROJECT_ID
@@ -170,22 +218,23 @@ jobs:
 
   deploy-production:
     needs: build-and-push
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: github.ref == 'refs/heads/main'
     environment: production
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Google Auth
       id: auth
-      uses: 'google-github-actions/auth@v2'
+      uses: 'google-github-actions/auth@v3'
       with:
-        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+        workload_identity_provider: '${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}'
+        service_account: '${{ secrets.GCP_SA_EMAIL }}'
 
     - name: Set up Cloud SDK
-      uses: 'google-github-actions/setup-gcloud@v2'
+      uses: 'google-github-actions/setup-gcloud@v3'
 
     - name: Configure kubectl
       run: gcloud container clusters get-credentials ${{ secrets.GKE_CLUSTER_NAME }} --region $REGION --project $PROJECT_ID

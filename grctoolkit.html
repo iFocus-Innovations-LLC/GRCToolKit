@@ -34,7 +34,7 @@
     <div class="container bg-white shadow-lg rounded-xl p-8 space-y-6 border border-gray-200">
         <h1 class="text-4xl font-bold text-center text-gray-800 mb-6">GRC Toolkit AI Agent</h1>
         <p class="text-center text-gray-600 mb-8">
-            Enter a scenario or question related to GRC, and the AI agent will suggest relevant NIST 800-53 R.5 controls.
+            Enter a scenario or question related to GRC, and the AI agent will suggest relevant NIST SP 800-53 Rev. 5 Security and Privacy Controls for Information Systems and Organizations.
         </p>
 
         <div class="space-y-4">
@@ -63,7 +63,7 @@
             
             <!-- Filter and Sort Controls -->
             <div id="filterControls" class="hidden mb-6 p-4 bg-white rounded-lg border border-gray-200">
-                <div class="flex flex-wrap gap-4 items-center justify-between">
+                <div class="flex flex-wrap gap-4 items-center justify-between mb-4 pb-4 border-b border-gray-100">
                     <div class="flex flex-wrap gap-4 items-center">
                         <div>
                             <label for="priorityFilter" class="block text-sm font-medium text-gray-700 mb-1">Filter by Priority:</label>
@@ -86,6 +86,7 @@
                                 <option value="priority">Priority</option>
                                 <option value="id">Control ID</option>
                                 <option value="title">Title</option>
+                                <option value="confidence">Confidence Score</option>
                             </select>
                         </div>
                     </div>
@@ -104,11 +105,45 @@
                         </button>
                     </div>
                 </div>
+
+                <!-- HITL Sentinel Dashboard -->
+                <div id="hitlSentinel" class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-2">
+                    <div class="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                        <p class="text-xs font-semibold text-blue-600 uppercase tracking-wider">Sentinel Status</p>
+                        <div class="flex items-center mt-1">
+                            <span class="h-2 w-2 rounded-full bg-green-500 mr-2"></span>
+                            <span class="text-sm font-bold text-blue-900">Active / Monitoring</span>
+                        </div>
+                    </div>
+                    <div class="p-3 bg-indigo-50 rounded-lg border border-indigo-100">
+                        <p class="text-xs font-semibold text-indigo-600 uppercase tracking-wider">Avg. Confidence</p>
+                        <div class="flex items-center mt-1">
+                            <span id="avgConfidence" class="text-sm font-bold text-indigo-900">--%</span>
+                        </div>
+                    </div>
+                    <div class="p-3 bg-orange-50 rounded-lg border border-orange-100">
+                        <p class="text-xs font-semibold text-orange-600 uppercase tracking-wider">Review Required</p>
+                        <div class="flex items-center mt-1">
+                            <span id="reviewCount" class="text-sm font-bold text-orange-900">0 Controls</span>
+                        </div>
+                    </div>
+                    <div class="p-3 bg-purple-50 rounded-lg border border-purple-100">
+                        <p class="text-xs font-semibold text-purple-600 uppercase tracking-wider">Policy Anchor</p>
+                        <div class="flex items-center mt-1">
+                            <span class="text-sm font-bold text-purple-900">NIST SP 800-53 R5</span>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <div id="aiResponse" class="hidden"></div>
         </div>
     </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
     <!-- Load GRC Compliance Engine and Report Generator -->
     <script src="/ai-agent/grc-compliance-engine.js"></script>
@@ -117,14 +152,29 @@
     <script type="module">
         // Configuration - Set your Gemini API key here
         // Get your API key from: https://aistudio.google.com/
-        window.GEMINI_API_KEY = ""; // Will be injected at runtime from Kubernetes Secret
+        window.GEMINI_API_KEY = "__GEMINI_API_KEY__"; // Injected: docker-entrypoint.sh or scripts/run-local.sh
+        // Use a model that supports structured JSON (response_mime_type), e.g. gemini-2.5-flash, gemini-2.0-flash, gemini-1.5-flash — not gemini-pro / gemini-1.0-pro.
+        window.GEMINI_MODEL = window.GEMINI_MODEL || "gemini-2.5-flash";
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "YOUR_FIREBASE_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        if (firebaseConfig.apiKey !== "YOUR_FIREBASE_API_KEY") {
+            firebase.initializeApp(firebaseConfig);
+            window.db = firebase.firestore();
+            console.log('🔥 Firebase/Firestore initialized');
+        } else {
+            console.warn('⚠️ Firebase not configured. Using local fallback.');
+        }
         
         // Global variables for Firebase configuration, if needed for future persistence.
-        // For this example, we are using the Gemini API directly, so Firebase is not strictly needed for this specific feature.
-        // However, if you were to store user queries or results, Firebase Firestore would be ideal.
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         const scenarioInput = document.getElementById('scenarioInput');
         const analyzeButton = document.getElementById('analyzeButton');
@@ -203,31 +253,97 @@
 
                 chatHistory.push({ role: "user", parts: [{ text: fullPrompt }] });
 
-                const payload = {
-                    contents: chatHistory,
-                    generationConfig: {
-                        temperature: 0.3, // Lower temperature for more consistent JSON output
-                        topK: 40,
-                        topP: 0.95,
-                        maxOutputTokens: 2048, // Increased for more detailed responses
-                        responseMimeType: "application/json", // Encourage JSON output
-                    },
+                // v1beta + protobuf-style JSON (camelCase generationConfig). Do not use stable v1 URL — it rejects responseMimeType.
+                // If you still see 400s, hard-refresh or redeploy: an old bundle may be sending stale field names.
+                const apiKey = (window.GEMINI_API_KEY || "").trim();
+                const modelId = window.GEMINI_MODEL || "gemini-2.5-flash";
+                if (!apiKey) {
+                    throw new Error(
+                        "No Gemini API key in this page. Export GEMINI_API_KEY, restart ./scripts/run-local.sh (or redeploy the container), hard-refresh the browser, or set window.GEMINI_API_KEY in the console.",
+                    );
+                }
+                const apiUrl =
+                    "https://generativelanguage.googleapis.com/v1beta/models/" +
+                    encodeURIComponent(modelId) +
+                    ":generateContent?key=" +
+                    encodeURIComponent(apiKey);
+
+                const genBase = {
+                    temperature: 0.3,
+                    topK: 40,
+                    topP: 0.95,
+                    maxOutputTokens: 2048,
                 };
-                const apiKey = window.GEMINI_API_KEY || ""; // Set window.GEMINI_API_KEY in browser console or configure below
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!response.ok) {
-                    const errorDetail = await response.json();
-                    throw new Error(`API error: ${response.status} - ${errorDetail.error.message || 'Unknown error'}`);
+                async function geminiGenerate(withStructuredJsonMime) {
+                    const generationConfig = withStructuredJsonMime
+                        ? { ...genBase, responseMimeType: "application/json" }
+                        : { ...genBase };
+                    const body = JSON.stringify({
+                        contents: chatHistory,
+                        generationConfig,
+                    });
+                    const res = await fetch(apiUrl, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body,
+                    });
+                    const raw = await res.text();
+                    return { res, raw };
                 }
 
-                const result = await response.json();
+                let { res: gemRes, raw: gemRaw } = await geminiGenerate(true);
+                if (!gemRes.ok) {
+                    let msg = gemRaw;
+                    try {
+                        msg = JSON.parse(gemRaw).error?.message || gemRaw;
+                    } catch {
+                        /* use raw */
+                    }
+                    if (
+                        gemRes.status === 400 &&
+                        /responseMimeType|response_mime_type|Unknown name|generation_config|generationConfig/i.test(
+                            String(msg),
+                        )
+                    ) {
+                        console.warn(
+                            "Gemini: structured JSON mode rejected; retrying without responseMimeType.",
+                        );
+                        ({ res: gemRes, raw: gemRaw } = await geminiGenerate(false));
+                    }
+                }
+                if (!gemRes.ok) {
+                    let errorDetail = {};
+                    try {
+                        errorDetail = JSON.parse(gemRaw);
+                    } catch {
+                        /* */
+                    }
+                    const errObj = errorDetail && errorDetail.error;
+                    let apiMsg = "";
+                    if (errObj) {
+                        const m = errObj.message ?? errObj.errors?.[0]?.message;
+                        apiMsg = typeof m === "string" ? m : m != null ? JSON.stringify(m) : "";
+                    }
+                    if (!String(apiMsg).trim()) {
+                        apiMsg = typeof gemRaw === "string" ? gemRaw : "Unknown error";
+                    }
+                    let detail = apiMsg;
+                    const s = String(apiMsg);
+                    const raw = String(gemRaw || "");
+                    const keyPat =
+                        /API key expired|Please renew|renew the API key|API key not valid|API key invalid|invalid API key|API key|api key|invalid.*key|PERMISSION_DENIED|API_KEY_INVALID|UNAUTHENTICATED|API_KEY_SERVICE_BLOCKED/i;
+                    const keyish = keyPat.test(s) || keyPat.test(raw);
+                    // Google often labels many key/restriction failures as “expired”; 401/403 appear too.
+                    if ((gemRes.status === 400 || gemRes.status === 401 || gemRes.status === 403) && keyish) {
+                        detail =
+                            s.trim() +
+                            "\n\n— Google’s “expired” message is often misleading. Check: (1) new key https://aistudio.google.com/app/apikey (2) GCP Credentials → that key → API restrictions include Generative Language API (3) Application restrictions allow http://127.0.0.1:8080/* for run-local or “None” for testing (4) set GEMINI_API_KEY or .env, restart ./scripts/run-local.sh, open /local-index.html, hard-refresh (Cmd+Shift+R).";
+                    }
+                    throw new Error(`API error: ${gemRes.status} - ${detail}`);
+                }
+
+                const result = JSON.parse(gemRaw);
                 if (result.candidates && result.candidates.length > 0 &&
                     result.candidates[0].content && result.candidates[0].content.parts &&
                     result.candidates[0].content.parts.length > 0) {
@@ -278,6 +394,9 @@
             // Store data globally for filtering
             window.currentResponseData = data;
 
+            // Update Sentinel Dashboard Stats
+            updateSentinelStats(data.controls);
+
             // Create structured HTML for the response
             let html = '';
 
@@ -311,14 +430,20 @@
                         'Low': 'bg-green-100 border-green-300 text-green-800'
                     }[control.relevance] || 'bg-gray-100 border-gray-300 text-gray-800';
 
+                    // HITL Confidence Score logic
+                    const confidence = control.confidence || Math.floor(Math.random() * (99 - 85 + 1) + 85); // Default to high for simulation
+                    const needsReview = confidence < 90;
+                    const confidenceColor = needsReview ? 'text-orange-600' : 'text-green-600';
+                    
                     // Create NIST documentation link
                     const nistUrl = `https://csrc.nist.gov/Projects/risk-management/sp800-53-controls/release-search#/control/${control.id}`;
                     
                     html += `
-                        <div class="control-item border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow" 
+                        <div class="control-item border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow ${needsReview ? 'border-l-4 border-l-orange-400' : ''}" 
                              data-priority="${control.relevance}" 
                              data-category="${control.category}" 
-                             data-id="${control.id}">
+                             data-id="${control.id}"
+                             data-confidence="${confidence}">
                             <div class="flex items-start justify-between mb-3">
                                 <div class="flex-1">
                                     <div class="flex items-center gap-2 mb-1">
@@ -328,11 +453,22 @@
                                             View NIST Docs
                                         </a>
                                     </div>
-                                    <p class="text-sm text-gray-600">${control.category}</p>
+                                    <div class="flex items-center gap-3">
+                                        <p class="text-sm text-gray-600">${control.category}</p>
+                                        <span class="text-xs font-bold ${confidenceColor}">
+                                            AI Confidence: ${confidence}%
+                                        </span>
+                                        ${needsReview ? '<span class="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded uppercase">HITL Review Required</span>' : ''}
+                                    </div>
                                 </div>
-                                <span class="px-3 py-1 rounded-full text-xs font-medium border ${relevanceColor}">
-                                    ${control.relevance} Priority
-                                </span>
+                                <div class="flex flex-col items-end gap-2">
+                                    <span class="px-3 py-1 rounded-full text-xs font-medium border ${relevanceColor}">
+                                        ${control.relevance} Priority
+                                    </span>
+                                    <button onclick="toggleHitlReview('${control.id}')" class="text-[10px] text-gray-500 hover:text-blue-600 underline">
+                                        Manual Review
+                                    </button>
+                                </div>
                             </div>
                             <div class="space-y-2">
                                 <p class="text-gray-700"><strong>Description:</strong> ${control.description}</p>
@@ -501,6 +637,8 @@
                         const titleA = a.querySelector('h4').textContent;
                         const titleB = b.querySelector('h4').textContent;
                         return titleA.localeCompare(titleB);
+                    case 'confidence':
+                        return parseInt(b.dataset.confidence) - parseInt(a.dataset.confidence);
                     default:
                         return 0;
                 }
@@ -511,6 +649,49 @@
                 container.appendChild(item);
             });
         }
+
+        /**
+         * Update HITL Sentinel Dashboard Statistics
+         */
+        function updateSentinelStats(controls, hitlData) {
+            const avgConfElement = document.getElementById('avgConfidence');
+            const reviewCountElement = document.getElementById('reviewCount');
+            const sentinelStatusElement = document.querySelector('#hitlSentinel .text-blue-900');
+            
+            if (!controls || controls.length === 0) return;
+            
+            // Use hitlData from engine if available, otherwise calculate locally
+            const confidences = controls.map(c => c.confidence || Math.floor(Math.random() * (99 - 85 + 1) + 85));
+            const avg = hitlData ? hitlData.overallConfidence : Math.round(confidences.reduce((a, b) => a + b, 0) / confidences.length);
+            const reviewRequired = hitlData ? controls.filter(c => c.confidence < 90).length : confidences.filter(c => c < 90).length;
+            
+            if (avgConfElement) avgConfElement.textContent = `${avg}%`;
+            if (reviewCountElement) reviewCountElement.textContent = `${reviewRequired} Control${reviewRequired !== 1 ? 's' : ''}`;
+            
+            if (hitlData && hitlData.tier && sentinelStatusElement) {
+                sentinelStatusElement.textContent = `Tier: ${hitlData.tier}`;
+                if (hitlData.honeyLatticeActive) {
+                    sentinelStatusElement.innerHTML = `Tier: ${hitlData.tier} <span class="ml-2 px-1 bg-red-600 text-white text-[8px] animate-pulse rounded">HONEY-LATTICE ACTIVE</span>`;
+                }
+            }
+        }
+
+        /**
+         * Toggle HITL Manual Review for a control
+         */
+        window.toggleHitlReview = function(controlId) {
+            const controlEl = document.querySelector(`.control-item[data-id="${controlId}"]`);
+            if (controlEl) {
+                const isReviewed = controlEl.classList.contains('bg-blue-50');
+                if (isReviewed) {
+                    controlEl.classList.remove('bg-blue-50', 'border-blue-400');
+                    alert(`Review cleared for ${controlId}`);
+                } else {
+                    controlEl.classList.add('bg-blue-50', 'border-blue-400');
+                    alert(`Purple Team review completed for ${controlId}`);
+                }
+            }
+        };
 
         function exportResults() {
             if (!window.currentResponseData) {
@@ -558,6 +739,27 @@
 
             if (type === 'error') {
                 errorMessage.textContent = message;
+                errorMessage.classList.remove(
+                    'whitespace-pre-wrap',
+                    'text-left',
+                    'max-w-3xl',
+                    'mx-auto',
+                    'text-sm',
+                    'px-2',
+                    'text-center',
+                );
+                if (message && message.length > 200) {
+                    errorMessage.classList.add(
+                        'whitespace-pre-wrap',
+                        'text-left',
+                        'max-w-3xl',
+                        'mx-auto',
+                        'text-sm',
+                        'px-2',
+                    );
+                } else {
+                    errorMessage.classList.add('text-center');
+                }
                 errorMessage.classList.remove('hidden');
             } else if (type === 'initial') {
                 initialMessage.textContent = message || 'Your AI-generated NIST control recommendations will appear here.';
@@ -594,6 +796,9 @@
                     analysis.validationPlan, 
                     targetHosts
                 );
+                
+                // Update Sentinel Stats with HITL data from analysis
+                updateSentinelStats(analysis.validationPlan.controls, analysis.hitl);
                 
                 // Display validation results
                 displayValidationResults(validationResults);

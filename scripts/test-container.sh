@@ -5,7 +5,10 @@
 
 set -e
 
+HOST_PORT="${TEST_CONTAINER_PORT:-8080}"
+
 echo "🧪 Testing GRC Toolkit Container..."
+
 
 # Build the Docker image
 echo "🔨 Building Docker image..."
@@ -13,7 +16,7 @@ docker build -t grc-toolkit:test .
 
 # Run the container
 echo "🚀 Starting container..."
-docker run -d --name grc-toolkit-test -p 8080:8080 grc-toolkit:test
+docker run -d --name grc-toolkit-test -p "${HOST_PORT}:8080" grc-toolkit:test
 
 # Wait for container to be ready
 echo "⏳ Waiting for container to be ready..."
@@ -21,7 +24,7 @@ sleep 10
 
 # Test health endpoint
 echo "🏥 Testing health endpoint..."
-if curl -f http://localhost:8080/health; then
+if curl -f "http://localhost:${HOST_PORT}/health"; then
     echo "✅ Health check passed!"
 else
     echo "❌ Health check failed!"
@@ -33,7 +36,7 @@ fi
 
 # Test main page
 echo "🌐 Testing main page..."
-if curl -f http://localhost:8080/; then
+if curl -f "http://localhost:${HOST_PORT}/"; then
     echo "✅ Main page loads successfully!"
 else
     echo "❌ Main page failed to load!"
@@ -45,7 +48,7 @@ fi
 
 # Test that the page contains expected content
 echo "📄 Testing page content..."
-if curl -s http://localhost:8080/ | grep -q "GRC Toolkit AI Agent"; then
+if curl -s "http://localhost:${HOST_PORT}/" | grep -q "GRC Toolkit AI Agent"; then
     echo "✅ Page contains expected content!"
 else
     echo "❌ Page content validation failed!"
@@ -57,7 +60,7 @@ fi
 
 # Test security headers
 echo "🔒 Testing security headers..."
-HEADERS=$(curl -s -I http://localhost:8080/)
+HEADERS=$(curl -s -I "http://localhost:${HOST_PORT}/")
 if echo "$HEADERS" | grep -q "X-Frame-Options"; then
     echo "✅ Security headers present!"
 else

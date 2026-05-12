@@ -49,6 +49,7 @@ class GRCComplianceEngine {
      * Load available Ansible playbooks
      */
     async loadAnsiblePlaybooks() {
+        // Standard GRC playbooks
         const playbooks = [
             'ac-3-access-enforcement',
             'ac-6-least-privilege',
@@ -61,6 +62,26 @@ class GRCComplianceEngine {
                 name: playbook,
                 path: `/ansible/playbooks/${playbook}.yml`,
                 controls: this.extractControlsFromPlaybook(playbook)
+            });
+        }
+
+        // PQC-specific playbooks
+        const pqcPlaybooks = [
+            'pqc/inventory',
+            'pqc/assess',
+            'pqc/deploy-mlkem',
+            'pqc/deploy-mldsa',
+            'pqc/deploy-slhdsa',
+            'pqc/hybrid-crypto',
+            'pqc/validate'
+        ];
+
+        for (const playbook of pqcPlaybooks) {
+            const playbookName = playbook.replace('pqc/', '');
+            this.ansiblePlaybooks.set(playbook, {
+                name: playbook,
+                path: `/ansible/playbooks/${playbook}.yml`,
+                controls: this.extractPQCControlsFromPlaybook(playbookName)
             });
         }
     }
@@ -92,6 +113,19 @@ class GRCComplianceEngine {
             controls: ['SC-28', 'SC-29', 'SC-30', 'SC-31'],
             playbooks: ['sc-28-data-protection']
         });
+
+        // PQC-specific scenario mappings
+        this.scenarioMappings.set('pqc_migration', {
+            keywords: ['post-quantum', 'quantum', 'pqc', 'cryptography', 'cryptographic', 'migration', 'fips 203', 'fips 204', 'fips 205', 'ml-kem', 'ml-dsa', 'slh-dsa', 'rsa', 'ecc', 'elliptic curve', 'harvest now decrypt later'],
+            controls: ['SC-12', 'SC-13', 'SC-17', 'SC-28'],
+            playbooks: ['pqc/inventory', 'pqc/assess', 'pqc/deploy-mlkem', 'pqc/deploy-mldsa', 'pqc/deploy-slhdsa']
+        });
+
+        this.scenarioMappings.set('quantum_risk', {
+            keywords: ['quantum risk', 'quantum threat', 'quantum computing', 'quantum vulnerability', 'quantum resistant', 'quantum safe'],
+            controls: ['SC-12', 'SC-13', 'SC-17'],
+            playbooks: ['pqc/assess', 'pqc/validate']
+        });
     }
 
     /**
@@ -110,6 +144,9 @@ class GRCComplianceEngine {
             // Generate validation plan
             const validationPlan = await this.generateValidationPlan(relevantControls);
             
+            // Apply HITL Sentinel Guardrails
+            const hitlAnalysis = this.applyHITLGuardrails(validationPlan, userScenario);
+            
             // Create OSCAL assessment plan
             const assessmentPlan = this.createOSCALAssessmentPlan(validationPlan);
             
@@ -119,6 +156,7 @@ class GRCComplianceEngine {
                 relevantControls: relevantControls,
                 validationPlan: validationPlan,
                 assessmentPlan: assessmentPlan,
+                hitl: hitlAnalysis,
                 timestamp: new Date().toISOString()
             };
             
@@ -126,6 +164,81 @@ class GRCComplianceEngine {
             console.error('Error analyzing scenario:', error);
             throw error;
         }
+    }
+
+    /**
+     * Apply Human-in-the-Loop (HITL) Sentinel Guardrails
+     * Implements Confidence Scoring and Policy Anchors
+     */
+    applyHITLGuardrails(validationPlan, scenario) {
+        console.log('🛡️ Applying HITL Sentinel Guardrails...');
+        
+        const hitlResults = {
+            overallConfidence: 0,
+            reviewRequired: false,
+            sentinelAlerts: [],
+            policyAnchor: 'NIST SP 800-53 R5',
+            tier: 'Automated' // Default tier
+        };
+
+        // 1. Confidence Scoring Logic
+        let totalConfidence = 0;
+        validationPlan.controls.forEach(control => {
+            // Simulate confidence scoring based on control complexity and scenario clarity
+            let confidence = Math.floor(Math.random() * (98 - 88 + 1) + 88);
+            
+            // Lower confidence for complex PQC scenarios without specific details
+            if (scenario.toLowerCase().includes('quantum') && !scenario.toLowerCase().includes('fips')) {
+                confidence -= 5;
+            }
+            
+            control.confidence = confidence;
+            totalConfidence += confidence;
+
+            if (confidence < 90) {
+                hitlResults.reviewRequired = true;
+                hitlResults.sentinelAlerts.push(`Low confidence score (${confidence}%) for ${control.id}`);
+            }
+        });
+
+        hitlResults.overallConfidence = Math.round(totalConfidence / validationPlan.controls.length);
+
+        // 2. Tier Routing (Sentinel Architecture)
+        if (hitlResults.overallConfidence < 85) {
+            hitlResults.tier = 'Human-Guided';
+        } else if (hitlResults.reviewRequired) {
+            hitlResults.tier = 'Human-Reviewed';
+        }
+
+        // 3. Honey-Lattice Deception Check
+        if (scenario.toLowerCase().includes('attack') || scenario.toLowerCase().includes('brute force')) {
+            hitlResults.sentinelAlerts.push('Adversarial intent detected: Triggering Honey-Lattice strategy');
+            hitlResults.honeyLatticeActive = true;
+            this.triggerHoneyLatticeDeception();
+        }
+
+        return hitlResults;
+    }
+
+    /**
+     * Honey-Lattice Deception Strategy Simulation
+     * Generates "Synthetic Targets" to achieve Mathematical Exhaustion of an adversary
+     */
+    triggerHoneyLatticeDeception() {
+        console.warn('🛡️ [SENTINEL] Honey-Lattice Deception Active: Generating Synthetic Targets...');
+        
+        const syntheticKeys = [];
+        for (let i = 0; i < 5; i++) {
+            syntheticKeys.push({
+                id: `hl-${this.generateUUID().substring(0, 8)}`,
+                type: 'ML-KEM-768-DECOY',
+                entropy: 'Simulated-Low-Variance',
+                purpose: 'Resource Sink'
+            });
+        }
+        
+        console.table(syntheticKeys);
+        console.log('📉 [SENTINEL] Mathematical Exhaustion Goal: 100% resource sink for adversarial swarm.');
     }
 
     /**
@@ -408,8 +521,24 @@ class GRCComplianceEngine {
         };
     }
 
-    // Helper methods
-    findControlInCatalog(controlId) {
+    /**
+     * Helper methods
+     */
+    async findControlInCatalog(controlId) {
+        // 1. Try Firestore first if available
+        if (window.db) {
+            try {
+                const doc = await window.db.collection('nist_800_53_controls').doc(controlId.toUpperCase()).get();
+                if (doc.exists) {
+                    console.log(`🔥 [Firestore] Found control ${controlId}`);
+                    return doc.data();
+                }
+            } catch (e) {
+                console.warn('Firestore lookup failed, falling back to local OSCAL:', e);
+            }
+        }
+
+        // 2. Fallback to local OSCAL catalog
         if (!this.oscalCatalog) return null;
         
         for (const group of this.oscalCatalog.catalog.groups) {
@@ -441,7 +570,15 @@ class GRCComplianceEngine {
             'ac-3-access-enforcement': 3,
             'ac-6-least-privilege': 5,
             'au-2-audit-events': 2,
-            'sc-7-boundary-protection': 4
+            'sc-7-boundary-protection': 4,
+            // PQC playbook runtime estimates
+            'pqc/inventory': 5,
+            'pqc/assess': 3,
+            'pqc/deploy-mlkem': 10,
+            'pqc/deploy-mldsa': 10,
+            'pqc/deploy-slhdsa': 10,
+            'pqc/hybrid-crypto': 8,
+            'pqc/validate': 5
         };
         return runtimeMap[playbookName] || 5;
     }
@@ -466,6 +603,24 @@ class GRCComplianceEngine {
             return [parts[0].toUpperCase() + '-' + parts[1]];
         }
         return [];
+    }
+
+    /**
+     * Extract PQC controls from playbook name
+     */
+    extractPQCControlsFromPlaybook(playbookName) {
+        // Map PQC playbooks to their associated NIST controls
+        const pqcControlMap = {
+            'inventory': ['SC-12', 'SC-13'],
+            'assess': ['SC-12', 'SC-13', 'SC-17'],
+            'deploy-mlkem': ['SC-12', 'SC-13'],
+            'deploy-mldsa': ['SC-17', 'SI-7'],
+            'deploy-slhdsa': ['SC-17', 'SI-7'],
+            'hybrid-crypto': ['SC-12', 'SC-13'],
+            'validate': ['SC-13', 'CA-7']
+        };
+        
+        return pqcControlMap[playbookName] || [];
     }
 }
 

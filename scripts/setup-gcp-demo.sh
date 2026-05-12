@@ -257,7 +257,7 @@ gcloud compute ssh ${DEMO_PREFIX}-grc-toolkit --zone=$ZONE
 
 # Deploy GRC Toolkit
 cd GRCToolKit
-docker run -d -p 8080:8080 -e GEMINI_API_KEY="your-api-key" --name grc-toolkit-demo grc-toolkit-oscal
+docker run -d -p 8080:8080 -e GEMINI_API_KEY="$GEMINI_API_KEY" --name grc-toolkit-demo grc-toolkit-oscal
 \`\`\`
 
 ### Windows VM Access

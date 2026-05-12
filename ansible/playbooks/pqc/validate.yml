@@ -1,0 +1,67 @@
+---
+# PQC Implementation Validation Playbook
+# Tests and validates PQC implementations
+# Part of GRCToolKit PQC Migration Framework
+
+- name: Validate PQC Implementation
+  hosts: all
+  become: yes
+  vars:
+    control_id: "SC-13"
+    control_title: "Cryptographic Protection"
+    pqc_migration: true
+    
+  tasks:
+    - name: Check PQC Configuration Files
+      find:
+        paths: /etc/pqc
+        patterns: "*.conf"
+      register: pqc_configs
+      
+    - name: Validate ML-KEM Configuration
+      command: cat /etc/pqc/mlkem.conf
+      register: mlkem_validation
+      failed_when: false
+      when: pqc_configs.matched > 0
+      
+    - name: Validate ML-DSA Configuration
+      command: cat /etc/pqc/mldsa.conf
+      register: mldsa_validation
+      failed_when: false
+      when: pqc_configs.matched > 0
+      
+    - name: Validate SLH-DSA Configuration
+      command: cat /etc/pqc/slhdsa.conf
+      register: slhdsa_validation
+      failed_when: false
+      when: pqc_configs.matched > 0
+      
+    - name: Generate Validation Report
+      set_fact:
+        validation_results:
+          hostname: "{{ inventory_hostname }}"
+          timestamp: "{{ ansible_date_time.iso8601 }}"
+          configurations_found: "{{ pqc_configs.matched | default(0) }}"
+          mlkem_configured: "{{ mlkem_validation.rc == 0 }}"
+          mldsa_configured: "{{ mldsa_validation.rc == 0 }}"
+          slhdsa_configured: "{{ slhdsa_validation.rc == 0 }}"
+          validation_status: "{{ 'passed' if (pqc_configs.matched | default(0) > 0) else 'failed' }}"
+          
+    - name: Display Validation Summary
+      debug:
+        msg:
+          - "PQC Implementation Validation Complete"
+          - "Host: {{ inventory_hostname }}"
+          - "Configurations Found: {{ validation_results.configurations_found }}"
+          - "ML-KEM Configured: {{ validation_results.mlkem_configured }}"
+          - "ML-DSA Configured: {{ validation_results.mldsa_configured }}"
+          - "SLH-DSA Configured: {{ validation_results.slhdsa_configured }}"
+          - "Validation Status: {{ validation_results.validation_status }}"
+          
+    - name: Save Validation Report
+      copy:
+        content: "{{ validation_results | to_nice_json }}"
+        dest: "/tmp/pqc-validation-{{ inventory_hostname }}.json"
+        mode: '0644'
+
+

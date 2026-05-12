@@ -287,17 +287,40 @@ Based on the [NIST OSCAL website](https://pages.nist.gov/OSCAL/), this integrati
 
 ## 📈 **Future Enhancements**
 
-### **Planned Features**
+### **Core Platform Features**
 - **Multi-Framework Support**: ISO 27001, SOX, HIPAA
 - **Continuous Monitoring**: Real-time compliance validation
 - **Integration APIs**: REST APIs for external tool integration
 - **Advanced Analytics**: ML-powered compliance insights
+- **User Authentication**: Firebase Authentication and data persistence
+- **Advanced UI**: Enhanced filtering, dashboards, and collaboration
+
+### **Post-Quantum Cryptography (PQC) Extensions**
+
+#### **PQC OSCAL Catalog Integration**
+- **FIPS 203/204/205 Mapping**: Integration of NIST PQC standards with OSCAL format
+- **PQC Control Catalog**: Extended OSCAL catalog with PQC-specific controls
+- **Quantum Risk Annotations**: OSCAL properties for quantum vulnerability assessment
+- **Migration Status Tracking**: OSCAL assessment results with PQC migration status
+
+#### **PQC Assessment Plans**
+- **PQC-Specific Assessment Activities**: OSCAL assessment plans for PQC controls
+- **Cryptographic Asset Assessment**: Structured assessment of cryptographic implementations
+- **Quantum Risk Assessment**: OSCAL-formatted risk assessment results
+- **Migration Roadmap Integration**: Four-phase roadmap in OSCAL structure
+
+#### **PQC Assessment Results**
+- **PQC Compliance Status**: OSCAL assessment results with PQC compliance metrics
+- **Algorithm Vulnerability Findings**: Structured findings for quantum-vulnerable algorithms
+- **Migration Progress Tracking**: OSCAL observations for migration milestones
+- **Timeline Compliance**: OSCAL properties for 2030/2035 deadline tracking
 
 ### **Extensibility**
 - **Custom Playbooks**: Add organization-specific validation
 - **Framework Extensions**: Support additional compliance frameworks
 - **Tool Integration**: Connect with existing security tools
 - **API Development**: RESTful APIs for automation
+- **PQC Playbooks**: Ansible automation for PQC deployment (ML-KEM, ML-DSA, SLH-DSA)
 
 ## 🎯 **Use Cases**
 
@@ -318,6 +341,14 @@ Based on the [NIST OSCAL website](https://pages.nist.gov/OSCAL/), this integrati
 - Machine-readable documentation
 - Automated evidence collection
 - Audit trail maintenance
+
+### **4. Post-Quantum Cryptography (PQC) Migration**
+- **Cryptographic Asset Inventory**: OSCAL-formatted inventory of cryptographic implementations
+- **PQC Risk Assessment**: Quantum risk scoring with OSCAL assessment results
+- **Migration Roadmap Tracking**: Four-phase migration progress in OSCAL structure
+- **PQC Compliance Documentation**: OSCAL-compliant PQC migration reports
+- **Timeline Management**: 2030/2035 deadline tracking with OSCAL properties
+- **FIPS 203/204/205 Integration**: PQC standard mapping to OSCAL controls
 
 ## 📞 **Support and Resources**
 

@@ -13,7 +13,8 @@ docker build -t grc-toolkit-graceful .
 
 # Start the container
 echo "🚀 Starting container..."
-CONTAINER_ID=$(docker run -d -p 8083:8080 -e GEMINI_API_KEY="test-key-12345" --name grc-toolkit-graceful-test grc-toolkit-graceful)
+TEST_TOKEN="${TEST_API_TOKEN:-test-placeholder}"
+CONTAINER_ID=$(docker run -d -p 8083:8080 -e GEMINI_API_KEY="$TEST_TOKEN" --name grc-toolkit-graceful-test grc-toolkit-graceful)
 
 echo "⏳ Waiting for container to be ready..."
 sleep 5

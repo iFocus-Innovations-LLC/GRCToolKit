@@ -1,0 +1,95 @@
+---
+# Deploy SLH-DSA (FIPS 205) Playbook
+# Implements Stateless Hash-Based Digital Signature Algorithm
+# Part of GRCToolKit PQC Migration Framework
+
+- name: Deploy SLH-DSA (FIPS 205) for PQC Migration
+  hosts: all
+  become: yes
+  vars:
+    control_id: "SC-17"
+    control_title: "Public Key Infrastructure Certificates"
+    fips_standard: "FIPS-205"
+    pqc_algorithm: "SLH-DSA"
+    pqc_migration: true
+    
+  tasks:
+    - name: Check System Requirements
+      shell: |
+        uname -a
+        openssl version 2>/dev/null || echo "OpenSSL not found"
+      register: system_info
+      changed_when: false
+      
+    - name: Verify PQC Library Availability
+      shell: |
+        echo "Checking for hash-based signature support..."
+        if command -v openssl >/dev/null 2>&1; then
+          openssl version
+        fi
+      register: pqc_lib_check
+      changed_when: false
+      
+    - name: Create PQC Configuration Directory
+      file:
+        path: /etc/pqc
+        state: directory
+        mode: '0755'
+        
+    - name: Generate SLH-DSA Configuration
+      copy:
+        content: |
+          # SLH-DSA (FIPS 205) Configuration
+          # Stateless Hash-Based Digital Signature Algorithm
+          
+          algorithm: SLH-DSA
+          standard: FIPS-205
+          variant: SLH-DSA-SHA2-128s
+          quantum_resistant: true
+          deployment_date: "{{ ansible_date_time.iso8601 }}"
+          migration_status: "in_progress"
+          use_cases:
+            - "Long-term document signing"
+            - "Certificate authority operations"
+            - "Code signing"
+        dest: /etc/pqc/slhdsa.conf
+        mode: '0644'
+        
+    - name: Validate SLH-DSA Configuration
+      command: cat /etc/pqc/slhdsa.conf
+      register: slhdsa_config
+      changed_when: false
+      
+    - name: Display Deployment Status
+      debug:
+        msg:
+          - "SLH-DSA (FIPS 205) Deployment Initiated"
+          - "Host: {{ inventory_hostname }}"
+          - "Standard: {{ fips_standard }}"
+          - "Algorithm: {{ pqc_algorithm }}"
+          - "Configuration: /etc/pqc/slhdsa.conf"
+          - "Status: Configuration created (simulated deployment)"
+          
+    - name: Save Deployment Report
+      copy:
+        content: |
+          {
+            "deployment": {
+              "hostname": "{{ inventory_hostname }}",
+              "timestamp": "{{ ansible_date_time.iso8601 }}",
+              "algorithm": "{{ pqc_algorithm }}",
+              "standard": "{{ fips_standard }}",
+              "status": "configured",
+              "configuration_path": "/etc/pqc/slhdsa.conf",
+              "next_steps": [
+                "Install hash-based signature libraries",
+                "Update signing configurations",
+                "Test SLH-DSA signatures",
+                "Validate quantum resistance"
+              ]
+            }
+          }
+        dest: "/tmp/pqc-deploy-slhdsa-{{ inventory_hostname }}.json"
+        mode: '0644'
+
+

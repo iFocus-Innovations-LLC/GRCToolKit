@@ -1,0 +1,77 @@
+---
+# PQC Quantum Risk Assessment Playbook
+# Performs quantum risk assessment on discovered cryptographic assets
+# Part of GRCToolKit PQC Migration Framework
+
+- name: Perform Quantum Risk Assessment
+  hosts: all
+  become: yes
+  vars:
+    control_id: "SC-13"
+    control_title: "Cryptographic Protection"
+    pqc_migration: true
+    
+  tasks:
+    - name: Load Asset Inventory
+      slurp:
+        src: "/tmp/pqc-inventory-{{ inventory_hostname }}.json"
+      register: inventory_data
+      failed_when: false
+      
+    - name: Parse Inventory Data
+      set_fact:
+        assets: "{{ (inventory_data.content | b64decode | from_json).inventory.assets | default({}) }}"
+      when: inventory_data.content is defined
+      
+    - name: Assess TLS Cipher Vulnerabilities
+      set_fact:
+        tls_risks: "{{ tls_risks | default([]) + [{
+          'type': 'TLS',
+          'algorithm': item | regex_search('(RSA|ECDSA|DSA)'),
+          'vulnerability': 'high' if (item | regex_search('(RSA|ECDSA|DSA)')) else 'low',
+          'risk_level': 'critical' if (item | regex_search('(RSA|ECDSA|DSA)')) else 'low'
+        }] }}"
+      loop: "{{ assets.tls_ciphers | default([]) }}"
+      when: assets.tls_ciphers is defined
+      
+    - name: Assess Certificate Algorithms
+      set_fact:
+        cert_risks: "{{ cert_risks | default([]) + [{
+          'type': 'Certificate',
+          'path': item,
+          'algorithm': 'Unknown',
+          'vulnerability': 'unknown',
+          'risk_level': 'medium'
+        }] }}"
+      loop: "{{ assets.tls_certificates | default([]) }}"
+      when: assets.tls_certificates is defined
+      
+    - name: Calculate Overall Risk Score
+      set_fact:
+        risk_assessment:
+          hostname: "{{ inventory_hostname }}"
+          timestamp: "{{ ansible_date_time.iso8601 }}"
+          tls_risks: "{{ tls_risks | default([]) }}"
+          cert_risks: "{{ cert_risks | default([]) }}"
+          critical_findings: "{{ (tls_risks | default([])) | selectattr('risk_level', 'equalto', 'critical') | list }}"
+          high_priority_assets: "{{ (tls_risks | default([])) | selectattr('vulnerability', 'equalto', 'high') | list }}"
+          overall_risk_level: "{{ 'critical' if (tls_risks | default([]) | selectattr('risk_level', 'equalto', 'critical') | list | length > 0) else 'medium' }}"
+          migration_priority: "{{ 'high' if (tls_risks | default([]) | selectattr('risk_level', 'equalto', 'critical') | list | length > 0) else 'medium' }}"
+          
+    - name: Display Risk Assessment Summary
+      debug:
+        msg:
+          - "Quantum Risk Assessment Complete"
+          - "Host: {{ inventory_hostname }}"
+          - "Overall Risk Level: {{ risk_assessment.overall_risk_level }}"
+          - "Critical Findings: {{ risk_assessment.critical_findings | length }}"
+          - "High Priority Assets: {{ risk_assessment.high_priority_assets | length }}"
+          - "Migration Priority: {{ risk_assessment.migration_priority }}"
+          
+    - name: Save Risk Assessment Report
+      copy:
+        content: "{{ risk_assessment | to_nice_json }}"
+        dest: "/tmp/pqc-risk-assessment-{{ inventory_hostname }}.json"
+        mode: '0644'
+
+

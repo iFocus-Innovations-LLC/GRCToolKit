@@ -5,7 +5,8 @@ metadata:
   namespace: grc-toolkit
   labels:
     app: grc-toolkit
-    version: v1
+    version: "2.1.0-dev"
+    release: "dev"
 spec:
   replicas: 3
   selector:
@@ -15,11 +16,13 @@ spec:
     metadata:
       labels:
         app: grc-toolkit
-        version: v1
+        version: "2.1.0-dev"
+        release: "dev"
     spec:
+      terminationGracePeriodSeconds: 30
       containers:
       - name: grc-toolkit
-        image: gcr.io/PROJECT_ID/grc-toolkit:latest
+        image: gcr.io/PROJECT_ID/grc-toolkit:2.1.0-dev
         ports:
         - containerPort: 8080
         env:
@@ -62,7 +65,6 @@ spec:
           timeoutSeconds: 3
           failureThreshold: 3
         # Graceful shutdown configuration
-        terminationGracePeriodSeconds: 30
         lifecycle:
           preStop:
             exec:

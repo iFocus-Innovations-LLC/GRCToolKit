@@ -1,40 +1,30 @@
-# Use nginx as the base image for serving static files
-FROM nginx:alpine
+# Static GRC Toolkit - nginx serves the app on port 8080 for CI/CD compatibility
+# Zero-trust: pinned multi-arch index digest, non-root user, slim Alpine 3.23 base (fewer pkgs/CVEs vs full alpine + curl install)
+FROM nginx:1.30.0-alpine-slim@sha256:2fb5d772cea6ef1a8dab525df1b9485289eee167d26af9613fce27a12c060caa
 
-# Set working directory
-WORKDIR /usr/share/nginx/html
+RUN rm -f /etc/nginx/conf.d/default.conf
 
-# Copy the HTML file and any static assets
-COPY grctoolkit.html /usr/share/nginx/html/grctoolkit.html
-
-# Copy custom nginx configuration
+# Copy our nginx config (listens on 8080, /health, security headers)
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# Copy startup and graceful shutdown scripts
-COPY startup.sh /usr/local/bin/startup.sh
-COPY graceful-shutdown.sh /usr/local/bin/graceful-shutdown.sh
-RUN chmod +x /usr/local/bin/startup.sh /usr/local/bin/graceful-shutdown.sh
+# Static assets: template is rendered to index.html on container start (API key injection).
+WORKDIR /usr/share/nginx/html
+COPY grctoolkit.html ./index.html.template
+COPY scripts/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chown nginx:nginx /docker-entrypoint.sh && chmod 550 /docker-entrypoint.sh
+COPY ai-agent ./ai-agent/
+COPY compliance-docs ./compliance-docs/
+COPY oscal ./oscal/
 
-# Create a non-root user for security and set proper permissions
-RUN addgroup -g 1001 -S appgroup && \
-    adduser -S -D -H -u 1001 -h /var/cache/nginx -s /sbin/nologin -G appgroup -g appgroup appuser && \
-    chown -R appuser:appgroup /usr/share/nginx/html && \
-    chown -R appuser:appgroup /var/cache/nginx && \
-    chown -R appuser:appgroup /var/log/nginx && \
-    chown -R appuser:appgroup /etc/nginx/conf.d && \
-    mkdir -p /tmp && \
-    chown -R appuser:appgroup /tmp && \
-    chmod 755 /tmp
+# Ensure nginx user can read files and write pid/cache
+RUN chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/log/nginx /tmp
 
-# Expose port 8080
+# Run as non-root (required by container hardening checks)
+USER nginx
+
 EXPOSE 8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/ || exit 1
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1
 
-# Switch to non-root user
-USER appuser
-
-# Start with our custom startup script
-CMD ["/usr/local/bin/startup.sh"]
+ENTRYPOINT ["/docker-entrypoint.sh"]

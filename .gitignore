@@ -1,17 +1,63 @@
-# Local secrets and env
-.env
-.env.*
-!.env.example
+# Version and build files
+VERSION.local
+*.buildinfo
 
-# Terraform
-**/.terraform/
-*.tfstate
-*.tfstate.*
-crash.log
-crash.*.log
-override.tf
-override.tf.json
-*_override.tf
-*_override.tf.json
-.terraformrc
-terraform.rc
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# GCP credentials
+*.json
+!package.json
+!package-lock.json
+gcp-key.json
+service-account-key.json
+
+# Kubernetes secrets (never commit)
+k8s/secrets.yaml
+k8s/secret.yaml
+k8s/*-secret.yaml
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE files
+.idea/
+.vscode/
+*.code-workspace
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Build artifacts
+dist/
+build/
+*.tar.gz
+
+# Auto-generated MVP demo reports (scripts/test-mvp-demo.sh)
+docs/test-reports/mvp-demo-test-report-*.md
+docs/test-reports/mvp-demo/mvp-demo-test-report-*.md
+
+
+# Local configuration
+config.local.yaml
+local-config.json
+local-index.html
+
+# Local deploy secrets (scripts/deploy.sh --env-file); never commit real values
+grc-deploy.env
+.grc-deploy.env
+
+SECRETS.md

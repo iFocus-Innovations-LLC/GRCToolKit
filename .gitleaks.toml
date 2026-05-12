@@ -1,0 +1,15 @@
+# Gitleaks config for GRC Toolkit
+title = "GRC Toolkit Gitleaks Config"
+
+[extend]
+useDefault = true
+
+# Exclude gitleaks output files; allowlist NIST playbook name false positive
+[allowlist]
+paths = [
+  '''gitleaks-baseline\.json$''',
+  '''gitleaks-report\.json$'''
+]
+regexes = [
+  '''ac-\d+-\w+'''  # NIST playbook names like ac-6-least-privilege
+]
