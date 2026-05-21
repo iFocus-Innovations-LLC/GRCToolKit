@@ -27,33 +27,22 @@ jobs:
 
       # ── 2. Build diff payload ─────────────────────────────────────────────────
       - name: Generate PR diff
-        id: diff
         run: |
           git fetch origin ${{ github.base_ref }}
-          DIFF=$(git diff origin/${{ github.base_ref }}...HEAD -- \
+          git diff origin/${{ github.base_ref }}...HEAD -- \
             '*.js' '*.html' '*.sh' '*.yml' '*.yaml' '*.json' \
             '*.md' '*.py' '*.txt' 'Dockerfile' \
-            | head -c 28000)          # stay well within token limits
-
-          # Escape for JSON
-          DIFF_ESCAPED=$(echo "$DIFF" | python3 -c "
-          import sys, json
-          print(json.dumps(sys.stdin.read()))
-          ")
-          echo "diff_json=$DIFF_ESCAPED" >> $GITHUB_OUTPUT
+            | head -c 28000 > /tmp/pr_diff.txt
 
       # ── 3. Collect PR metadata ────────────────────────────────────────────────
       - name: Collect PR metadata
-        id: meta
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PR_TITLE=$(gh pr view ${{ github.event.pull_request.number }} --json title -q .title)
-          PR_BODY=$(gh pr view ${{ github.event.pull_request.number }} --json body -q .body | head -c 2000)
-          FILES=$(gh pr view ${{ github.event.pull_request.number }} --json files -q '[.files[].path] | join(", ")')
-          echo "title=$PR_TITLE" >> $GITHUB_OUTPUT
-          echo "body=$PR_BODY" >> $GITHUB_OUTPUT
-          echo "files=$FILES" >> $GITHUB_OUTPUT
+          gh pr view ${{ github.event.pull_request.number }} \
+            --json title,body,files \
+            -q '{title: .title, body: (.body // "")[0:2000], files: ([.files[].path] | join(", "))}' \
+            > /tmp/pr_meta.json
 
       # ── 4. Call Claude API ────────────────────────────────────────────────────
       # Fork PRs and repos without Actions secrets do not receive ANTHROPICAPI;
@@ -80,19 +69,59 @@ jobs:
             exit 0
           fi
 
-          cat > /tmp/review_request.json << 'PAYLOAD_EOF'
-          {
-            "model": "claude-sonnet-4-20250514",
-            "max_tokens": 2048,
-            "system": "You are a senior security engineer and GRC (Governance, Risk, and Compliance) expert reviewing code for the GRCToolKit.ai open source project.\n\nGRCToolKit.ai is an AI-powered GRC platform that:\n- Analyzes compliance scenarios against NIST SP 800-53 Rev. 5 controls\n- Provides a PQC (Post-Quantum Cryptography) migration management platform\n- Integrates OSCAL (Open Security Controls Assessment Language)\n- Uses Ansible for automated control validation\n- Deploys to GCP Kubernetes environments\n- Has Human-in-the-Loop (HITL) guardrails with confidence scoring\n- Tracks NIST FIPS 203/204/205 (ML-KEM, ML-DSA, SLH-DSA) compliance\n\nYour review must cover these dimensions in order:\n\n1. **Security & Secrets** — Any hardcoded API keys, tokens, credentials, or secrets. Flag CRITICAL if found.\n2. **GRC Domain Correctness** — Accuracy of NIST 800-53 control references, OSCAL structure, PQC algorithm references (FIPS 203/204/205), CSF 2.0 mappings.\n3. **HITL Guardrails** — Does the change preserve or correctly modify Human-in-the-Loop logic, confidence thresholds, and audit trails?\n4. **Code Quality** — Bugs, error handling gaps, async/await issues, missing input validation.\n5. **Security Posture** — OWASP Top 10 issues, injection risks, insecure dependencies, container hardening concerns.\n6. **Open Source Readiness** — Is the code well-commented? Are there any internal-only references, TODO items, or developer shortcuts that shouldn't be in a public release?\n7. **Overall Recommendation** — One of: APPROVE / REQUEST_CHANGES / COMMENT_ONLY\n\nFormat your response as structured markdown with clear section headers. Be concise — highlight the most important issues only. End with a one-line summary suitable for a PR comment header.",
-            "messages": [
-              {
-                "role": "user",
-                "content": "Please review this pull request for GRCToolKit.ai.\n\n**PR Title**: ${{ steps.meta.outputs.title }}\n\n**PR Description**: ${{ steps.meta.outputs.body }}\n\n**Files Changed**: ${{ steps.meta.outputs.files }}\n\n**Diff**:\n```diff\n${{ steps.diff.outputs.diff_json }}\n```"
-              }
-            ]
+          python3 << 'PYEOF'
+          import json
+          import textwrap
+          from pathlib import Path
+
+          SYSTEM = textwrap.dedent("""\
+          You are a senior security engineer and GRC (Governance, Risk, and Compliance) expert reviewing code for the GRCToolKit.ai open source project.
+
+          GRCToolKit.ai is an AI-powered GRC platform that:
+          - Analyzes compliance scenarios against NIST SP 800-53 Rev. 5 controls
+          - Provides a PQC (Post-Quantum Cryptography) migration management platform
+          - Integrates OSCAL (Open Security Controls Assessment Language)
+          - Uses Ansible for automated control validation
+          - Deploys to GCP Kubernetes environments
+          - Has Human-in-the-Loop (HITL) guardrails with confidence scoring
+          - Tracks NIST FIPS 203/204/205 (ML-KEM, ML-DSA, SLH-DSA) compliance
+
+          Your review must cover these dimensions in order:
+
+          1. **Security & Secrets** — Any hardcoded API keys, tokens, credentials, or secrets. Flag CRITICAL if found.
+          2. **GRC Domain Correctness** — Accuracy of NIST 800-53 control references, OSCAL structure, PQC algorithm references (FIPS 203/204/205), CSF 2.0 mappings.
+          3. **HITL Guardrails** — Does the change preserve or correctly modify Human-in-the-Loop logic, confidence thresholds, and audit trails?
+          4. **Code Quality** — Bugs, error handling gaps, async/await issues, missing input validation.
+          5. **Security Posture** — OWASP Top 10 issues, injection risks, insecure dependencies, container hardening concerns.
+          6. **Open Source Readiness** — Is the code well-commented? Are there any internal-only references, TODO items, or developer shortcuts that shouldn't be in a public release?
+          7. **Overall Recommendation** — One of: APPROVE / REQUEST_CHANGES / COMMENT_ONLY
+
+          Format your response as structured markdown with clear section headers. Be concise — highlight the most important issues only. End with a one-line summary suitable for a PR comment header.
+          """)
+
+          meta = json.loads(Path("/tmp/pr_meta.json").read_text(encoding="utf-8"))
+          diff = Path("/tmp/pr_diff.txt").read_text(encoding="utf-8", errors="replace")
+
+          user_content = (
+              "Please review this pull request for GRCToolKit.ai.\n\n"
+              f"**PR Title**: {meta['title']}\n\n"
+              f"**PR Description**: {meta['body']}\n\n"
+              f"**Files Changed**: {meta['files']}\n\n"
+              f"**Diff**:\n```diff\n{diff}\n```"
+          )
+
+          payload = {
+              "model": "claude-sonnet-4-20250514",
+              "max_tokens": 2048,
+              "system": SYSTEM,
+              "messages": [{"role": "user", "content": user_content}],
           }
-          PAYLOAD_EOF
+
+          Path("/tmp/review_request.json").write_text(
+              json.dumps(payload, ensure_ascii=False),
+              encoding="utf-8",
+          )
+          PYEOF
 
           RESPONSE=$(curl -sS -X POST https://api.anthropic.com/v1/messages \
             -H "Content-Type: application/json" \
