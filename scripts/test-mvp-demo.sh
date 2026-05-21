@@ -15,6 +15,7 @@ echo "🎯 GRC Toolkit MVP Demo Test Suite"
 echo "=================================="
 
 # Configuration
+<<<<<<< HEAD
 # BASE_URL — origin only, default http://localhost:8080 (Docker -p 8080:8080 or run-local.sh)
 # MVP_USE_LOCAL_SERVER=1 — targets ./scripts/run-local.sh output (/local-index.html unless MVP_HTML_PATH is set)
 # MVP_HTML_PATH — app path, e.g. /local-index.html (uses this URL instead of BASE_URL/; health = page reachable)
@@ -23,6 +24,10 @@ if [[ "${MVP_USE_LOCAL_SERVER:-}" == "1" && -z "${MVP_HTML_PATH:-}" ]]; then
     MVP_HTML_PATH="/local-index.html"
 fi
 SKIP_GRACEFUL_SHUTDOWN_TEST="${SKIP_GRACEFUL_SHUTDOWN_TEST:-0}"
+=======
+BASE_URL="http://localhost:8085"
+REPORT_DIR="docs/mvp-demo-test-reports"
+>>>>>>> 1c2d2bc (updates for mvp)
 DEMO_SCENARIOS=(
     "How do I secure access to our cloud database?"
     "What controls are needed for protecting patient health information?"
@@ -37,6 +42,7 @@ BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+<<<<<<< HEAD
 mvp_html_url() {
     local path="${MVP_HTML_PATH:-}"
     if [[ -n "$path" ]]; then
@@ -63,11 +69,17 @@ hint_mvp_demo_unreachable() {
     echo "  ./scripts/run-local.sh"
     echo "  BASE_URL=http://127.0.0.1:\${PORT:-8080} MVP_USE_LOCAL_SERVER=1 ./scripts/test-mvp-demo.sh"
     echo "(Set MVP_HTML_PATH=/local-index.html and BASE_URL if you use a custom path or port.)"
+=======
+hint_mvp_server() {
+    echo -e "${YELLOW}Hint: run a container on $BASE_URL (host port → container 8080), e.g.:${NC}"
+    echo -e "${YELLOW}  docker build -t grc-toolkit-oscal . && docker run -d -p 8085:8080 -e GEMINI_API_KEY=\"\${GEMINI_API_KEY:?}\" --name grc-toolkit-mvp grc-toolkit-oscal${NC}"
+>>>>>>> 1c2d2bc (updates for mvp)
 }
 
 # Test functions
 test_health_check() {
     echo -e "\n${BLUE}🏥 Testing Health Check...${NC}"
+<<<<<<< HEAD
     if mvp_uses_local_html_path; then
         local u
         u=$(mvp_html_url)
@@ -79,16 +91,21 @@ test_health_check() {
         return 1
     fi
     if curl -s "$BASE_URL/health" | grep -q "healthy"; then
+=======
+    if curl -sS --connect-timeout 3 "$BASE_URL/health" 2>/dev/null | grep -q "healthy"; then
+>>>>>>> 1c2d2bc (updates for mvp)
         echo -e "${GREEN}✅ Health check passed${NC}"
         return 0
     else
         echo -e "${RED}❌ Health check failed${NC}"
+        hint_mvp_server
         return 1
     fi
 }
 
 test_api_key_injection() {
     echo -e "\n${BLUE}🔐 Testing API Key Injection...${NC}"
+<<<<<<< HEAD
     local html
     html=$(curl -s "$(mvp_html_url)")
 
@@ -112,6 +129,17 @@ test_api_key_injection() {
         else
             echo "  Hint: confirm $(mvp_html_url) serves the built page and matches your environment." >&2
         fi
+=======
+    local body
+    body=$(curl -sS --connect-timeout 3 "$BASE_URL/" 2>/dev/null || true)
+    # startup.sh replaces empty assignment with GEMINI_API_KEY; require non-empty quoted value
+    if echo "$body" | grep -qE 'window\.GEMINI_API_KEY = "[^"]{1,}"'; then
+        echo -e "${GREEN}✅ API key properly injected${NC}"
+        return 0
+    else
+        echo -e "${RED}❌ API key injection failed (expected non-empty window.GEMINI_API_KEY in served HTML)${NC}"
+        hint_mvp_server
+>>>>>>> 1c2d2bc (updates for mvp)
         return 1
     fi
 
@@ -171,20 +199,35 @@ test_ai_agent_files() {
 
 test_ui_components() {
     echo -e "\n${BLUE}🎨 Testing UI Components...${NC}"
+<<<<<<< HEAD
     local page
     page=$(mvp_html_url)
 
     if curl -s "$page" | grep -q "validateControlsBtn"; then
+=======
+    
+    local body
+    body=$(curl -sS --connect-timeout 3 "$BASE_URL/" 2>/dev/null || true)
+    # Check for new buttons in HTML
+    if echo "$body" | grep -q "validateControlsBtn"; then
+>>>>>>> 1c2d2bc (updates for mvp)
         echo -e "${GREEN}✅ Validate Controls button found${NC}"
     else
         echo -e "${RED}❌ Validate Controls button missing${NC}"
+        hint_mvp_server
         return 1
     fi
+<<<<<<< HEAD
 
     if curl -s "$page" | grep -q "generateAuditReportBtn"; then
+=======
+    
+    if echo "$body" | grep -q "generateAuditReportBtn"; then
+>>>>>>> 1c2d2bc (updates for mvp)
         echo -e "${GREEN}✅ Generate Audit Report button found${NC}"
     else
         echo -e "${RED}❌ Generate Audit Report button missing${NC}"
+        hint_mvp_server
         return 1
     fi
 
@@ -258,16 +301,24 @@ test_demo_scenarios() {
 
 test_security_features() {
     echo -e "\n${BLUE}🔒 Testing Security Features...${NC}"
+<<<<<<< HEAD
 
     local headers
     headers=$(curl -s -I "$(mvp_html_url)")
+=======
+    
+    # Check for security headers
+    local headers
+    headers=$(curl -sSI --connect-timeout 3 "$BASE_URL/" 2>/dev/null || true)
+>>>>>>> 1c2d2bc (updates for mvp)
     
     if echo "$headers" | grep -qi "X-Frame-Options"; then
         echo -e "${GREEN}✅ Security headers present${NC}"
     else
-        echo -e "${YELLOW}⚠️  Security headers not detected${NC}"
+        echo -e "${YELLOW}⚠️  Security headers not detected (is $BASE_URL reachable?)${NC}"
     fi
     
+<<<<<<< HEAD
     # Check for non-root user in container (if running)
     if docker ps --format "{{.Names}}" | grep -q "^grc-toolkit-mvp$"; then
         if docker exec grc-toolkit-mvp id 2>/dev/null | grep -q "uid=1001"; then
@@ -278,6 +329,22 @@ test_security_features() {
         fi
     else
         echo -e "${YELLOW}⚠️  grc-toolkit-mvp container not running; skipping non-root check${NC}"
+=======
+    # Check for non-root user in container
+    if ! docker exec grc-toolkit-mvp true 2>/dev/null; then
+        echo -e "${RED}❌ Cannot inspect grc-toolkit-mvp (container not running or wrong name)${NC}"
+        hint_mvp_server
+        return 1
+    fi
+    local id_out
+    id_out=$(docker exec grc-toolkit-mvp id 2>/dev/null || true)
+    if echo "$id_out" | grep -q "uid=1001"; then
+        echo -e "${GREEN}✅ Container running as non-root user${NC}"
+    else
+        echo -e "${RED}❌ Container not running as non-root user (got: ${id_out:-empty})${NC}"
+        echo -e "${YELLOW}Hint: rebuild image from current Dockerfile (USER appuser, uid 1001).${NC}"
+        return 1
+>>>>>>> 1c2d2bc (updates for mvp)
     fi
     
     return 0
@@ -285,10 +352,17 @@ test_security_features() {
 
 generate_demo_report() {
     echo -e "\n${BLUE}📊 Generating Demo Report...${NC}"
+<<<<<<< HEAD
 
     local report_file="docs/test-reports/mvp-demo/mvp-demo-test-report-$(date +%Y%m%d-%H%M%S).md"
     mkdir -p "$(dirname "$report_file")"
 
+=======
+    
+    mkdir -p "$REPORT_DIR"
+    local report_file="$REPORT_DIR/mvp-demo-test-report-$(date +%Y%m%d-%H%M%S).md"
+    
+>>>>>>> 1c2d2bc (updates for mvp)
     cat > "$report_file" << EOF
 # GRC Toolkit MVP Demo Test Report
 
@@ -395,7 +469,9 @@ main() {
     echo "App page: $(mvp_html_url)"
     echo "Origin:   $BASE_URL"
     echo "Container: grc-toolkit-mvp"
-    echo "Status: $(docker ps --filter name=grc-toolkit-mvp --format 'table {{.Status}}' | tail -1)"
+    local mvp_status
+    mvp_status=$(docker ps --filter name=grc-toolkit-mvp --format '{{.Status}}' 2>/dev/null | head -1)
+    echo "Status: ${mvp_status:-not running}"
     
     return $failed_tests
 }
