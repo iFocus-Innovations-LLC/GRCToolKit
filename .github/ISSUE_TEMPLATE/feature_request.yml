@@ -1,0 +1,50 @@
+name: Feature request
+description: Suggest an enhancement for GRCToolKit.ai
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem you want solved and how it fits GRCToolKit's GRC / NIST / OSCAL / PQC mission.
+        See [docs/ROADMAP.md](https://github.com/iFocus-Innovations-LLC/GRCToolKit/blob/main/docs/ROADMAP.md) for planned work.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What pain point or compliance gap does this address?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How should it work? Include HITL / audit implications if relevant.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - AI compliance engine
+        - OSCAL / audit reporting
+        - PQC migration
+        - Ansible automation
+        - UI / analyst workflow
+        - Infrastructure / deployment
+        - Documentation / demos
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: willing
+    attributes:
+      label: Contribution
+      options:
+        - label: I am willing to open a PR for this (subject to maintainer review)
+        - label: I can help test a prototype

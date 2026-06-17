@@ -34,12 +34,15 @@
 
 ---
 
-## `develop` Branch — Integration Gate (Moderate)
+## `develop` / `dev` Branch — Integration Gate (Moderate)
+
+> **Note:** The live integration branch in this repository is **`dev`**. Apply the
+> same rules to `dev`. Use `develop` as an alias if you create that branch later.
 
 ### How to configure
 1. Go to **Settings → Branches → Add branch ruleset**
-2. Name: `develop-protection`
-3. Target: `develop`
+2. Name: `dev-protection` (or `develop-protection`)
+3. Target: `dev` (and/or `develop` if used)
 
 ### Required settings
 

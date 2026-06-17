@@ -10,11 +10,9 @@
 *                                   @iFocus-Innovations-LLC
 
 # ── CI/CD & GitHub Workflows ──────────────────────────────────────────────────
-# Changes to the pipeline itself need extra scrutiny
 .github/                            @iFocus-Innovations-LLC
 
 # ── Security-sensitive: PQC migration platform ───────────────────────────────
-# Any change to post-quantum crypto logic requires maintainer sign-off
 pqc/                                @iFocus-Innovations-LLC
 ansible/                            @iFocus-Innovations-LLC
 
@@ -22,12 +20,14 @@ ansible/                            @iFocus-Innovations-LLC
 oscal/                              @iFocus-Innovations-LLC
 compliance-docs/                    @iFocus-Innovations-LLC
 
-# ── AI agent logic ────────────────────────────────────────────────────────────
-# HITL guardrails, confidence scoring, sentinel architecture
+# ── AI agent logic (including OpenClaw sentinel architecture) ─────────────────
 ai-agent/                           @iFocus-Innovations-LLC
+ai-agent/openclaw/                  @iFocus-Innovations-LLC
 
 # ── Infrastructure & Kubernetes ───────────────────────────────────────────────
 k8s/                                @iFocus-Innovations-LLC
+charts/                             @iFocus-Innovations-LLC
+terraform/                          @iFocus-Innovations-LLC
 Dockerfile                          @iFocus-Innovations-LLC
 nginx.conf                          @iFocus-Innovations-LLC
 *.sh                                @iFocus-Innovations-LLC
@@ -40,8 +40,8 @@ grc-dataprotction.yaml              @iFocus-Innovations-LLC
 requirements*.txt                   @iFocus-Innovations-LLC
 VERSION                             @iFocus-Innovations-LLC
 
-# ── Documentation ─────────────────────────────────────────────────────────────
-# Docs can be approved by maintainer or any future designated doc reviewer
+# ── Documentation & governance ────────────────────────────────────────────────
 docs/                               @iFocus-Innovations-LLC
 README.md                           @iFocus-Innovations-LLC
 CONTRIBUTING.md                     @iFocus-Innovations-LLC
+CODE_OF_CONDUCT.md                  @iFocus-Innovations-LLC
