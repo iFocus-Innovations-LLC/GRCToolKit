@@ -70,6 +70,12 @@ Detailed documentation for the GRCToolKit can be found in the `docs/` directory:
   - [Changelog](docs/CHANGELOG.md) - History of changes and versions.
   - [Release Notes v2.0.0-dev](docs/RELEASE-NOTES-v2.0.0-dev.md) - Specific notes for the previous development release.
 
+## 🤝 Contributing
+
+- [Contributing Guide](CONTRIBUTING.md) — branch workflow, local dev, PR checks, and CODEOWNERS.
+- [Code of Conduct](CODE_OF_CONDUCT.md) — community standards (Contributor Covenant 2.1).
+- [Branch Protection](docs/BRANCH-PROTECTION.md) — merge gates, labels, and required CI checks.
+
 ## 🏗️ Architecture
 
 This application provides a modern UI for interacting with a GRC Compliance Engine. It uses the **Gemini API** (`generateContent` on **v1beta**) with a default model such as **`gemini-2.5-flash`** (supports structured JSON / `response_mime_type`). Avoid legacy IDs like **`gemini-pro`** for JSON mode. The engine integrates with Ansible playbooks for automated control validation and generates OSCAL-compliant documentation.
