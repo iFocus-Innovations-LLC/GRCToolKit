@@ -6,3 +6,6 @@ contact_links:
   - name: Contributing guide
     url: https://github.com/iFocus-Innovations-LLC/GRCToolKit/blob/main/CONTRIBUTING.md
     about: Branch workflow, local dev, PR checks, and CODEOWNERS.
+  - name: Project overview
+    url: https://github.com/iFocus-Innovations-LLC/GRCToolKit/blob/main/docs/OVERVIEW.md
+    about: Executive summary, architecture, and engagement paths for evaluators.
