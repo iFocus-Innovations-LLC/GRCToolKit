@@ -6,6 +6,8 @@
 
 A comprehensive Governance, Risk, and Compliance (GRC) toolkit that provides AI-powered analysis of compliance scenarios and suggests relevant NIST SP 800-53 Rev. 5 Security and Privacy Controls. The application features OSCAL integration, Ansible automation, and a robust Post-Quantum Cryptography (PQC) migration management platform with Human-in-the-Loop (HITL) guardrails. Containerized and ready for deployment to Google Cloud Platform (GCP) Kubernetes environments.
 
+**New here?** Read the [Project Overview](docs/OVERVIEW.md) — executive summary, architecture, standards alignment, and engagement paths for evaluators and contributors.
+
 ## 🚀 Quick Start
 
 ### Local Development
@@ -48,6 +50,7 @@ CI/CD to this project uses GitHub secrets (e.g. `GCP_PROJECT_ID`, service accoun
 Detailed documentation for the GRCToolKit can be found in the `docs/` directory:
 
 - **Frameworks & Architecture**:
+  - [Project Overview](docs/OVERVIEW.md) - Executive summary for evaluators, partners, and new contributors.
   - [HITL Framework](docs/HITL-FRAMEWORK.md) - Human-in-the-Loop guardrails and sentinel architecture.
   - [PQC Integration Summary](docs/PQC-INTEGRATION-SUMMARY.md) - Post-Quantum Cryptography migration strategy.
   - [OSCAL Integration](docs/OSCAL-INTEGRATION.md) - Open Security Controls Assessment Language implementation.
