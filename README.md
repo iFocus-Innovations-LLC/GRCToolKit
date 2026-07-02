@@ -150,6 +150,8 @@ GRCToolKit is evolving into a comprehensive PQC migration management platform, b
 - **API Integration**: RESTful APIs, webhooks, and SDK for third-party integrations
 - **Mobile Application**: iOS and Android apps for executive access and reporting
 
+**Post-production (planned):** [Shields Up — robotics security](docs/ROADMAP.md#post-production-shields-up--robotics-security-phase-4) — read-only OWASP/RSF routine checks for ROS 2 and robotic AI stacks (after core platform production release; see [PM-TODO.md](docs/PM-TODO.md)).
+
 For detailed roadmap information, see [ROADMAP.md](docs/ROADMAP.md).
 
 ## 🎯 Use Cases

@@ -503,6 +503,53 @@ ansible/playbooks/pqc/
 
 ---
 
+## Post-Production: Shields Up — Robotics Security (Phase 4+)
+
+**Status:** Planned — starts after GRCToolKit production release on `main`  
+**Branch:** `feature/shields-up-robotics` (doc/planning stub; not merged until production gate)  
+**Tracker:** [PM-TODO.md](PM-TODO.md)  
+**Vision:** [SHIELDS-UP-ROBOTICS.md](SHIELDS-UP-ROBOTICS.md)
+
+### Prerequisite gate
+
+Do not begin Shields Up implementation until:
+
+- GRCToolKit production release is tagged on `main`
+- Helm/GKE deployment path is stable and governance docs are live
+- MVP demo and CI pipelines are green on `main`
+- PM sign-off on P0 items in [PM-TODO.md](PM-TODO.md)
+
+### Vision
+
+**Shields Up** adds AI-assisted, **read-only** routine security checks for robotic AI operating stacks (ROS 2, Linux edge, web/API surfaces). Findings map to:
+
+- [Robot Security Framework (RSF)](https://github.com/aliasrobotics/RSF) layers
+- OWASP Web, API, IoT, and LLM Top 10 (where applicable)
+- NIST SP 800-53 Rev. 5 controls (SC, AC, AU families)
+- OSCAL-style assessment evidence (reuse existing compliance-docs patterns)
+
+All remediation requires **Human-in-the-Loop (HITL)** approval — no silent changes on robots that move.
+
+### MVP scope (v0.1)
+
+- ROS 2 + Linux lab environment (Dockerized test target)
+- 10–15 read-only probes from [awesome-ros-security](https://github.com/iotsrg/awesome-ros-security) checklists
+- JSON findings → AI security summary → Markdown/OSCAL report
+- Per-layer Shields Up / Shields Down status
+
+### Deferred (post v0.1)
+
+- Vendor-specific robot platforms
+- NVIDIA ovrtx / Isaac sim integration
+- Fleet schedulers and continuous monitoring at scale
+- Automated remediation on production systems
+
+### Brand
+
+Optional product name **Shields Up** under the GRCToolKit / future sentinel brand line. Module lives inside this repository (not a separate repo for v1).
+
+---
+
 ## Conclusion
 
 GRCToolKit is uniquely positioned to become the leading platform for PQC migration management. The existing OSCAL integration, AI-powered compliance engine, and Ansible automation provide a solid foundation for rapid PQC capability development. By targeting the NIST conference presentation as a launch vehicle and positioning the MVP as the first comprehensive PQC GRC solution, iFocus Innovations can capture significant market share in this emerging space.
