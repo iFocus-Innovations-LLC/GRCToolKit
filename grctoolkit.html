@@ -319,18 +319,26 @@
                     } catch {
                         /* */
                     }
-                    const apiMsg = errorDetail.error?.message || gemRaw || "Unknown error";
+                    const errObj = errorDetail && errorDetail.error;
+                    let apiMsg = "";
+                    if (errObj) {
+                        const m = errObj.message ?? errObj.errors?.[0]?.message;
+                        apiMsg = typeof m === "string" ? m : m != null ? JSON.stringify(m) : "";
+                    }
+                    if (!String(apiMsg).trim()) {
+                        apiMsg = typeof gemRaw === "string" ? gemRaw : "Unknown error";
+                    }
                     let detail = apiMsg;
                     const s = String(apiMsg);
-                    if (
-                        gemRes.status === 400 &&
-                        /API key expired|API key|api key|invalid.*key|PERMISSION_DENIED/i.test(s)
-                    ) {
+                    const raw = String(gemRaw || "");
+                    const keyPat =
+                        /API key expired|Please renew|renew the API key|API key not valid|API key invalid|invalid API key|API key|api key|invalid.*key|PERMISSION_DENIED|API_KEY_INVALID|UNAUTHENTICATED|API_KEY_SERVICE_BLOCKED/i;
+                    const keyish = keyPat.test(s) || keyPat.test(raw);
+                    // Google often labels many key/restriction failures as “expired”; 401/403 appear too.
+                    if ((gemRes.status === 400 || gemRes.status === 401 || gemRes.status === 403) && keyish) {
                         detail =
-                            s +
-                            " Note: Google often returns “API key expired” for any rejected key (revoked, wrong project, HTTP referrer / API restrictions, or stale HTML). " +
-                            "Create or copy a current key from https://aistudio.google.com/ , check GCP Credentials → key restrictions (Generative Language API; referrer rules must match how you open the app), " +
-                            "then set GEMINI_API_KEY, restart run-local.sh or redeploy, and hard-refresh.";
+                            s.trim() +
+                            "\n\n— Google’s “expired” message is often misleading. Check: (1) new key https://aistudio.google.com/app/apikey (2) GCP Credentials → that key → API restrictions include Generative Language API (3) Application restrictions allow http://127.0.0.1:8080/* for run-local or “None” for testing (4) set GEMINI_API_KEY or .env, restart ./scripts/run-local.sh, open /local-index.html, hard-refresh (Cmd+Shift+R).";
                     }
                     throw new Error(`API error: ${gemRes.status} - ${detail}`);
                 }
@@ -731,6 +739,27 @@
 
             if (type === 'error') {
                 errorMessage.textContent = message;
+                errorMessage.classList.remove(
+                    'whitespace-pre-wrap',
+                    'text-left',
+                    'max-w-3xl',
+                    'mx-auto',
+                    'text-sm',
+                    'px-2',
+                    'text-center',
+                );
+                if (message && message.length > 200) {
+                    errorMessage.classList.add(
+                        'whitespace-pre-wrap',
+                        'text-left',
+                        'max-w-3xl',
+                        'mx-auto',
+                        'text-sm',
+                        'px-2',
+                    );
+                } else {
+                    errorMessage.classList.add('text-center');
+                }
                 errorMessage.classList.remove('hidden');
             } else if (type === 'initial') {
                 initialMessage.textContent = message || 'Your AI-generated NIST control recommendations will appear here.';
