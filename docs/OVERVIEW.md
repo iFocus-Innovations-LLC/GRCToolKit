@@ -18,6 +18,30 @@ The project is designed for organizations modernizing compliance workflows in cl
 
 ---
 
+## Why GRCToolKit vs traditional GRC
+
+Legacy GRC suites (e.g. enterprise IRM/GRC platforms and compliance SaaS) excel at **workflow, attestations, and document storage**. They are weaker at **technical control validation**, **machine-readable audit evidence**, and **engineer-operable automation**.
+
+GRCToolKit.ai targets that gap:
+
+| Capability | Typical GRC application | GRCToolKit.ai |
+|------------|-------------------------|---------------|
+| NIST 800-53 + OSCAL | Manual mapping or add-on modules | Native OSCAL catalog and assessment artifacts |
+| Prove a control works | Policy sign-off, screenshots | Ansible read-only probes + JSON evidence |
+| AI in compliance | Generic chat over policies | Scenario → controls with **HITL** and confidence tiers |
+| Post-quantum readiness | Rarely addressed | FIPS 203/204/205 playbooks and migration roadmap |
+| Inspectability | Closed SaaS | **MIT open source** — run, fork, audit the code |
+| Physical AI / robotics | Not in scope | **Shields Up** roadmap: OWASP LLM, RSF, robotic stacks |
+| Deployment | Vendor cloud only | Docker, Kubernetes, Helm, GCP bootstrap |
+
+**Fair positioning:** GRCToolKit is not a replacement for full enterprise GRC operations (multi-tenant RBAC, vendor risk suites, FedRAMP-authorized SaaS). It is open source **infrastructure for automated NIST validation, OSCAL evidence, and HITL-guarded AI** — built for security engineers, auditors, and innovation programs that need controls **validated in the stack**, not only tracked in a dashboard.
+
+Three market forces align with this approach: **OSCAL** adoption for machine-readable assessments, **PQC** deadlines (2030/2035), and **Physical AI** systems that require security and compliance in the same pipeline.
+
+For roadmap detail, see [ROADMAP.md](ROADMAP.md#market-positioning-grctoolkit-vs-traditional-grc).
+
+---
+
 ## Problem we solve
 
 | Challenge | How GRCToolKit addresses it |
@@ -215,4 +239,4 @@ We are transparent about maturity so evaluators — including government innovat
 
 ---
 
-*Last updated: 2026-06-17 · GRCToolKit.ai v2.1.0-dev*
+*Last updated: 2026-07-02 · GRCToolKit.ai v2.1.0-dev*

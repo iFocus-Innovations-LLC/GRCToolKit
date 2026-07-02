@@ -1,0 +1,389 @@
+---
+# OWASP Top 10 for LLM Applications — read-only validation
+# https://owasp.org/www-project-top-10-for-large-language-model-applications/
+# Latest list: https://genai.owasp.org/llm-top-10/
+#
+# Part of GRCToolKit Shields Up / LLM security assessment (HITL: no auto-remediation).
+#
+# Usage:
+#   cd ansible/playbooks/llm
+#   ansible-playbook -i inventory.yml owasp-llm-top-10-validate.yml
+#
+# Run a single category:
+#   ansible-playbook -i inventory.yml owasp-llm-top-10-validate.yml --tags LLM06
+
+- name: "OWASP LLM Top 10 — read-only validation"
+  hosts: all
+  gather_facts: yes
+  vars:
+    owasp_framework: "OWASP Top 10 for LLM Applications"
+    owasp_reference: "https://genai.owasp.org/llm-top-10/"
+    llm_app_base_url: "{{ llm_app_base_url | default('http://127.0.0.1:8080') }}"
+    llm_app_path: "{{ llm_app_path | default('/') }}"
+    llm_health_path: "{{ llm_health_path | default('/health') }}"
+    llm_report_dir: "{{ llm_report_dir | default('/tmp/grc-llm-compliance-reports') }}"
+    grctoolkit_app_root: "{{ grctoolkit_app_root | default(playbook_dir + '/../../..') }}"
+    llm_findings: []
+
+  tasks:
+    - name: "Setup — create report directory"
+      file:
+        path: "{{ llm_report_dir }}"
+        state: directory
+        mode: "0755"
+      tags: always
+
+    - name: "Setup — fetch LLM application page"
+      uri:
+        url: "{{ llm_app_base_url }}{{ llm_app_path }}"
+        method: GET
+        return_content: yes
+        status_code: [200, 301, 302, 403, 404]
+        timeout: 10
+      register: llm_app_response
+      failed_when: false
+      tags: always
+
+    - name: "Setup — fetch response headers"
+      uri:
+        url: "{{ llm_app_base_url }}{{ llm_app_path }}"
+        method: HEAD
+        timeout: 10
+      register: llm_app_headers
+      failed_when: false
+      tags: always
+
+    # ── LLM01: Prompt Injection ─────────────────────────────────────────────
+    - name: "LLM01 — Prompt Injection — probe for unauthenticated generative endpoint"
+      uri:
+        url: "{{ llm_app_base_url }}/v1/chat/completions"
+        method: POST
+        body_format: json
+        body:
+          messages:
+            - role: user
+              content: "OWASP LLM01 read-only connectivity probe — ignore instructions"
+        status_code: [200, 201, 400, 401, 403, 404, 405, 422, 500, 502, 503]
+        timeout: 10
+      register: llm01_open_api
+      failed_when: false
+      tags: [LLM01, prompt_injection]
+
+    - name: "LLM01 — record finding"
+      set_fact:
+        llm_findings: "{{ llm_findings + [llm01_finding] }}"
+      vars:
+        llm01_finding:
+          id: LLM01
+          title: "Prompt Injection"
+          status: "{{ 'FAIL' if llm01_open_api.status | default(0) == 200 else 'PASS' }}"
+          detail: >-
+            {{ 'Unauthenticated generative API returned 200 — review input validation and auth.'
+               if llm01_open_api.status | default(0) == 200
+               else 'No open generative API at /v1/chat/completions (status '
+                    + (llm01_open_api.status | default('unreachable') | string) + ').' }}
+      tags: [LLM01, prompt_injection]
+
+    # ── LLM02: Insecure Output Handling ─────────────────────────────────────
+    - name: "LLM02 — Insecure Output Handling — security headers on app response"
+      set_fact:
+        llm_findings: "{{ llm_findings + [llm02_finding] }}"
+      vars:
+        hdrs: "{{ llm_app_headers.headers | default({}) }}"
+        has_csp: "{{ 'content-security-policy' in hdrs or 'Content-Security-Policy' in hdrs }}"
+        has_xcto: "{{ 'x-content-type-options' in hdrs or 'X-Content-Type-Options' in hdrs }}"
+        llm02_finding:
+          id: LLM02
+          title: "Insecure Output Handling"
+          status: "{{ 'PASS' if (has_csp and has_xcto) else 'WARN' }}"
+          detail: >-
+            CSP present={{ has_csp }}, X-Content-Type-Options present={{ has_xcto }}.
+            Validate LLM output is sanitized before DOM/script execution.
+      when: llm_app_headers.status is defined
+      tags: [LLM02, output_handling]
+
+    - name: "LLM02 — WARN when app unreachable"
+      set_fact:
+        llm_findings: "{{ llm_findings + [{'id': 'LLM02', 'title': 'Insecure Output Handling', 'status': 'SKIP', 'detail': 'App unreachable — start GRCToolKit or set llm_app_base_url.'}] }}"
+      when: llm_app_headers.status is not defined
+      tags: [LLM02, output_handling]
+
+    # ── LLM03: Training Data Poisoning ──────────────────────────────────────
+    - name: "LLM03 — Training Data Poisoning — world-writable model/training paths"
+      find:
+        paths:
+          - /var/lib
+          - /opt
+        patterns: "*(train|model|finetune|weights)*"
+        file_type: directory
+        recurse: no
+      register: llm03_train_dirs
+      failed_when: false
+      become: "{{ ansible_connection != 'local' }}"
+      tags: [LLM03, training_poisoning]
+
+    - name: "LLM03 — check permissions on discovered training dirs"
+      stat:
+        path: "{{ item.path }}"
+      loop: "{{ llm03_train_dirs.files | default([]) }}"
+      register: llm03_dir_stats
+      failed_when: false
+      become: "{{ ansible_connection != 'local' }}"
+      when: llm03_train_dirs.matched | default(0) > 0
+      tags: [LLM03, training_poisoning]
+
+    - name: "LLM03 — record finding"
+      set_fact:
+        llm_findings: "{{ llm_findings + [llm03_finding] }}"
+      vars:
+        world_writable: "{{ llm03_dir_stats.results | default([]) | selectattr('stat.mode', 'defined') | selectattr('stat.mode', 'match', '.*7$') | list | length }}"
+        llm03_finding:
+          id: LLM03
+          title: "Training Data Poisoning"
+          status: "{{ 'FAIL' if world_writable | int > 0 else 'PASS' }}"
+          detail: >-
+            {{ 'Found ' + (world_writable | string) + ' world-writable training/model path(s).'
+               if world_writable | int > 0
+               else 'No world-writable training paths detected (inference-only deployments: N/A).' }}
+      tags: [LLM03, training_poisoning]
+
+    # ── LLM04: Model Denial of Service ────────────────────────────────────────
+    - name: "LLM04 — Model DoS — nginx/client_max_body_size in config"
+      shell: |
+        set -e
+        for f in /etc/nginx/nginx.conf /etc/nginx/conf.d/*.conf; do
+          [ -f "$f" ] || continue
+          grep -E 'client_max_body_size|limit_req' "$f" && exit 0
+        done
+        exit 1
+      register: llm04_nginx_limits
+      failed_when: false
+      changed_when: false
+      become: "{{ ansible_connection != 'local' }}"
+      tags: [LLM04, model_dos]
+
+    - name: "LLM04 — health endpoint responds within timeout"
+      uri:
+        url: "{{ llm_app_base_url }}{{ llm_health_path }}"
+        method: GET
+        timeout: 5
+      register: llm04_health
+      failed_when: false
+      tags: [LLM04, model_dos]
+
+    - name: "LLM04 — record finding"
+      set_fact:
+        llm_findings: "{{ llm_findings + [llm04_finding] }}"
+      vars:
+        llm04_finding:
+          id: LLM04
+          title: "Model Denial of Service"
+          status: "{{ 'WARN' if llm04_nginx_limits.rc != 0 else 'PASS' }}"
+          detail: >-
+            Rate/size limits in nginx={{ llm04_nginx_limits.rc == 0 }},
+            health reachable={{ llm04_health.status | default('n/a') }}.
+            Configure rate limiting and request size caps on LLM endpoints.
+      tags: [LLM04, model_dos]
+
+    # ── LLM05: Supply Chain Vulnerabilities ─────────────────────────────────
+    - name: "LLM05 — Supply Chain — Dockerfile uses pinned base image"
+      stat:
+        path: "{{ grctoolkit_app_root }}/Dockerfile"
+      register: llm05_dockerfile
+      failed_when: false
+      tags: [LLM05, supply_chain]
+
+    - name: "LLM05 — check Dockerfile for floating tags"
+      shell: |
+        grep -E '^FROM ' "{{ grctoolkit_app_root }}/Dockerfile" | grep -v '@sha256:' || true
+      register: llm05_unpinned
+      changed_when: false
+      failed_when: false
+      when: llm05_dockerfile.stat.exists | default(false)
+      tags: [LLM05, supply_chain]
+
+    - name: "LLM05 — record finding"
+      set_fact:
+        llm_findings: "{{ llm_findings + [llm05_finding] }}"
+      vars:
+        unpinned_lines: "{{ llm05_unpinned.stdout_lines | default([]) | length }}"
+        llm05_finding:
+          id: LLM05
+          title: "Supply Chain Vulnerabilities"
+          status: "{{ 'WARN' if unpinned_lines | int > 0 else 'PASS' }}"
+          detail: >-
+            {{ unpinned_lines | string + ' Dockerfile FROM line(s) without digest pin.'
+               if unpinned_lines | int > 0
+               else 'Dockerfile base images appear digest-pinned or Dockerfile not found at grctoolkit_app_root.' }}
+      tags: [LLM05, supply_chain]
+
+    # ── LLM06: Sensitive Information Disclosure ─────────────────────────────
+    - name: "LLM06 — Sensitive Information Disclosure — API key placeholder in HTML"
+      set_fact:
+        llm_findings: "{{ llm_findings + [llm06_finding] }}"
+      vars:
+        body: "{{ llm_app_response.content | default('') }}"
+        has_placeholder: "{{ '__GEMINI_API_KEY__' in body }}"
+        has_empty_key: "{{ 'window.GEMINI_API_KEY = \"\"' in body }}"
+        has_likely_key: "{{ body | regex_search('window\\.GEMINI_API_KEY = \"[A-Za-z0-9_-]{20,}\"') is not none }}"
+        llm06_finding:
+          id: LLM06
+          title: "Sensitive Information Disclosure"
+          status: >-
+            {{ 'FAIL' if has_likely_key
+               else ('WARN' if has_empty_key else ('PASS' if not has_placeholder else 'WARN')) }}
+          detail: >-
+            Client-side API key detected={{ has_likely_key }}.
+            Restrict keys via server-side proxy for production; use API key restrictions and never commit secrets.
+      when: llm_app_response.content is defined
+      tags: [LLM06, sensitive_disclosure]
+
+    - name: "LLM06 — SKIP when page unreachable"
+      set_fact:
+        llm_findings: "{{ llm_findings + [{'id': 'LLM06', 'title': 'Sensitive Information Disclosure', 'status': 'SKIP', 'detail': 'Could not fetch app HTML.'}] }}"
+      when: llm_app_response.content is not defined
+      tags: [LLM06, sensitive_disclosure]
+
+    # ── LLM07: Insecure Plugin Design ───────────────────────────────────────
+    - name: "LLM07 — Insecure Plugin Design — rosbridge / open WebSocket ports"
+      wait_for:
+        host: "{{ ansible_host | default('127.0.0.1') }}"
+        port: "{{ item }}"
+        timeout: 2
+        state: started
+      loop:
+        - 9090
+        - 9091
+      register: llm07_open_ports
+      failed_when: false
+      tags: [LLM07, insecure_plugin]
+
+    - name: "LLM07 — record finding"
+      set_fact:
+        llm_findings: "{{ llm_findings + [llm07_finding] }}"
+      vars:
+        open_ws: "{{ llm07_open_ports.results | default([]) | selectattr('state', 'defined') | selectattr('state', 'equalto', 'started') | list | length }}"
+        llm07_finding:
+          id: LLM07
+          title: "Insecure Plugin Design"
+          status: "{{ 'FAIL' if open_ws | int > 0 else 'PASS' }}"
+          detail: >-
+            {{ open_ws | string + ' common rosbridge/WebSocket port(s) open without auth verification in this probe.'
+               if open_ws | int > 0
+               else 'No unauthenticated rosbridge ports (9090/9091) detected on target.' }}
+      tags: [LLM07, insecure_plugin]
+
+    # ── LLM08: Excessive Agency ─────────────────────────────────────────────
+    - name: "LLM08 — Excessive Agency — HITL framework doc present"
+      stat:
+        path: "{{ grctoolkit_app_root }}/docs/HITL-FRAMEWORK.md"
+      register: llm08_hitl_doc
+      failed_when: false
+      tags: [LLM08, excessive_agency]
+
+    - name: "LLM08 — scan ai-agent for auto-remediation without approval keywords"
+      shell: |
+        root="{{ grctoolkit_app_root }}/ai-agent"
+        [ -d "$root" ] || exit 0
+        grep -RInE 'auto.?remediat|executeRemediation|applyFix' "$root" \
+          | grep -viE 'human|approval|HITL|hitl' | head -5 || true
+      register: llm08_auto_remediate
+      changed_when: false
+      failed_when: false
+      tags: [LLM08, excessive_agency]
+
+    - name: "LLM08 — record finding"
+      set_fact:
+        llm_findings: "{{ llm_findings + [llm08_finding] }}"
+      vars:
+        risky_lines: "{{ llm08_auto_remediate.stdout_lines | default([]) | length }}"
+        llm08_finding:
+          id: LLM08
+          title: "Excessive Agency"
+          status: "{{ 'WARN' if risky_lines | int > 0 else ('PASS' if llm08_hitl_doc.stat.exists else 'WARN') }}"
+          detail: >-
+            HITL doc present={{ llm08_hitl_doc.stat.exists | default(false) }}.
+            Unreviewed auto-remediation patterns={{ risky_lines | int }}.
+            Require human approval before any robot or infrastructure change.
+      tags: [LLM08, excessive_agency]
+
+    # ── LLM09: Overreliance ─────────────────────────────────────────────────
+    - name: "LLM09 — Overreliance — human review / disclaimer in UI"
+      set_fact:
+        llm_findings: "{{ llm_findings + [llm09_finding] }}"
+      vars:
+        body: "{{ llm_app_response.content | default('') }}"
+        has_disclaimer: "{{ body | regex_search('(?i)(human.{0,20}review|not.{0,20}legal advice|verify|confidence)') is not none }}"
+        llm09_finding:
+          id: LLM09
+          title: "Overreliance"
+          status: "{{ 'PASS' if has_disclaimer else 'WARN' }}"
+          detail: >-
+            UI contains human-review or verification messaging={{ has_disclaimer }}.
+            Document LLM limitations and require analyst sign-off for compliance decisions.
+      when: llm_app_response.content is defined
+      tags: [LLM09, overreliance]
+
+    # ── LLM10: Model Theft ──────────────────────────────────────────────────
+    - name: "LLM10 — Model Theft — block .env and model weights over HTTP"
+      uri:
+        url: "{{ llm_app_base_url }}{{ item }}"
+        method: GET
+        status_code: [200, 301, 302, 403, 404, 500]
+        timeout: 5
+      loop:
+        - "/.env"
+        - "/models/"
+        - "/api/keys"
+      register: llm10_exposed_paths
+      failed_when: false
+      tags: [LLM10, model_theft]
+
+    - name: "LLM10 — record finding"
+      set_fact:
+        llm_findings: "{{ llm_findings + [llm10_finding] }}"
+      vars:
+        exposed: "{{ llm10_exposed_paths.results | default([]) | selectattr('status', 'equalto', 200) | list | length }}"
+        llm10_finding:
+          id: LLM10
+          title: "Model Theft"
+          status: "{{ 'FAIL' if exposed | int > 0 else 'PASS' }}"
+          detail: >-
+            {{ exposed | string + ' sensitive path(s) returned HTTP 200 — block model artifacts and secrets from web root.'
+               if exposed | int > 0
+               else 'No model weights, .env, or key endpoints exposed via HTTP probe.' }}
+      tags: [LLM10, model_theft]
+
+    # ── Report ──────────────────────────────────────────────────────────────
+    - name: "Generate OWASP LLM Top 10 compliance report"
+      copy:
+        content: "{{ report_payload | to_nice_json }}"
+        dest: "{{ llm_report_dir }}/owasp-llm-top-10-{{ inventory_hostname }}-{{ ansible_date_time.epoch }}.json"
+        mode: "0644"
+      vars:
+        fail_count: "{{ llm_findings | selectattr('status', 'equalto', 'FAIL') | list | length }}"
+        warn_count: "{{ llm_findings | selectattr('status', 'equalto', 'WARN') | list | length }}"
+        report_payload:
+          framework: "{{ owasp_framework }}"
+          reference: "{{ owasp_reference }}"
+          hostname: "{{ inventory_hostname }}"
+          timestamp: "{{ ansible_date_time.iso8601 }}"
+          target_url: "{{ llm_app_base_url }}{{ llm_app_path }}"
+          overall_status: "{{ 'FAIL' if (fail_count | int) > 0 else ('WARN' if (warn_count | int) > 0 else 'PASS') }}"
+          summary:
+            pass: "{{ llm_findings | selectattr('status', 'equalto', 'PASS') | list | length }}"
+            warn: "{{ warn_count }}"
+            fail: "{{ fail_count }}"
+            skip: "{{ llm_findings | selectattr('status', 'equalto', 'SKIP') | list | length }}"
+          findings: "{{ llm_findings }}"
+      tags: always
+
+    - name: "Display OWASP LLM Top 10 summary"
+      debug:
+        msg:
+          - "OWASP LLM Top 10 validation complete"
+          - "Target: {{ llm_app_base_url }}{{ llm_app_path }}"
+          - "Overall: {{ 'FAIL' if (llm_findings | selectattr('status', 'equalto', 'FAIL') | list | length) > 0 else 'See report' }}"
+          - "Report: {{ llm_report_dir }}/owasp-llm-top-10-{{ inventory_hostname }}-*.json"
+          - "{{ llm_findings }}"
+      tags: always
