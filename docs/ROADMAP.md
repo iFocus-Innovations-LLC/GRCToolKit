@@ -536,6 +536,7 @@ All remediation requires **Human-in-the-Loop (HITL)** approval — no silent cha
 - 10–15 read-only probes from [awesome-ros-security](https://github.com/iotsrg/awesome-ros-security) checklists
 - JSON findings → AI security summary → Markdown/OSCAL report
 - Per-layer Shields Up / Shields Down status
+- OWASP LLM Top 10 read-only playbook: `ansible/playbooks/llm/owasp-llm-top-10-validate.yml` ([OWASP GenAI / LLM Top 10](https://genai.owasp.org/llm-top-10/))
 
 ### Deferred (post v0.1)
 

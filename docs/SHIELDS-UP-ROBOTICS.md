@@ -24,7 +24,7 @@ Modern robots run embedded Linux, ROS 2 middleware, web/API control surfaces, an
 | **OS** | Linux packages, SSH, users, containers | CIS benchmarks, SBOM/CVE scan |
 | **Middleware** | ROS 2, SROS2/DDS-Security, topic ACLs | RSF, [awesome-ros-security](https://github.com/iotsrg/awesome-ros-security) |
 | **Application** | Fleet dashboards, REST, rosbridge WebSocket | OWASP Web Top 10, OWASP API Top 10 |
-| **AI** | LLM planners, tool use, perception pipelines | OWASP LLM Top 10 |
+| **AI** | LLM planners, tool use, perception pipelines | [OWASP LLM Top 10](https://genai.owasp.org/llm-top-10/), OWASP GenAI Security Project |
 
 ---
 
@@ -73,7 +73,7 @@ See [HITL-FRAMEWORK.md](HITL-FRAMEWORK.md) for guardrail tiers.
 | **OWASP Web Top 10** | Robot web dashboards, rosbridge HTTP surfaces |
 | **OWASP API Top 10** | Fleet REST/gRPC APIs |
 | **OWASP IoT Top 10** | Edge devices, default credentials, update mechanisms |
-| **OWASP LLM Top 10** | AI planning layers, prompt injection to motion topics |
+| **OWASP LLM Top 10** | AI planning layers, prompt injection, excessive agency | `ansible/playbooks/llm/owasp-llm-top-10-validate.yml` |
 | **NIST SP 800-53 Rev. 5** | SC, AC, AU control mapping for evidence packages |
 | **OSCAL** | Assessment results format (reuse GRCToolKit compliance-docs) |
 
@@ -109,7 +109,7 @@ See [HITL-FRAMEWORK.md](HITL-FRAMEWORK.md) for guardrail tiers.
 | [HITL-FRAMEWORK.md](HITL-FRAMEWORK.md) | Mandatory human approval path |
 | [SECRETS-SETUP.md](SECRETS-SETUP.md) | No keys in repo; GCP Secret Manager |
 
-Planned probe location: `ansible/playbooks/robot/` (created in a later phase).
+Planned probe locations: `ansible/playbooks/robot/` (robotics, later phase) and `ansible/playbooks/llm/` (OWASP LLM Top 10 read-only checks).
 
 ---
 

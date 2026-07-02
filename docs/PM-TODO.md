@@ -20,6 +20,7 @@ For technical roadmap detail, see [ROADMAP.md](ROADMAP.md).
 
 - [x] Create branch `feature/shields-up-robotics` from `main`
 - [x] Add [SHIELDS-UP-ROBOTICS.md](SHIELDS-UP-ROBOTICS.md) vision + MVP spec
+- [x] Define `ansible/playbooks/llm/` OWASP LLM Top 10 read-only probe playbook
 - [ ] Define `ansible/playbooks/robot/` probe catalog (read-only)
 - [ ] Map probes → OWASP categories + NIST SC/AC/AU controls + RSF layers
 - [ ] AI report template (reuse `compliance-docs/` patterns)
