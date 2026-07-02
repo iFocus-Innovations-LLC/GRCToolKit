@@ -42,6 +42,21 @@ For roadmap detail, see [ROADMAP.md](ROADMAP.md#market-positioning-grctoolkit-vs
 
 ---
 
+## Editions: Community and Enterprise
+
+**Branding builds up to Enterprise** — open source adoption, Shields Up, and Sentinel/HITL narratives drive trust toward the commercial product; they are not separate product lines.
+
+| Edition | Summary |
+|---------|---------|
+| **GRCToolKit Community Edition** | MIT open source; full self-host; BYOK for Gemini/Anthropic; GitHub community support |
+| **GRCToolKit Enterprise** | Bronze → Platinum support and training; optional bundled **agentic token** pools; Shields Up hands-on assist at Gold+ |
+
+Module themes (**Shields Up**, OWASP LLM probes, sentinel/HITL) showcase capability in Community and deepen value in Enterprise.
+
+Details: [BRAND-AND-EDITIONS.md](BRAND-AND-EDITIONS.md) · Commercial planning: [PM-TODO.md](PM-TODO.md)
+
+---
+
 ## Problem we solve
 
 | Challenge | How GRCToolKit addresses it |

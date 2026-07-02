@@ -22,6 +22,7 @@ GRCToolKit is evolving into a comprehensive Post-Quantum Cryptography (PQC) migr
 | PQC migration | Emerging slide-deck topic | Playbooks, inventory, FIPS 203/204/205 roadmap |
 | Deployment model | Vendor-hosted SaaS | Open source; self-hosted Docker/GKE/Helm |
 | Physical AI / robots | Out of scope | **Shields Up** (Phase 4+): RSF, OWASP LLM, routine read-only scans |
+| Commercial model | Closed subscription | **Open core** + [GRCToolKit Enterprise](BRAND-AND-EDITIONS.md) (support, training, agentic token pools) |
 
 ### What we are not claiming (today)
 
@@ -39,6 +40,7 @@ GRCToolKit is evolving into a comprehensive Post-Quantum Cryptography (PQC) migr
 | Phase | Focus | Market message |
 |-------|--------|----------------|
 | **Now — production gate** | OSCAL, Ansible, HITL, PQC core, GCP deploy | Prove the automatable GRC stack |
+| **Phase 4 — Enterprise** | Support tiers, token metering, RBAC | [Brand ladder → Enterprise](BRAND-AND-EDITIONS.md) |
 | **Phase 4+ — Shields Up** | Robotics, OWASP LLM, RSF | Extend validation to Physical AI |
 | **Future — sim / ovrtx** | Synthetic lab, sensor evidence (post v0.1) | Demo and train without production robot risk |
 
@@ -303,6 +305,18 @@ GRCToolKit's existing capabilities provide an ideal foundation for PQC migration
   - Offline report viewing
   - Mobile-optimized workflows
 
+#### 4.5 GRCToolKit Enterprise (commercial)
+
+- **Objective**: Commercial destination after Community adoption — support, training, agentic token economics
+- **Brand model**: Module names (Shields Up, Sentinel/HITL) **build up to Enterprise**; see [BRAND-AND-EDITIONS.md](BRAND-AND-EDITIONS.md)
+- **Tiers**: Bronze, Silver, Gold, Platinum (support + training; pricing TBD)
+- **Features** (roadmap):
+  - Enterprise support portal and SLAs
+  - Training catalog (HITL, OSCAL auditor, Shields Up operator)
+  - **Usage metering API** for agentic token workflows (BYOK + bundled pools)
+  - Optional hosted agent runtime (future)
+  - Shields Up fleet architecture assist (Gold+)
+
 ---
 
 ## Technical Implementation
@@ -402,29 +416,24 @@ ansible/playbooks/pqc/
    - Sensitive IP protection
    - Customer data security
 
-### Pricing Strategy
+### Pricing and editions
 
-- **Starter**: $5,000/year
-  - Up to 100 assets
-  - Basic PQC assessment
-  - Standard support
+Commercial model: **open core + GRCToolKit Enterprise**. Community Edition remains MIT with BYOK for AI.
 
-- **Professional**: $25,000/year
-  - Up to 1,000 assets
-  - Full roadmap tracking
-  - Ansible automation
-  - Priority support
+Full tier definitions, brand ladder, and token economics: **[BRAND-AND-EDITIONS.md](BRAND-AND-EDITIONS.md)** and **[PM-TODO.md](PM-TODO.md)** (P2–P4).
 
-- **Enterprise**: $100,000/year
-  - Unlimited assets
-  - Dedicated support
-  - Custom integrations
-  - On-premise deployment
+| Edition | Purpose |
+|---------|---------|
+| **Community** | OSS adoption — self-host, contribute, BYOK |
+| **Enterprise Bronze** | Entry support + onboarding |
+| **Enterprise Silver** | Business-hours support + analyst training |
+| **Enterprise Gold** | Priority support + HITL/OSCAL workshops + Shields Up assist |
+| **Enterprise Platinum** | Custom SLA + gov-style engagement + large token pools |
+| **Government** | Custom procurement (GSA Schedule, on-premise options) — pricing TBD |
 
-- **Government**: Custom pricing
-  - FedRAMP compliance
-  - On-premise deployment options
-  - GSA Schedule availability
+**Agentic pricing:** Token-metered workflows (scenario analysis, AI review, Shields Up triage). Community = BYOK only; Enterprise = optional bundled pools + overage policy. Dollar amounts **TBD** pending pilot customers and quarterly macro review (see PM-TODO P3/P4).
+
+*Legacy placeholder tiers (Starter $5k / Professional $25k / Enterprise $100k) are retired — use Bronze–Platinum model above.*
 
 ### Go-to-Market Strategy
 
