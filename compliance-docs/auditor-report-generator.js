@@ -360,7 +360,7 @@ class AuditorReportGenerator {
 
     // Helper methods
     generateReportId() {
-        return `GRC-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        return `GRC-${Date.now()}-${crypto.randomUUID().replace(/-/g, "").slice(0, 9)}`;
     }
 
     calculateRiskLevel(compliancePercentage) {
@@ -545,11 +545,7 @@ class AuditorReportGenerator {
     }
 
     generateUUID() {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            const r = Math.random() * 16 | 0;
-            const v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
+        return crypto.randomUUID();
     }
 }
 

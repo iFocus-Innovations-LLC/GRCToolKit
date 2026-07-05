@@ -20,6 +20,38 @@ PLAYBOOKS_DIR = (ROOT / "ansible" / "playbooks").resolve()
 DEFAULT_INVENTORY = PLAYBOOKS_DIR / "inventory.yml"
 PLAYBOOK_TIMEOUT_SEC = 180
 REPORT_DIR = Path("/tmp/grc-oscal-reports")
+REPORT_PREFIX = "oscal-assessment-"
+REPORT_SUFFIX = ".pdf"
+MAX_REPORT_FILENAME = 128
+MAX_JSON_BODY_BYTES = 10_000_000
+
+
+def _build_playbook_allowlist() -> dict[str, Path]:
+    """Build stem -> resolved path map at startup (CodeQL-safe allowlist)."""
+    allowed: dict[str, Path] = {}
+    for path in sorted(PLAYBOOKS_DIR.rglob("*.yml")):
+        if path.name == "inventory.yml":
+            continue
+        stem = path.relative_to(PLAYBOOKS_DIR).with_suffix("").as_posix()
+        resolved = path.resolve()
+        if PLAYBOOKS_DIR not in resolved.parents and resolved.parent != PLAYBOOKS_DIR:
+            continue
+        allowed[stem] = resolved
+    return allowed
+
+
+def _build_playbook_commands(allowed: dict[str, Path], inventory: Path) -> dict[str, list[str]]:
+    """Pre-build subprocess argv lists so runtime uses no user-controlled path strings."""
+    inv_arg = str(inventory)
+    return {
+        stem: ["ansible-playbook", "-i", inv_arg, str(path), "--limit", "localhost"]
+        for stem, path in allowed.items()
+    }
+
+
+ALLOWED_PLAYBOOKS: dict[str, Path] = _build_playbook_allowlist()
+INVENTORY_PATH = DEFAULT_INVENTORY.resolve()
+ALLOWED_CMD: dict[str, list[str]] = _build_playbook_commands(ALLOWED_PLAYBOOKS, INVENTORY_PATH)
 
 sys.path.insert(0, str(ROOT / "scripts"))
 try:
@@ -35,14 +67,40 @@ def playbook_stem(name: str) -> str:
     return name.replace(".yml", "").replace(".yaml", "")
 
 
-def resolve_playbook(name: str) -> Path:
+def resolve_playbook_stem(name: str) -> str:
     stem = playbook_stem(name.strip().lstrip("/"))
     if not stem or ".." in stem or stem.startswith("."):
         raise ValueError("Invalid playbook name")
-    path = (PLAYBOOKS_DIR / f"{stem}.yml").resolve()
-    if not path.is_file() or PLAYBOOKS_DIR not in path.parents:
-        raise ValueError(f"Playbook not found: {stem}")
-    return path
+    if stem not in ALLOWED_CMD:
+        raise ValueError(f"Playbook not in allowlist: {stem}")
+    return stem
+
+
+def _sanitize_report_filename(raw: str) -> str | None:
+    """Validate PDF basename without regex (avoids ReDoS / path injection)."""
+    name = unquote(raw).split("/")[-1].split("\\")[-1]
+    if not name or len(name) > MAX_REPORT_FILENAME:
+        return None
+    if not name.startswith(REPORT_PREFIX) or not name.endswith(REPORT_SUFFIX):
+        return None
+    middle = name[len(REPORT_PREFIX) : -len(REPORT_SUFFIX)]
+    if not middle:
+        return None
+    for ch in middle:
+        if not (ch.isalnum() or ch in "-_"):
+            return None
+    return name
+
+
+def _resolve_report_pdf(safe_name: str) -> Path | None:
+    candidate = (REPORT_DIR / safe_name).resolve()
+    if candidate.parent != REPORT_DIR.resolve() or not candidate.is_file():
+        return None
+    return candidate
+
+
+def _header_safe_filename(filename: str) -> str:
+    return "".join(ch for ch in filename if ch.isalnum() or ch in "._-")
 
 
 def control_id_from_playbook(stem: str) -> str:
@@ -128,28 +186,20 @@ def validate_localhost_inventory(inventory_path: Path) -> None:
         )
 
 
-def run_playbook(playbook_name: str, inventory: str | None = None) -> dict:
+def run_playbook(playbook_name: str) -> dict:
     if shutil.which("ansible-playbook") is None:
         raise RuntimeError(
             "ansible-playbook not found. Install Ansible (e.g. brew install ansible)."
         )
 
-    playbook_path = resolve_playbook(playbook_name)
-    stem = playbook_stem(playbook_path.name)
-    inventory_path = Path(inventory).resolve() if inventory else DEFAULT_INVENTORY
-    if not inventory_path.is_file():
-        raise FileNotFoundError(f"Inventory not found: {inventory_path}")
+    stem = resolve_playbook_stem(playbook_name)
+    if not INVENTORY_PATH.is_file():
+        raise FileNotFoundError(f"Inventory not found: {INVENTORY_PATH}")
 
-    validate_localhost_inventory(inventory_path)
+    validate_localhost_inventory(INVENTORY_PATH)
 
-    cmd = [
-        "ansible-playbook",
-        "-i",
-        str(inventory_path),
-        str(playbook_path),
-        "--limit",
-        "localhost",
-    ]
+    cmd = ALLOWED_CMD[stem]
+    playbook_path = ALLOWED_PLAYBOOKS[stem]
 
     proc = subprocess.run(
         cmd,
@@ -170,7 +220,7 @@ def run_playbook(playbook_name: str, inventory: str | None = None) -> dict:
         "stderr": stderr,
         "findings": findings,
         "playbook": stem,
-        "inventory": str(inventory_path),
+        "inventory": str(INVENTORY_PATH),
         "command": cmd,
     }
 
@@ -203,12 +253,15 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Access-Control-Allow-Origin", "*")
         if filename:
-            self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+            safe_name = _header_safe_filename(filename)
+            self.send_header("Content-Disposition", f'attachment; filename="{safe_name}"')
         self.end_headers()
         self.wfile.write(body)
 
     def _read_json_body(self) -> dict:
         length = int(self.headers.get("Content-Length", "0"))
+        if length > MAX_JSON_BODY_BYTES:
+            raise ValueError("Request body too large")
         raw = self.rfile.read(length).decode("utf-8") if length else "{}"
         try:
             return json.loads(raw or "{}")
@@ -221,15 +274,16 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
             self._send_json(404, {"error": "Not found"})
             return
         filename = unquote(path[len(prefix) :])
-        if not re.fullmatch(r"oscal-assessment-[A-Za-z0-9-]+\.pdf", filename):
+        safe_name = _sanitize_report_filename(filename)
+        if safe_name is None:
             self._send_json(400, {"error": "Invalid report filename"})
             return
-        pdf_path = (REPORT_DIR / filename).resolve()
-        if REPORT_DIR.resolve() not in pdf_path.parents or not pdf_path.is_file():
+        pdf_path = _resolve_report_pdf(safe_name)
+        if pdf_path is None:
             self._send_json(404, {"error": "Report not found"})
             return
         body = pdf_path.read_bytes()
-        self._send_bytes(200, body, "application/pdf", filename)
+        self._send_bytes(200, body, "application/pdf", safe_name)
 
     def _handle_oscal_pdf(self) -> None:
         try:
@@ -257,8 +311,9 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
                 data.get("validationResults"),
                 REPORT_DIR,
             )
-            host = self.headers.get("Host", "127.0.0.1:8081")
-            download_url = f"http://{host}/api/reports/download/{paths['pdfFilename']}"
+            port = self.server.server_address[1]
+            pdf_name = paths["pdfFilename"]
+            download_url = f"http://127.0.0.1:{port}/api/reports/download/{pdf_name}"
             self._send_json(
                 200,
                 {
@@ -313,7 +368,7 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            result = run_playbook(playbook, data.get("inventory"))
+            result = run_playbook(playbook)
             self._send_json(200, result)
         except (ValueError, FileNotFoundError) as exc:
             self._send_json(400, {"error": str(exc)})
