@@ -13,7 +13,7 @@ import subprocess
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse, unquote
+from urllib.parse import urlparse, unquote, quote
 
 ROOT = Path(__file__).resolve().parents[1]
 PLAYBOOKS_DIR = (ROOT / "ansible" / "playbooks").resolve()
@@ -258,8 +258,10 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Access-Control-Allow-Origin", "*")
         if filename:
-            safe_name = _header_safe_filename(filename)
-            self.send_header("Content-Disposition", f'attachment; filename="{safe_name}"')
+            safe_name = _header_safe_filename(filename) or "download.bin"
+            encoded_name = quote(safe_name, safe="")
+            content_disposition = f'attachment; filename="{safe_name}"; filename*=UTF-8\'\'{encoded_name}'
+            self.send_header("Content-Disposition", content_disposition)
         self.end_headers()
         self.wfile.write(body)
 
