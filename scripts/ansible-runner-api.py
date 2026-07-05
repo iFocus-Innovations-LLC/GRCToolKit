@@ -21,6 +21,23 @@ DEFAULT_INVENTORY = PLAYBOOKS_DIR / "inventory.yml"
 PLAYBOOK_TIMEOUT_SEC = 180
 REPORT_DIR = Path("/tmp/grc-oscal-reports")
 
+
+def _build_playbook_allowlist() -> dict[str, Path]:
+    """Build stem -> resolved path map at startup (CodeQL-safe allowlist)."""
+    allowed: dict[str, Path] = {}
+    for path in sorted(PLAYBOOKS_DIR.rglob("*.yml")):
+        if path.name == "inventory.yml":
+            continue
+        stem = path.relative_to(PLAYBOOKS_DIR).with_suffix("").as_posix()
+        resolved = path.resolve()
+        if PLAYBOOKS_DIR not in resolved.parents and resolved.parent != PLAYBOOKS_DIR:
+            continue
+        allowed[stem] = resolved
+    return allowed
+
+
+ALLOWED_PLAYBOOKS: dict[str, Path] = _build_playbook_allowlist()
+
 sys.path.insert(0, str(ROOT / "scripts"))
 try:
     from oscal_pdf import generate_oscal_report_files
@@ -35,14 +52,14 @@ def playbook_stem(name: str) -> str:
     return name.replace(".yml", "").replace(".yaml", "")
 
 
-def resolve_playbook(name: str) -> Path:
+def resolve_playbook(name: str) -> tuple[str, Path]:
     stem = playbook_stem(name.strip().lstrip("/"))
     if not stem or ".." in stem or stem.startswith("."):
         raise ValueError("Invalid playbook name")
-    path = (PLAYBOOKS_DIR / f"{stem}.yml").resolve()
-    if not path.is_file() or PLAYBOOKS_DIR not in path.parents:
-        raise ValueError(f"Playbook not found: {stem}")
-    return path
+    playbook_path = ALLOWED_PLAYBOOKS.get(stem)
+    if playbook_path is None:
+        raise ValueError(f"Playbook not in allowlist: {stem}")
+    return stem, playbook_path
 
 
 def control_id_from_playbook(stem: str) -> str:
@@ -128,15 +145,14 @@ def validate_localhost_inventory(inventory_path: Path) -> None:
         )
 
 
-def run_playbook(playbook_name: str, inventory: str | None = None) -> dict:
+def run_playbook(playbook_name: str) -> dict:
     if shutil.which("ansible-playbook") is None:
         raise RuntimeError(
             "ansible-playbook not found. Install Ansible (e.g. brew install ansible)."
         )
 
-    playbook_path = resolve_playbook(playbook_name)
-    stem = playbook_stem(playbook_path.name)
-    inventory_path = Path(inventory).resolve() if inventory else DEFAULT_INVENTORY
+    stem, playbook_path = resolve_playbook(playbook_name)
+    inventory_path = DEFAULT_INVENTORY.resolve()
     if not inventory_path.is_file():
         raise FileNotFoundError(f"Inventory not found: {inventory_path}")
 
@@ -313,7 +329,7 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            result = run_playbook(playbook, data.get("inventory"))
+            result = run_playbook(playbook)
             self._send_json(200, result)
         except (ValueError, FileNotFoundError) as exc:
             self._send_json(400, {"error": str(exc)})
