@@ -93,8 +93,13 @@ def _sanitize_report_filename(raw: str) -> str | None:
 
 
 def _resolve_report_pdf(safe_name: str) -> Path | None:
-    candidate = (REPORT_DIR / safe_name).resolve()
-    if candidate.parent != REPORT_DIR.resolve() or not candidate.is_file():
+    report_root = REPORT_DIR.resolve()
+    candidate = (report_root / safe_name).resolve()
+    try:
+        candidate.relative_to(report_root)
+    except ValueError:
+        return None
+    if not candidate.is_file():
         return None
     return candidate
 
