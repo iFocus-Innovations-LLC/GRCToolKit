@@ -76,31 +76,32 @@ def resolve_playbook_stem(name: str) -> str:
     return stem
 
 
-def _sanitize_report_filename(raw: str) -> str | None:
-    """Validate PDF basename without regex (avoids ReDoS / path injection)."""
-    name = unquote(raw).split("/")[-1].split("\\")[-1]
-    if not name or len(name) > MAX_REPORT_FILENAME:
+def _extract_report_token(raw: str) -> str | None:
+    """Return validated report id token from URL segment (no path components)."""
+    segment = unquote(raw).split("/")[-1].split("\\")[-1]
+    if not segment.startswith(REPORT_PREFIX) or not segment.endswith(REPORT_SUFFIX):
         return None
-    if not name.startswith(REPORT_PREFIX) or not name.endswith(REPORT_SUFFIX):
+    middle = segment[len(REPORT_PREFIX) : -len(REPORT_SUFFIX)]
+    if not middle or len(middle) > MAX_REPORT_FILENAME - len(REPORT_PREFIX) - len(REPORT_SUFFIX):
         return None
-    middle = name[len(REPORT_PREFIX) : -len(REPORT_SUFFIX)]
-    if not middle:
-        return None
+    token_chars: list[str] = []
     for ch in middle:
         if not (ch.isalnum() or ch in "-_"):
             return None
-    return name
+        token_chars.append(ch)
+    return "".join(token_chars)
 
 
-def _resolve_report_pdf(safe_name: str) -> Path | None:
-    candidate = (REPORT_DIR / safe_name).resolve()
-    if candidate.parent != REPORT_DIR.resolve() or not candidate.is_file():
+def _find_report_pdf(raw: str) -> tuple[str, Path] | None:
+    """Locate report by scanning REPORT_DIR (avoids user-controlled path join)."""
+    token = _extract_report_token(raw)
+    if token is None:
         return None
-    return candidate
-
-
-def _header_safe_filename(filename: str) -> str:
-    return "".join(ch for ch in filename if ch.isalnum() or ch in "._-")
+    canonical = f"{REPORT_PREFIX}{token}{REPORT_SUFFIX}"
+    for path in REPORT_DIR.glob(f"{REPORT_PREFIX}*.pdf"):
+        if path.is_file() and path.name == canonical:
+            return canonical, path
+    return None
 
 
 def control_id_from_playbook(stem: str) -> str:
@@ -253,8 +254,8 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Access-Control-Allow-Origin", "*")
         if filename:
-            safe_name = _header_safe_filename(filename)
-            self.send_header("Content-Disposition", f'attachment; filename="{safe_name}"')
+            # filename is server-canonical (from _find_report_pdf), not raw user input
+            self.send_header("Content-Disposition", 'attachment; filename="report.pdf"')
         self.end_headers()
         self.wfile.write(body)
 
@@ -274,16 +275,13 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
             self._send_json(404, {"error": "Not found"})
             return
         filename = unquote(path[len(prefix) :])
-        safe_name = _sanitize_report_filename(filename)
-        if safe_name is None:
-            self._send_json(400, {"error": "Invalid report filename"})
-            return
-        pdf_path = _resolve_report_pdf(safe_name)
-        if pdf_path is None:
+        found = _find_report_pdf(filename)
+        if found is None:
             self._send_json(404, {"error": "Report not found"})
             return
+        canonical_name, pdf_path = found
         body = pdf_path.read_bytes()
-        self._send_bytes(200, body, "application/pdf", safe_name)
+        self._send_bytes(200, body, "application/pdf", canonical_name)
 
     def _handle_oscal_pdf(self) -> None:
         try:
