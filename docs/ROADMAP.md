@@ -22,7 +22,6 @@ GRCToolKit is evolving into a comprehensive Post-Quantum Cryptography (PQC) migr
 | PQC migration | Emerging slide-deck topic | Playbooks, inventory, FIPS 203/204/205 roadmap |
 | Deployment model | Vendor-hosted SaaS | Open source; self-hosted Docker/GKE/Helm |
 | Physical AI / robots | Out of scope | **Shields Up** (Phase 4+): RSF, OWASP LLM, routine read-only scans |
-| Commercial model | Closed subscription | **Open core** + [GRCToolKit Enterprise](BRAND-AND-EDITIONS.md) (support, training, agentic token pools) |
 
 ### What we are not claiming (today)
 
@@ -40,7 +39,6 @@ GRCToolKit is evolving into a comprehensive Post-Quantum Cryptography (PQC) migr
 | Phase | Focus | Market message |
 |-------|--------|----------------|
 | **Now — production gate** | OSCAL, Ansible, HITL, PQC core, GCP deploy | Prove the automatable GRC stack |
-| **Phase 4 — Enterprise** | Support tiers, token metering, RBAC | [Brand ladder → Enterprise](BRAND-AND-EDITIONS.md) |
 | **Phase 4+ — Shields Up** | Robotics, OWASP LLM, RSF | Extend validation to Physical AI |
 | **Future — sim / ovrtx** | Synthetic lab, sensor evidence (post v0.1) | Demo and train without production robot risk |
 

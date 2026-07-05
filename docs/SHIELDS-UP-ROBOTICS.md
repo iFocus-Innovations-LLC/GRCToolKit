@@ -3,7 +3,7 @@
 **Status:** Post-production planning (doc-only)  
 **Branch:** `feature/shields-up-robotics`  
 **Target:** GRCToolKit module after core platform production release  
-**Brand:** *Shields Up* — routine security for robots that move. **Part of the path to [GRCToolKit Enterprise](BRAND-AND-EDITIONS.md).**
+**Brand:** *Shields Up* — routine security for robots that move
 
 ---
 
@@ -120,16 +120,14 @@ Planned probe locations: `ansible/playbooks/robot/` (robotics, later phase) and 
 3. **Deterministic probes, AI interpretation** — AI does not invent scan commands without review.
 4. **Authorization required** — customer must explicitly permit assessment scope.
 5. **Evidence for auditors** — timestamped reports suitable for GRC workflows.
-6. **Enterprise alignment** — AI triage in report generation is an **agentic, token-metered workflow** at scale (BYOK in Community; bundled pools in Enterprise — see [PM-TODO.md](PM-TODO.md) P3).
 
 ---
 
 ## Related documents
 
-- [BRAND-AND-EDITIONS.md](BRAND-AND-EDITIONS.md) — Brand ladder; Shields Up in Community vs Enterprise tiers
 - [ROADMAP.md](ROADMAP.md) — Post-Production: Shields Up section
-- [PM-TODO.md](PM-TODO.md) — P0/P1 backlog, P3 agentic token economics
-- [OVERVIEW.md](OVERVIEW.md) — GRCToolKit platform overview
+- [PM-TODO.md](PM-TODO.md) — P0/P1 backlog and production gate
+- [OVERVIEW.md](OVERVIEW.md) — GRCToolKit platform overview (when present on branch)
 
 ---
 
