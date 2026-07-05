@@ -1,0 +1,65 @@
+name: Bug report
+description: Report incorrect behavior, a regression, or a deployment failure
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please do **not** include API keys, tokens, or sensitive compliance data in this issue.
+
+        For **security vulnerabilities**, follow [docs/SECURITY.md](https://github.com/iFocus-Innovations-LLC/GRCToolKit/blob/main/docs/SECURITY.md) instead of filing a public issue.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected instead.
+      placeholder: When I run ./scripts/test-mvp-demo.sh, the health check fails with...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Commands, URLs, and inputs that trigger the issue.
+      placeholder: |
+        1. export GEMINI_API_KEY=...
+        2. docker run ...
+        3. curl http://localhost:8080/health
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version / branch
+      description: e.g. 2.1.0-dev, commit SHA, or branch name
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - UI / grctoolkit.html
+        - AI agent / compliance engine
+        - OSCAL / compliance docs
+        - PQC / Ansible
+        - Docker / Kubernetes / Helm
+        - Terraform / GCP
+        - CI / GitHub Actions
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or screenshots
+      description: Paste redacted logs or attach screenshots.
+    validations:
+      required: false

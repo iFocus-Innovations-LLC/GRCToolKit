@@ -44,12 +44,23 @@ if [[ -f "$ROOT/.env.local" ]]; then
   set +a
 fi
 
+# Pick up GEMINI_API_KEY from repo-root .env when the shell did not export it (file is gitignored).
+if [[ -z "${GEMINI_API_KEY:-}" && -f "$ROOT/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ROOT/.env" || true
+  set +a
+fi
+
 k="${GEMINI_API_KEY:-}"
 k="${k//$'\r'/}"
 k="${k#"${k%%[![:space:]]*}"}"
 k="${k%"${k##*[![:space:]]}"}"
 if [[ -z "$k" ]]; then
-  echo "warning: GEMINI_API_KEY is unset. Add it to .env.local (see .env.local.example) or export for this session only." >&2
+  echo "warning: GEMINI_API_KEY is unset. Get a key from https://aistudio.google.com/ then either:" >&2
+  echo "  .env.local (see .env.local.example), repo-root .env, or export GEMINI_API_KEY for this session" >&2
+  echo "  export GEMINI_API_KEY=\"...\"   # same terminal, then re-run this script" >&2
+  echo "Or in the browser console: window.GEMINI_API_KEY = \"...\"; then Analyze (no reload needed)." >&2
 fi
 k_esc=$(printf '%s' "$k" | sed -e 's/[\\|&]/\\&/g')
 sed -e "s|__GEMINI_API_KEY__|${k_esc}|g" grctoolkit.html > "$OUT"
@@ -89,7 +100,8 @@ python3 -m http.server "$PORT" &
 HTTP_PID=$!
 
 echo "Repository: $ROOT"
-echo "UI:         http://127.0.0.1:${PORT}/${OUT}"
+echo "Open (injected key lives only in local-index.html — not in grctoolkit.html):"
+echo "  http://127.0.0.1:${PORT}/${OUT}"
 echo "Ansible API: http://127.0.0.1:${RUNNER_PORT}/health"
 echo "Reports:    /tmp/grc-oscal-reports/ (PDF + JSON)"
 echo "Stop:       Ctrl+C (stops UI and Ansible runner)"
