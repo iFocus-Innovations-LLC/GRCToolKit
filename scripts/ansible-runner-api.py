@@ -254,7 +254,6 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Access-Control-Allow-Origin", "*")
         if filename:
-            # filename is server-canonical (from _find_report_pdf), not raw user input
             self.send_header("Content-Disposition", 'attachment; filename="report.pdf"')
         self.end_headers()
         self.wfile.write(body)
