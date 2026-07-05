@@ -1,0 +1,19 @@
+---
+# Local MVP demo inventory (Mac or Linux laptop — no GCP required)
+#
+# Production: use a private inventory with SSH + become per docs/ANSIBLE-AUDIT-OPERATIONS.md
+# Do NOT trigger remote hosts from the GRCToolKit UI/API in v1.
+#
+# Usage:
+#   cd ansible/playbooks
+#   ansible-playbook -i inventory.yml ac-3-access-enforcement.yml
+#
+# Note: AC/AU/SC playbooks use Linux-oriented modules (systemd, auditd, etc.).
+# On macOS you will see real probe failures for those tasks — expected live output.
+# For a full Linux-style pass demo, run against a Linux VM or container.
+
+all:
+  hosts:
+    localhost:
+      ansible_connection: local
+      ansible_python_interpreter: auto_silent

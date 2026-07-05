@@ -2,6 +2,9 @@
 VERSION.local
 *.buildinfo
 
+# Local demo Python venv (fpdf2 for OSCAL PDF reports)
+.venv-local-demo/
+
 # Environment variables
 .env
 .env.local

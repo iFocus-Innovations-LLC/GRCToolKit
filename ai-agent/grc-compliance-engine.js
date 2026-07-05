@@ -201,7 +201,9 @@ class GRCComplianceEngine {
             }
         });
 
-        hitlResults.overallConfidence = Math.round(totalConfidence / validationPlan.controls.length);
+        hitlResults.overallConfidence = validationPlan.controls.length
+            ? Math.round(totalConfidence / validationPlan.controls.length)
+            : 0;
 
         // 2. Tier Routing (Sentinel Architecture)
         if (hitlResults.overallConfidence < 85) {
@@ -295,14 +297,16 @@ class GRCComplianceEngine {
         };
 
         for (const controlId of relevantControls.controls) {
-            const control = this.findControlInCatalog(controlId);
+            const control = await this.findControlInCatalog(controlId);
             if (control) {
                 validationPlan.controls.push({
                     id: controlId,
                     title: control.title,
-                    description: control.statements[0]?.description,
+                    description: control.statements?.[0]?.description
+                        || control.guidelines?.[0]?.prose
+                        || '',
                     priority: this.getControlPriority(control),
-                    playbook: this.getPlaybookForControl(controlId)
+                    playbook: await this.getPlaybookForControl(controlId)
                 });
             }
         }
@@ -321,6 +325,34 @@ class GRCComplianceEngine {
         }
 
         return validationPlan;
+    }
+
+    /**
+     * Build a validation plan from AI-recommended controls (e.g. Gemini analysis).
+     */
+    async buildValidationPlanFromAiControls(aiControls) {
+        const controlIds = (aiControls || [])
+            .map((c) => (c.id || '').toUpperCase())
+            .filter(Boolean);
+        const playbooks = new Set();
+
+        for (const controlId of controlIds) {
+            const playbook = await this.getPlaybookForControl(controlId);
+            if (playbook) {
+                playbooks.add(playbook.replace(/\.yml$/, ''));
+            }
+        }
+
+        for (const [playbookName, playbook] of this.ansiblePlaybooks) {
+            if (playbook.controls.some((id) => controlIds.includes(id))) {
+                playbooks.add(playbookName);
+            }
+        }
+
+        return this.generateValidationPlan({
+            controls: controlIds,
+            playbooks: Array.from(playbooks),
+        });
     }
 
     /**
@@ -418,14 +450,19 @@ class GRCComplianceEngine {
                     playbook: playbook.name,
                     status: playbookResult.status,
                     output: playbookResult.output,
+                    stderr: playbookResult.stderr,
+                    exitCode: playbookResult.exitCode,
                     findings: playbookResult.findings,
+                    live: playbookResult.live === true,
+                    runnerReason: playbookResult.runnerReason || null,
                     timestamp: new Date().toISOString()
                 });
             }
 
             results.endTime = new Date().toISOString();
             results.overallStatus = this.calculateOverallStatus(results.playbookResults);
-            
+            results.playbookResults = this.enrichPlaybookResultsForSudo(results.playbookResults);
+
             // Generate compliance report
             const complianceReport = await this.generateComplianceReport(results);
             
@@ -441,35 +478,185 @@ class GRCComplianceEngine {
     }
 
     /**
-     * Execute Ansible playbook (simulated - in production, this would call Ansible API)
+     * Execute Ansible playbook via local runner API (scripts/ansible-runner-api.py).
+     * Falls back to simulation when the runner is unavailable.
      */
     async executeAnsiblePlaybook(playbookPath, targetHosts) {
-        // Simulate playbook execution
-        console.log(`🔧 Simulating execution of ${playbookPath} on ${targetHosts.join(', ')}`);
-        
-        // In a real implementation, this would:
-        // 1. Call Ansible API or execute ansible-playbook command
-        // 2. Parse the output
-        // 3. Extract compliance findings
-        
+        const apiBase = (window.ANSIBLE_API_BASE || 'http://127.0.0.1:8081').replace(/\/$/, '');
+        const stem = playbookPath
+            .replace(/^.*\//, '')
+            .replace(/\.ya?ml$/i, '');
+        const controlId = this.controlIdFromPlaybookStem(stem);
+
+        try {
+            const healthRes = await fetch(`${apiBase}/health`, {
+                signal: AbortSignal.timeout(3000),
+            });
+            if (!healthRes.ok) {
+                throw new Error(`Ansible runner health check failed (${healthRes.status})`);
+            }
+            const health = await healthRes.json();
+            if (!health.ansible) {
+                return {
+                    status: 'completed',
+                    output: 'ansible-playbook not found on this Mac. Install with: brew install ansible',
+                    findings: [
+                        {
+                            control: controlId,
+                            status: 'FAIL',
+                            message: 'Live validation skipped — Ansible CLI not installed',
+                            evidence: 'Runner API is up at ' + apiBase + '/health but ansible-playbook is missing from PATH.',
+                        },
+                    ],
+                    live: false,
+                    runnerReason: 'ansible-cli-missing',
+                };
+            }
+
+            console.log(`🔧 Running ansible-playbook ${stem} on ${targetHosts.join(', ')} via ${apiBase}`);
+            const res = await fetch(`${apiBase}/api/ansible/playbook`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ playbook: stem }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || `Ansible runner error (${res.status})`);
+            }
+
+            return {
+                status: data.status === 'completed' ? 'completed' : 'failed',
+                output: data.output || '',
+                stderr: data.stderr || '',
+                exitCode: data.exitCode,
+                findings: data.findings || [],
+                live: true,
+            };
+        } catch (error) {
+            console.warn('Ansible runner API unavailable, using simulation:', error);
+        }
+
         return {
             status: 'completed',
-            output: 'Playbook executed successfully',
+            output: 'Playbook executed successfully (simulated — start ./scripts/run-local.sh for live Ansible)',
             findings: [
                 {
-                    control: 'AC-3',
+                    control: controlId,
                     status: 'PASS',
-                    message: 'Access enforcement controls properly configured',
-                    evidence: 'Authentication services running, ACLs configured'
-                }
-            ]
+                    message: 'Simulated result — Ansible runner not available',
+                    evidence: `Target hosts: ${targetHosts.join(', ')}`,
+                },
+            ],
+            live: false,
+            runnerReason: 'runner-unavailable',
         };
+    }
+
+    /**
+     * Detect sudo/become failures in Ansible output.
+     */
+    detectSudoRequired(text) {
+        return /BECOME|sudo password|Missing sudo|permission denied|Authentication failure|Incorrect sudo/i.test(text || '');
+    }
+
+    /**
+     * Manual CLI handoff steps when automated validation cannot obtain sudo.
+     */
+    manualValidationSteps(playbook) {
+        return [
+            `Review playbook: ansible/playbooks/${playbook}.yml`,
+            'Schedule ITIL change window; obtain SysAdmin approval (see docs/ANSIBLE-AUDIT-OPERATIONS.md)',
+            `Dry-run: ansible-playbook -i inventory.yml ${playbook}.yml --check --diff --limit <target_host>`,
+            `Execute: ansible-playbook -i inventory.yml ${playbook}.yml --limit <target_host> --ask-become-pass`,
+            'Attach stdout and OSCAL assessment results to change ticket',
+        ].join('\n');
+    }
+
+    /**
+     * Mark findings MANUAL_REQUIRED when sudo/become is needed.
+     */
+    enrichPlaybookResultsForSudo(playbookResults) {
+        return playbookResults.map((result) => {
+            const combined = [
+                result.output,
+                result.stderr,
+                ...(result.findings || []).flatMap((f) => [f.evidence, f.message]),
+            ]
+                .filter(Boolean)
+                .join('\n');
+            if (!this.detectSudoRequired(combined)) {
+                return result;
+            }
+            const steps = this.manualValidationSteps(result.playbook);
+            return {
+                ...result,
+                findings: (result.findings || []).map((finding) => ({
+                    ...finding,
+                    status: 'MANUAL_REQUIRED',
+                    message: `${finding.control}: Manual validation required (sudo/become)`,
+                    evidence: `${finding.evidence || ''}\n\nManual validation steps:\n${steps}`.trim(),
+                    validationMode: 'manual-cli-handoff',
+                })),
+            };
+        });
     }
 
     /**
      * Generate compliance report in OSCAL format
      */
     async generateComplianceReport(results) {
+        const hasManualRequired = results.playbookResults.some((r) =>
+            (r.findings || []).some((f) => f.status === 'MANUAL_REQUIRED'),
+        );
+
+        const assessmentResult = {
+            "uuid": `urn:uuid:${this.generateUUID()}`,
+            "title": "GRC Compliance Assessment",
+            "description": "Automated compliance assessment using Ansible playbooks",
+            "start": results.startTime,
+            "end": results.endTime,
+            "reviewed-controls": {
+                "control-selections": results.playbookResults.map(result => ({
+                    "include-controls": [
+                        {
+                            "control-id": result.playbook.split('-')[0].toUpperCase() + '-' + result.playbook.split('-')[1]
+                        }
+                    ]
+                }))
+            },
+            "findings": results.playbookResults.flatMap(result =>
+                result.findings.map(finding => {
+                    const props = [
+                        {
+                            "name": "status",
+                            "value": finding.status
+                        },
+                        {
+                            "name": "control-id",
+                            "value": finding.control
+                        }
+                    ];
+                    if (finding.validationMode) {
+                        props.push({
+                            "name": "validation-mode",
+                            "value": finding.validationMode
+                        });
+                    }
+                    return {
+                        "uuid": `urn:uuid:${this.generateUUID()}`,
+                        "title": finding.message,
+                        "description": finding.evidence,
+                        "props": props
+                    };
+                })
+            )
+        };
+
+        if (hasManualRequired) {
+            assessmentResult.remarks =
+                'Automated validation incomplete: root/sudo required. Complete manual steps documented per finding and docs/ANSIBLE-AUDIT-OPERATIONS.md.';
+        }
+
         return {
             "assessment-results": {
                 "uuid": `urn:uuid:${this.generateUUID()}`,
@@ -482,41 +669,7 @@ class GRCComplianceEngine {
                 "import-ap": {
                     "href": "/oscal/assessment-plans/grc-assessment-plan.json"
                 },
-                "results": [
-                    {
-                        "uuid": `urn:uuid:${this.generateUUID()}`,
-                        "title": "GRC Compliance Assessment",
-                        "description": "Automated compliance assessment using Ansible playbooks",
-                        "start": results.startTime,
-                        "end": results.endTime,
-                        "reviewed-controls": {
-                            "control-selections": results.playbookResults.map(result => ({
-                                "include-controls": [
-                                    {
-                                        "control-id": result.playbook.split('-')[0].toUpperCase() + '-' + result.playbook.split('-')[1]
-                                    }
-                                ]
-                            }))
-                        },
-                        "findings": results.playbookResults.flatMap(result => 
-                            result.findings.map(finding => ({
-                                "uuid": `urn:uuid:${this.generateUUID()}`,
-                                "title": finding.message,
-                                "description": finding.evidence,
-                                "props": [
-                                    {
-                                        "name": "status",
-                                        "value": finding.status
-                                    },
-                                    {
-                                        "name": "control-id",
-                                        "value": finding.control
-                                    }
-                                ]
-                            }))
-                        )
-                    }
-                ]
+                "results": [assessmentResult]
             }
         };
     }
@@ -556,8 +709,8 @@ class GRCComplianceEngine {
         return priorityProp?.value || 'medium';
     }
 
-    getPlaybookForControl(controlId) {
-        const control = this.findControlInCatalog(controlId);
+    async getPlaybookForControl(controlId) {
+        const control = await this.findControlInCatalog(controlId);
         if (control) {
             const playbookProp = control.props?.find(prop => prop.name === 'ansible-playbook');
             return playbookProp?.value || null;
@@ -584,8 +737,18 @@ class GRCComplianceEngine {
     }
 
     calculateOverallStatus(playbookResults) {
-        const hasFailures = playbookResults.some(result => result.status === 'failed');
+        const hasFailures = playbookResults.some(
+            (result) => result.status === 'failed' || (result.exitCode ?? 0) > 0,
+        );
         return hasFailures ? 'failed' : 'passed';
+    }
+
+    controlIdFromPlaybookStem(stem) {
+        const parts = stem.split('-');
+        if (parts.length >= 2) {
+            return `${parts[0].toUpperCase()}-${parts[1]}`;
+        }
+        return stem.toUpperCase();
     }
 
     generateUUID() {

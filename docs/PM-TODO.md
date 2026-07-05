@@ -4,7 +4,15 @@ Lightweight backlog for post-production initiatives and cross-cutting release ga
 For technical roadmap detail, see [ROADMAP.md](ROADMAP.md).  
 For brand ladder and Enterprise tiers, see [BRAND-AND-EDITIONS.md](BRAND-AND-EDITIONS.md).
 
-**Last updated:** 2026-07-02
+**Last updated:** 2026-07-05
+
+---
+
+## Ansible audit safety (v1 + post-v1)
+
+- [x] v1: [ANSIBLE-AUDIT-OPERATIONS.md](ANSIBLE-AUDIT-OPERATIONS.md) + localhost-only runner API + sudo manual steps in OSCAL JSON/PDF
+- [ ] Post-v1: read-only refactor AC/AU/SC playbooks (acceptance: no `systemd state:` mutations; `grc_audit_mode: read_only`; scoped `find` paths; align with OWASP LLM playbook pattern)
+- [ ] Post-v1: inventory templates for production (SSH, become, change-window vars, audit service account + optional sudoers allow-list)
 
 ---
 

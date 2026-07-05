@@ -48,13 +48,23 @@
                 placeholder="e.g., 'What controls are needed for securing patient health information in a cloud database?' or 'How do I manage access to critical systems?'"
             ></textarea>
 
-            <button
-                id="analyzeButton"
-                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out flex items-center justify-center space-x-2"
-            >
-                <span id="buttonText">Analyze Scenario</span>
-                <div id="loadingSpinner" class="loading-spinner"></div>
-            </button>
+            <div class="flex gap-3">
+                <button
+                    id="analyzeButton"
+                    class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out flex items-center justify-center space-x-2"
+                >
+                    <span id="buttonText">Analyze Scenario</span>
+                    <div id="loadingSpinner" class="loading-spinner"></div>
+                </button>
+                <button
+                    id="clearScenarioBtn"
+                    type="button"
+                    class="px-6 py-3 bg-white hover:bg-gray-50 text-gray-700 font-semibold rounded-lg border border-gray-300 shadow-sm transition duration-300 ease-in-out"
+                    title="Clear scenario and results"
+                >
+                    Clear
+                </button>
+            </div>
         </div>
 
         <div id="responseArea" class="mt-8 p-6 bg-gray-50 rounded-lg border border-gray-200 shadow-inner min-h-[150px] text-gray-700">
@@ -146,8 +156,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
     <!-- Load GRC Compliance Engine and Report Generator -->
-    <script src="/ai-agent/grc-compliance-engine.js"></script>
-    <script src="/compliance-docs/auditor-report-generator.js"></script>
+    <script src="/ai-agent/grc-compliance-engine.js?v=2.1.0-dev-ansible2"></script>
+    <script src="/compliance-docs/auditor-report-generator.js?v=2.1.0-dev"></script>
     
     <script type="module">
         // Configuration - Set your Gemini API key here
@@ -155,6 +165,8 @@
         window.GEMINI_API_KEY = "__GEMINI_API_KEY__"; // Injected: docker-entrypoint.sh or scripts/run-local.sh
         // Use a model that supports structured JSON (response_mime_type), e.g. gemini-2.5-flash, gemini-2.0-flash, gemini-1.5-flash — not gemini-pro / gemini-1.0-pro.
         window.GEMINI_MODEL = window.GEMINI_MODEL || "gemini-2.5-flash";
+        window.ANSIBLE_API_BASE = window.ANSIBLE_API_BASE || "http://127.0.0.1:8081";
+
         // Firebase Configuration
         const firebaseConfig = {
             apiKey: "YOUR_FIREBASE_API_KEY",
@@ -177,6 +189,7 @@
         // Global variables for Firebase configuration, if needed for future persistence.
 
         const scenarioInput = document.getElementById('scenarioInput');
+        const clearScenarioBtn = document.getElementById('clearScenarioBtn');
         const analyzeButton = document.getElementById('analyzeButton');
         const buttonText = document.getElementById('buttonText');
         const loadingSpinner = document.getElementById('loadingSpinner');
@@ -199,6 +212,18 @@
                 console.error('❌ Failed to initialize GRC Compliance tools:', error);
             }
         });
+
+        function clearScenario() {
+            scenarioInput.value = '';
+            window.currentResponseData = null;
+            document.getElementById('priorityFilter').value = 'all';
+            document.getElementById('categoryFilter').value = 'all';
+            document.getElementById('sortBy').value = 'priority';
+            displayMessage('', 'initial');
+            scenarioInput.focus();
+        }
+
+        clearScenarioBtn.addEventListener('click', clearScenario);
 
         analyzeButton.addEventListener('click', async () => {
             const prompt = scenarioInput.value.trim();
@@ -223,7 +248,8 @@
 
                 Scenario: "${prompt}"
 
-                Please respond with a valid JSON object in the following format:
+                Please respond with a valid JSON object in the following format.
+                Identify the top 8 most relevant NIST 800-53 R.5 controls (highest impact first). Keep each field concise.
                 {
                     "summary": "Brief summary of the scenario and overall compliance approach",
                     "controls": [
@@ -272,17 +298,22 @@
                     temperature: 0.3,
                     topK: 40,
                     topP: 0.95,
-                    maxOutputTokens: 2048,
+                    maxOutputTokens: 8192,
                 };
 
-                async function geminiGenerate(withStructuredJsonMime) {
+                async function geminiGenerate(withStructuredJsonMime, maxTokens, disableThinking) {
                     const generationConfig = withStructuredJsonMime
-                        ? { ...genBase, responseMimeType: "application/json" }
-                        : { ...genBase };
-                    const body = JSON.stringify({
+                        ? { ...genBase, maxOutputTokens: maxTokens, responseMimeType: "application/json" }
+                        : { ...genBase, maxOutputTokens: maxTokens };
+                    // thinkingConfig must be nested under generationConfig (not top-level).
+                    if (!disableThinking && /^gemini-2\.5/i.test(modelId)) {
+                        generationConfig.thinkingConfig = { thinkingBudget: 0 };
+                    }
+                    const bodyObj = {
                         contents: chatHistory,
                         generationConfig,
-                    });
+                    };
+                    const body = JSON.stringify(bodyObj);
                     const res = await fetch(apiUrl, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -292,7 +323,10 @@
                     return { res, raw };
                 }
 
-                let { res: gemRes, raw: gemRaw } = await geminiGenerate(true);
+                let usedStructuredJson = true;
+                let maxTokensUsed = genBase.maxOutputTokens;
+                let disableThinking = false;
+                let { res: gemRes, raw: gemRaw } = await geminiGenerate(true, maxTokensUsed, disableThinking);
                 if (!gemRes.ok) {
                     let msg = gemRaw;
                     try {
@@ -302,6 +336,17 @@
                     }
                     if (
                         gemRes.status === 400 &&
+                        /thinkingConfig|thinkingBudget|Unknown name.*thinking/i.test(
+                            String(msg),
+                        )
+                    ) {
+                        console.warn(
+                            "Gemini: thinkingConfig rejected; retrying without thinking budget.",
+                        );
+                        disableThinking = true;
+                        ({ res: gemRes, raw: gemRaw } = await geminiGenerate(usedStructuredJson, maxTokensUsed, disableThinking));
+                    } else if (
+                        gemRes.status === 400 &&
                         /responseMimeType|response_mime_type|Unknown name|generation_config|generationConfig/i.test(
                             String(msg),
                         )
@@ -309,7 +354,8 @@
                         console.warn(
                             "Gemini: structured JSON mode rejected; retrying without responseMimeType.",
                         );
-                        ({ res: gemRes, raw: gemRaw } = await geminiGenerate(false));
+                        usedStructuredJson = false;
+                        ({ res: gemRes, raw: gemRaw } = await geminiGenerate(false, maxTokensUsed, disableThinking));
                     }
                 }
                 if (!gemRes.ok) {
@@ -339,8 +385,24 @@
                 if (result.candidates && result.candidates.length > 0 &&
                     result.candidates[0].content && result.candidates[0].content.parts &&
                     result.candidates[0].content.parts.length > 0) {
-                    const text = result.candidates[0].content.parts[0].text;
-                    
+                    let candidate = result.candidates[0];
+                    let text = candidate.content.parts[0].text;
+                    let finishReason = candidate.finishReason || null;
+
+                    // Retry once with higher token budget if output was truncated.
+                    if (finishReason === "MAX_TOKENS" && maxTokensUsed < 16384) {
+                        maxTokensUsed = 16384;
+                        ({ res: gemRes, raw: gemRaw } = await geminiGenerate(usedStructuredJson, maxTokensUsed, disableThinking));
+                        if (gemRes.ok) {
+                            const retryResult = JSON.parse(gemRaw);
+                            if (retryResult.candidates?.[0]?.content?.parts?.[0]?.text) {
+                                candidate = retryResult.candidates[0];
+                                text = candidate.content.parts[0].text;
+                                finishReason = candidate.finishReason || null;
+                            }
+                        }
+                    }
+
                     try {
                         // Try to parse the JSON response
                         const jsonResponse = JSON.parse(text);
@@ -744,6 +806,20 @@
         // OSCAL Integration Functions
         
         /**
+         * Build validation plan from AI controls, with fallback for cached engine scripts.
+         */
+        async function resolveValidationPlan(scenario, aiControls) {
+            if (typeof grcComplianceEngine.buildValidationPlanFromAiControls === 'function') {
+                const plan = await grcComplianceEngine.buildValidationPlanFromAiControls(aiControls);
+                if (plan.controls.length || plan.playbooks.length) {
+                    return plan;
+                }
+            }
+            const analysis = await grcComplianceEngine.analyzeScenario(scenario);
+            return analysis.validationPlan;
+        }
+
+        /**
          * Validate controls using Ansible playbooks
          */
         async function validateControls() {
@@ -755,23 +831,26 @@
             try {
                 displayMessage('🔍 Validating controls using Ansible playbooks...', 'initial');
                 
-                // Get the scenario from the input
                 const scenario = scenarioInput.value.trim();
-                
-                // Analyze scenario to get validation plan
-                const analysis = await grcComplianceEngine.analyzeScenario(scenario);
-                
-                // Execute compliance validation (simulated)
-                const targetHosts = ['localhost']; // In production, this would be configurable
+                const aiControls = window.currentResponseData.controls || [];
+                const validationPlan = await resolveValidationPlan(scenario, aiControls);
+
+                if (!validationPlan.playbooks.length) {
+                    displayMessage(
+                        'No Ansible playbooks are mapped for these controls yet. Configure ansible/inventory.yml with your target hosts and ensure playbooks exist under ansible/playbooks/ for the recommended control IDs.',
+                        'error'
+                    );
+                    return;
+                }
+
+                const targetHosts = ['localhost'];
                 const validationResults = await grcComplianceEngine.executeComplianceValidation(
-                    analysis.validationPlan, 
+                    validationPlan,
                     targetHosts
                 );
-                
-                // Update Sentinel Stats with HITL data from analysis
-                updateSentinelStats(analysis.validationPlan.controls, analysis.hitl);
-                
-                // Display validation results
+
+                const hitl = grcComplianceEngine.applyHITLGuardrails(validationPlan, scenario);
+                updateSentinelStats(validationPlan.controls, hitl);
                 displayValidationResults(validationResults);
                 
             } catch (error) {
@@ -839,11 +918,29 @@
          */
         function displayValidationResults(validationResults) {
             const results = validationResults.results;
-            
+            const liveCount = results.playbookResults.filter((r) => r.live).length;
+            const runnerReasons = new Set(
+                results.playbookResults.map((r) => r.runnerReason).filter(Boolean),
+            );
+            let modeLabel;
+            if (liveCount > 0) {
+                modeLabel = `Live Ansible on localhost (${liveCount}/${results.playbookResults.length} playbooks)`;
+            } else if (runnerReasons.has('ansible-cli-missing')) {
+                modeLabel = 'Simulated — Ansible API is running but ansible-playbook is not installed. Run: brew install ansible, then restart ./scripts/run-local.sh';
+            } else {
+                modeLabel = 'Simulated — Ansible runner not detected. Restart ./scripts/run-local.sh and confirm http://127.0.0.1:8081/health';
+            }
+
+            const escapeHtml = (value) => String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+
             let html = `
                 <div class="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400 rounded-r-lg">
                     <h3 class="text-lg font-semibold text-blue-800 mb-2">🔍 Control Validation Results</h3>
-                    <p class="text-blue-700">Validation completed using Ansible playbooks and OSCAL framework</p>
+                    <p class="text-blue-700">${escapeHtml(modeLabel)}</p>
                 </div>
                 
                 <div class="mb-6">
@@ -871,15 +968,19 @@
             
             results.playbookResults.forEach(result => {
                 const statusColor = result.status === 'completed' ? 'green' : 'red';
+                const liveBadge = result.live
+                    ? '<span class="ml-2 px-2 py-0.5 text-xs rounded bg-emerald-100 text-emerald-800">LIVE</span>'
+                    : '<span class="ml-2 px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-600">SIMULATED</span>';
+                const logText = [result.output, result.stderr].filter(Boolean).join('\n').trim();
                 html += `
                     <div class="border border-gray-200 rounded-lg p-4">
                         <div class="flex items-center justify-between mb-2">
-                            <h4 class="text-lg font-semibold text-gray-800">${result.playbook}</h4>
+                            <h4 class="text-lg font-semibold text-gray-800">${escapeHtml(result.playbook)}${liveBadge}</h4>
                             <span class="px-3 py-1 rounded-full text-sm font-medium bg-${statusColor}-100 text-${statusColor}-800">
                                 ${result.status.toUpperCase()}
                             </span>
                         </div>
-                        <p class="text-gray-700 mb-2">${result.output}</p>
+                        ${logText ? `<pre class="text-xs text-gray-700 bg-gray-100 p-3 rounded overflow-x-auto max-h-64 whitespace-pre-wrap">${escapeHtml(logText)}</pre>` : ''}
                         <div class="mt-3">
                             <h5 class="font-medium text-gray-800 mb-2">Findings:</h5>
                             <ul class="space-y-1">
@@ -891,9 +992,9 @@
                         <li class="flex items-start space-x-2">
                             <span class="text-${findingColor}-500 mt-1">•</span>
                             <div>
-                                <span class="font-medium text-${findingColor}-800">${finding.control}: ${finding.status}</span>
-                                <p class="text-gray-700 text-sm">${finding.message}</p>
-                                <p class="text-gray-600 text-xs">Evidence: ${finding.evidence}</p>
+                                <span class="font-medium text-${findingColor}-800">${escapeHtml(finding.control)}: ${escapeHtml(finding.status)}</span>
+                                <p class="text-gray-700 text-sm">${escapeHtml(finding.message)}</p>
+                                <pre class="text-gray-600 text-xs mt-1 whitespace-pre-wrap bg-white border rounded p-2 max-h-40 overflow-y-auto">${escapeHtml(finding.evidence)}</pre>
                             </div>
                         </li>
                     `;
@@ -913,14 +1014,21 @@
                 <div class="mt-6 p-4 bg-gray-50 rounded-lg">
                     <h4 class="font-semibold text-gray-800 mb-2">📋 OSCAL Assessment Plan</h4>
                     <p class="text-gray-700 text-sm mb-3">This validation was conducted using NIST OSCAL framework for standardized compliance assessment.</p>
-                    <button onclick="downloadOSCALPlan('${validationResults.complianceReport}')" 
+                    <button id="downloadOscalPlanBtn"
+                            type="button"
                             class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
-                        Download OSCAL Assessment Plan
+                        Download OSCAL Report (PDF)
                     </button>
+                    <p id="downloadOscalPlanStatus" class="text-gray-600 text-xs mt-2 hidden"></p>
                 </div>
             `;
             
+            window.lastComplianceReport = validationResults.complianceReport;
+            window.lastValidationResults = validationResults.results;
             aiResponse.innerHTML = html;
+            document.getElementById('downloadOscalPlanBtn')?.addEventListener('click', () => {
+                downloadOscalReportPdf(window.lastComplianceReport, window.lastValidationResults);
+            });
             aiResponse.classList.remove('hidden');
             initialMessage.classList.add('hidden');
             errorMessage.classList.add('hidden');
@@ -996,11 +1104,11 @@
                 <div class="mt-6 p-4 bg-gray-50 rounded-lg">
                     <h4 class="font-semibold text-gray-800 mb-2">📄 Download Reports</h4>
                     <div class="flex space-x-4">
-                        <button onclick="downloadReport('${JSON.stringify(report.oscalReport)}', 'oscal-assessment-results.json')" 
+                        <button id="downloadOscalReportBtn" type="button"
                                 class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
                             Download OSCAL Report
                         </button>
-                        <button onclick="downloadReport('${JSON.stringify(humanReport)}', 'audit-report.json')" 
+                        <button id="downloadHumanReportBtn" type="button"
                                 class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
                             Download Human-Readable Report
                         </button>
@@ -1008,31 +1116,82 @@
                 </div>
             `;
             
+            window.lastOscalReport = report.oscalReport;
+            window.lastHumanReport = humanReport;
             aiResponse.innerHTML = html;
+            document.getElementById('downloadOscalReportBtn')?.addEventListener('click', () => {
+                downloadReport(window.lastOscalReport, 'oscal-assessment-results.json');
+            });
+            document.getElementById('downloadHumanReportBtn')?.addEventListener('click', () => {
+                downloadReport(window.lastHumanReport, 'audit-report.json');
+            });
             aiResponse.classList.remove('hidden');
             initialMessage.classList.add('hidden');
             errorMessage.classList.add('hidden');
         }
         
         /**
-         * Download OSCAL plan
+         * Generate PDF OSCAL report via local runner API; JSON + PDF stored in /tmp/grc-oscal-reports.
          */
+        async function downloadOscalReportPdf(complianceReport, validationResults) {
+            const statusEl = document.getElementById('downloadOscalPlanStatus');
+            const setStatus = (msg, isError = false) => {
+                if (!statusEl) return;
+                statusEl.textContent = msg;
+                statusEl.classList.remove('hidden', 'text-red-600', 'text-gray-600');
+                statusEl.classList.add(isError ? 'text-red-600' : 'text-gray-600');
+            };
+
+            if (!complianceReport) {
+                setStatus('No OSCAL report available. Run Validate Controls first.', true);
+                return;
+            }
+
+            const apiBase = (window.ANSIBLE_API_BASE || 'http://127.0.0.1:8081').replace(/\/$/, '');
+            setStatus('Generating PDF…');
+
+            try {
+                const res = await fetch(`${apiBase}/api/reports/oscal-pdf`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        complianceReport,
+                        validationResults,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.error || `Report API error (${res.status})`);
+                }
+
+                const downloadUrl = data.downloadUrl || `${apiBase}/api/reports/download/${data.pdfFilename}`;
+                const anchor = document.createElement('a');
+                anchor.href = downloadUrl;
+                anchor.download = data.pdfFilename || 'oscal-assessment.pdf';
+                anchor.rel = 'noopener';
+                document.body.appendChild(anchor);
+                anchor.click();
+                document.body.removeChild(anchor);
+
+                setStatus(`Saved PDF and JSON under ${data.reportDir || '/tmp/grc-oscal-reports'}`);
+            } catch (error) {
+                console.error('OSCAL PDF download failed:', error);
+                setStatus(error.message || 'PDF download failed.', true);
+            }
+        }
+
         function downloadOSCALPlan(planData) {
-            const blob = new Blob([JSON.stringify(planData, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `oscal-assessment-plan-${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            downloadOscalReportPdf(planData, window.lastValidationResults);
         }
         
         /**
          * Download report
          */
         function downloadReport(data, filename) {
+            if (!data) {
+                console.error('No report data available to download.');
+                return;
+            }
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
