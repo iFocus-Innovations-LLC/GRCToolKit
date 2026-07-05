@@ -130,11 +130,13 @@ The AI agent:
 The interface now includes:
 
 1. **Analyze Scenario**: Original AI-powered control recommendations
-2. **Validate Controls**: Execute Ansible playbooks for control validation
+2. **Validate Controls**: Execute Ansible playbooks for control validation (localhost lab; production via manual CLI)
 3. **Generate Audit Report**: Create OSCAL-compliant audit documentation
 
+> **Production vs lab:** The UI runner API accepts **localhost + `ansible_connection: local` only** in v1. Production validation requires manual playbook execution per [ANSIBLE-AUDIT-OPERATIONS.md](ANSIBLE-AUDIT-OPERATIONS.md) (change window, SysAdmin handoff, jump host).
+
 ### **New Buttons**
-- **🔍 Validate Controls**: Runs Ansible playbooks to validate controls
+- **🔍 Validate Controls**: Runs Ansible playbooks to validate controls (localhost lab)
 - **📊 Generate Audit Report**: Creates OSCAL-compliant audit reports
 
 ## 🔍 **Validation Process**

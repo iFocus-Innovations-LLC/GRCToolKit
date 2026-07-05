@@ -64,6 +64,7 @@ For roadmap detail, see [ROADMAP.md](ROADMAP.md#market-positioning-grctoolkit-vs
 ### OSCAL & automation
 - NIST 800-53 Rev. 5 OSCAL catalog (`oscal/catalog/`)
 - Ansible playbooks for control validation and evidence collection
+- **Production handoff:** [Ansible Audit Operations](ANSIBLE-AUDIT-OPERATIONS.md) (ITIL window, manual CLI, SysAdmin RACI)
 - Auditor-ready report generation (`compliance-docs/`)
 
 ### Human-in-the-Loop (HITL)
@@ -130,7 +131,7 @@ flowchart LR
 1. Analyst describes a compliance scenario in plain language.
 2. AI engine recommends NIST 800-53 controls (with confidence scoring).
 3. Analyst reviews recommendations (HITL gate for medium/high risk).
-4. **Validate Controls** runs Ansible playbooks against the environment.
+4. **Validate Controls** runs Ansible playbooks against localhost (lab) or **manual Ansible** per [ANSIBLE-AUDIT-OPERATIONS.md](ANSIBLE-AUDIT-OPERATIONS.md) for production targets.
 5. **Generate Audit Report** produces OSCAL-aligned documentation.
 
 ---

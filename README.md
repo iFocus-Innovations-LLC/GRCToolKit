@@ -50,7 +50,8 @@ CI/CD to this project uses GitHub secrets (e.g. `GCP_PROJECT_ID`, service accoun
 Detailed documentation for the GRCToolKit can be found in the `docs/` directory:
 
 - **Frameworks & Architecture**:
-  - [Project Overview](docs/OVERVIEW.md) - Executive summary for evaluators, partners, and new contributors.
+  - [Project Overview](docs/OVERVIEW.md) - Executive summary, market positioning, and evaluator guide.
+  - [Brand and Editions](docs/BRAND-AND-EDITIONS.md) - Community vs Enterprise; brand ladder.
   - [HITL Framework](docs/HITL-FRAMEWORK.md) - Human-in-the-Loop guardrails and sentinel architecture.
   - [PQC Integration Summary](docs/PQC-INTEGRATION-SUMMARY.md) - Post-Quantum Cryptography migration strategy.
   - [OSCAL Integration](docs/OSCAL-INTEGRATION.md) - Open Security Controls Assessment Language implementation.
@@ -106,6 +107,7 @@ This application provides a modern UI for interacting with a GRC Compliance Engi
 ### 📄 OSCAL & Automation
 - **OSCAL Integration**: Full NIST 800-53 R5 OSCAL catalog integration.
 - **Ansible Playbooks**: Automated validation for AC-3, AC-6, AU-2, SC-7, and PQC controls.
+- **Safe production handoff**: [docs/ANSIBLE-AUDIT-OPERATIONS.md](docs/ANSIBLE-AUDIT-OPERATIONS.md) — ITIL change window, manual CLI, SysAdmin RACI (v1 UI is lab/localhost only).
 - **Auditor Reports**: Automated generation of compliance test reports.
 
 ### 🚀 Cloud-Native Deployment
