@@ -1,0 +1,37 @@
+---
+# Production inventory template — grc-audit service account
+# Copy to a PRIVATE repo; do not commit host IPs or keys to GRCToolKit git.
+#
+# Usage (jump host, after change window approved):
+#   export GRCTOOLKIT_CHANGE_ID="CHG-2026-001"
+#   cd ansible/playbooks
+#   ansible-playbook -i inventory.production.yml ac-3-access-enforcement.yml --limit prod_targets
+#
+# Prerequisites:
+#   - grc-audit UNIX account with SSH key from jump host only
+#   - /usr/local/sbin/grc-audit-* scripts installed (see ansible/scripts/grc-audit-probes/)
+#   - /etc/sudoers.d/grc-audit deployed and validated (visudo -c)
+
+all:
+  vars:
+    grc_audit_mode: read_only
+    grc_audit_become: true
+    grc_compliance_report_dir: /tmp/grc-compliance-reports
+    grc_audit_find_paths:
+      - /etc
+      - /var/log
+      - /usr/local
+    ansible_become: true
+    ansible_become_method: sudo
+    # NOPASSWD for GRC_AUDIT Cmnd_Alias only — see ansible/templates/sudoers.d/grc-audit
+
+  children:
+    prod_targets:
+      hosts:
+        prod-app-01:
+          ansible_host: 10.0.1.50
+          ansible_user: grc-audit
+          ansible_connection: ssh
+        # prod-app-02:
+        #   ansible_host: 10.0.1.51
+        #   ansible_user: grc-audit

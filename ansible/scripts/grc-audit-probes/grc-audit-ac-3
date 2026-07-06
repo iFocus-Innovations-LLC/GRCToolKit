@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# AC-3 Access Enforcement — read-only probes (sudo via /etc/sudoers.d/grc-audit).
+# Install: cp to /usr/local/sbin/grc-audit-ac-3 && chmod 755
+set -euo pipefail
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f /usr/local/sbin/grc-audit-probes-common.sh ]; then
+  # shellcheck source=/usr/local/sbin/grc-audit-probes-common.sh
+  source /usr/local/sbin/grc-audit-probes-common.sh
+else
+  # shellcheck source=common.sh
+  source "${DIR}/common.sh"
+fi
+
+grc_probe_header "AC-3"
+grc_run_readonly "sshd_active" systemctl is-active sshd
+grc_run_readonly "pam_config" test -f /etc/pam.d/system-auth
+grc_run_readonly "sudoers_stat" stat -c '%a %U %G' /etc/sudoers
+grc_run_readonly "auditd_active" systemctl is-active auditd
+grc_run_readonly "audit_rules" test -f /etc/audit/rules.d/audit.rules
+grc_probe_footer

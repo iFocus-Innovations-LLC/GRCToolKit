@@ -1,0 +1,13 @@
+# Illustrative only — org legal/security must review before production deploy.
+# Validate: visudo -cf /etc/sudoers.d/grc-audit
+# Install probe scripts from ansible/scripts/grc-audit-probes/ to /usr/local/sbin/
+
+Cmnd_Alias GRC_AUDIT = /usr/local/sbin/grc-audit-ac-3, \
+                        /usr/local/sbin/grc-audit-ac-6, \
+                        /usr/local/sbin/grc-audit-au-2, \
+                        /usr/local/sbin/grc-audit-sc-7
+
+Defaults!GRC_AUDIT !authenticate
+
+# Dedicated audit account — SSH from jump host only; no interactive login
+grc-audit ALL=(root) NOPASSWD: GRC_AUDIT

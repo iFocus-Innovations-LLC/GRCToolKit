@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# SC-7 Boundary Protection — read-only probes.
+set -euo pipefail
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f /usr/local/sbin/grc-audit-probes-common.sh ]; then
+  # shellcheck source=/usr/local/sbin/grc-audit-probes-common.sh
+  source /usr/local/sbin/grc-audit-probes-common.sh
+else
+  # shellcheck source=common.sh
+  source "${DIR}/common.sh"
+fi
+
+grc_probe_header "SC-7"
+grc_run_readonly "iptables_active" systemctl is-active iptables
+grc_run_readonly "ufw_active" systemctl is-active ufw
+grc_run_readonly "iptables_list" iptables -L
+grc_run_readonly "ufw_status" ufw status
+grc_run_readonly "ip_link" ip link show
+grc_probe_footer
