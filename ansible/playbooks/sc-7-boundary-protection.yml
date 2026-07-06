@@ -1,78 +1,67 @@
 ---
-# Ansible Playbook: SC-7 Boundary Protection
-# Validates that network boundary protection is properly configured
+# Ansible Playbook: SC-7 Boundary Protection (read-only audit profile)
+# HITL: evidence collection only — no firewall state changes.
 # Based on NIST 800-53 Rev. 5 Control SC-7
 
 - name: "SC-7: Boundary Protection Validation"
   hosts: all
-  become: yes
+  become: "{{ ansible_connection != 'local' and grc_audit_become | default(false) }}"
   vars:
     control_id: "SC-7"
     control_title: "Boundary Protection"
     compliance_framework: "NIST 800-53 Rev. 5"
-    
+    grc_audit_mode: read_only
+
   tasks:
-    - name: "SC-7.1: Verify firewall service is running"
+    - name: "SC-7.1: Verify firewall services (read-only)"
       block:
-        - name: "Check for iptables service"
-          systemd:
-            name: "{{ item }}"
-            state: "started"
-            enabled: yes
-          loop:
-            - "iptables"
-            - "netfilter-persistent"
-          register: firewall_services
+        - name: "Check iptables service status"
+          command: systemctl is-active iptables
+          register: iptables_active
+          changed_when: false
           failed_when: false
-          
-        - name: "Check for UFW service"
-          systemd:
-            name: "ufw"
-            state: "started"
-            enabled: yes
-          register: ufw_service
-          failed_when: false
-          
-        - name: "SC-7.1: WARN - No firewall service found"
-          debug:
-            msg: "No active firewall service detected - consider implementing boundary protection"
-          when: firewall_services.failed and ufw_service.failed
 
-    - name: "SC-7.2: Verify firewall rules are configured"
-      block:
-        - name: "Check iptables rules"
-          shell: "iptables -L | grep -c '^[A-Z]'"
-          register: iptables_rules
+        - name: "Check UFW service status"
+          command: systemctl is-active ufw
+          register: ufw_active
+          changed_when: false
           failed_when: false
-          
+
+        - name: "SC-7.1: WARN - No active firewall service"
+          debug:
+            msg: "Neither iptables nor ufw appears active - review boundary protection"
+          when: iptables_active.rc != 0 and ufw_active.rc != 0
+
+    - name: "SC-7.2: Verify firewall rules (read-only)"
+      block:
+        - name: "List iptables chains"
+          command: iptables -L
+          register: iptables_list
+          changed_when: false
+          failed_when: false
+
         - name: "Check UFW status"
-          shell: "ufw status | grep -c '^[0-9]'"
-          register: ufw_rules
+          command: ufw status
+          register: ufw_status
+          changed_when: false
           failed_when: false
-          
-        - name: "SC-7.2: INFO - Firewall rules status"
-          debug:
-            msg: "Iptables rules: {{ iptables_rules.stdout }}, UFW rules: {{ ufw_rules.stdout }}"
-          when: iptables_rules.stdout != "" or ufw_rules.stdout != ""
 
-    - name: "SC-7.3: Verify network interfaces are properly configured"
+    - name: "SC-7.3: Verify network interfaces (read-only)"
       block:
-        - name: "Get network interfaces"
-          shell: "ip link show | grep -E '^[0-9]+:' | wc -l"
+        - name: "List network interfaces"
+          command: ip link show
           register: network_interfaces
-          
-        - name: "Check for loopback interface"
-          shell: "ip link show lo | grep -c 'UP'"
-          register: loopback_status
-          failed_when: false
-          
-        - name: "SC-7.3: INFO - Network interfaces"
-          debug:
-            msg: "Network interfaces: {{ network_interfaces.stdout }}, Loopback: {{ loopback_status.stdout }}"
+          changed_when: false
 
-    - name: "SC-7.4: Verify network security policies"
+        - name: "Check loopback is up"
+          command: ip link show lo
+          register: loopback_status
+          changed_when: false
+          failed_when: false
+
+    - name: "SC-7.4: Verify network security config files (read-only)"
       block:
-        - name: "Check for network security configuration files"
+        - name: "Stat network configuration files"
           stat:
             path: "{{ item }}"
           loop:
@@ -80,51 +69,37 @@
             - "/etc/ufw/ufw.conf"
             - "/etc/sysctl.conf"
           register: network_config_files
-          
-        - name: "SC-7.4: INFO - Network configuration files"
-          debug:
-            msg: "Network config files found: {{ network_config_files.results | selectattr('stat.exists') | map(attribute='item') | list }}"
 
-    - name: "SC-7.5: Verify network monitoring"
+    - name: "SC-7.5: Verify network monitoring tools (read-only)"
       block:
-        - name: "Check for network monitoring tools"
-          shell: "which {{ item }}"
+        - name: "Check tool availability"
+          command: "which {{ item }}"
           loop:
-            - "tcpdump"
-            - "netstat"
-            - "ss"
-            - "nmap"
+            - tcpdump
+            - ss
+            - nmap
           register: network_tools
+          changed_when: false
           failed_when: false
-          
-        - name: "SC-7.5: INFO - Network monitoring tools"
-          debug:
-            msg: "Available network tools: {{ network_tools.results | selectattr('stdout') | map(attribute='item') | list }}"
 
     - name: "Generate SC-7 compliance report"
       block:
-        - name: "Create compliance report directory"
+        - name: "Ensure report directory exists"
           file:
-            path: "/tmp/grc-compliance-reports"
-            state: "directory"
+            path: "{{ grc_compliance_report_dir }}"
+            state: directory
             mode: "0755"
-            
-        - name: "Generate SC-7 compliance report"
-          template:
-            src: "sc-7-compliance-report.j2"
-            dest: "/tmp/grc-compliance-reports/sc-7-compliance-{{ ansible_date_time.epoch }}.json"
+
+        - name: "Write SC-7 compliance report JSON"
+          copy:
+            content: |
+              {
+                "control_id": "SC-7",
+                "hostname": "{{ inventory_hostname }}",
+                "validation_timestamp": "{{ ansible_date_time.iso8601 }}",
+                "grc_audit_mode": "{{ grc_audit_mode }}",
+                "iptables_active": "{{ iptables_active.stdout | default('unknown') }}",
+                "ufw_active": "{{ ufw_active.stdout | default('unknown') }}"
+              }
+            dest: "{{ grc_compliance_report_dir }}/sc-7-compliance-{{ ansible_date_time.epoch }}.json"
             mode: "0644"
-          vars:
-            compliance_status: "{{ 'PASS' if not (firewall_services.failed and ufw_service.failed) else 'WARN' }}"
-            validation_timestamp: "{{ ansible_date_time.iso8601 }}"
-            hostname: "{{ inventory_hostname }}"
-            firewall_rules: "{{ iptables_rules.stdout | default('0') }}"
-            ufw_rules: "{{ ufw_rules.stdout | default('0') }}"
-            
-  handlers:
-    - name: "Notify compliance team"
-      mail:
-        to: "{{ compliance_notification_email | default('compliance@company.com') }}"
-        subject: "SC-7 Compliance Validation - {{ inventory_hostname }}"
-        body: "SC-7 Boundary Protection validation completed. Status: {{ compliance_status }}"
-      when: compliance_notification_email is defined

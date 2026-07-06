@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# AC-6 Least Privilege — read-only probes (scoped paths).
+set -euo pipefail
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f /usr/local/sbin/grc-audit-probes-common.sh ]; then
+  # shellcheck source=/usr/local/sbin/grc-audit-probes-common.sh
+  source /usr/local/sbin/grc-audit-probes-common.sh
+else
+  # shellcheck source=common.sh
+  source "${DIR}/common.sh"
+fi
+
+FIND_PATHS="/etc /var/log /usr/local"
+
+grc_probe_header "AC-6"
+grc_run_readonly "nopasswd_sudoers" grep -E '^[^#]*NOPASSWD' /etc/sudoers
+grc_run_readonly "root_users" awk -F: '$3==0 {print $1}' /etc/passwd
+grc_run_readonly "world_writable" bash -c "for d in ${FIND_PATHS}; do [ -d \"\$d\" ] && find \"\$d\" -xdev -type f -perm -002 2>/dev/null; done | head -20"
+grc_run_readonly "suid_sgid" bash -c "for d in ${FIND_PATHS}; do [ -d \"\$d\" ] && find \"\$d\" -xdev -type f \\( -perm -4000 -o -perm -2000 \\) 2>/dev/null; done | head -20"
+grc_probe_footer

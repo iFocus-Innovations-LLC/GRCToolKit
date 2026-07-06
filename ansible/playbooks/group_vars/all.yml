@@ -1,0 +1,13 @@
+---
+# Shared GRC audit probe settings (read-only validation profile).
+# Production: set grc_audit_become: true and ansible_user: grc-audit in private inventory.
+# See docs/ANSIBLE-AUDIT-OPERATIONS.md and docs/ANSIBLE-AUDIT-COMMAND-MATRIX.md
+
+grc_audit_mode: read_only
+grc_audit_become: false
+grc_audit_find_paths:
+  - /etc
+  - /var/log
+  - /usr/local
+grc_compliance_report_dir: /tmp/grc-compliance-reports
+grc_audit_wrapper_dir: /usr/local/sbin

@@ -2,7 +2,7 @@
 
 **Version:** 1.0 (v1 release)  
 **Audience:** GRC analysts, system administrators, IT security operators, auditors  
-**Related:** [HITL Framework](HITL-FRAMEWORK.md) · [OSCAL Integration](OSCAL-INTEGRATION.md) · [Security](SECURITY.md)
+**Related:** [HITL Framework](HITL-FRAMEWORK.md) · [OSCAL Integration](OSCAL-INTEGRATION.md) · [Security](SECURITY.md) · [Command Matrix](ANSIBLE-AUDIT-COMMAND-MATRIX.md)
 
 ---
 
@@ -22,7 +22,7 @@ This guide defines how organizations run validation **without outages**, align w
 | **Human-in-the-loop** | Production runs require human approval — see [HITL Framework](HITL-FRAMEWORK.md) Tier 2/3 |
 | **Change window** | Schedule playbook execution in an approved maintenance or after-hours window (ITIL Standard Change) |
 | **Lab vs production** | UI **Validate Controls** is for localhost QA only; production uses **manual CLI** from a jump host |
-| **No silent mutation** | Current AC/AU/SC playbooks may change service state if run without `--check` — treat as **pre-production / lab** until read-only refactor ships |
+| **No silent mutation** | AC-3, AC-6, AU-2, SC-7 playbooks use `grc_audit_mode: read_only` — probes only; no `systemd` state changes |
 
 **Reference posture (target state):** [`ansible/playbooks/llm/owasp-llm-top-10-validate.yml`](../ansible/playbooks/llm/owasp-llm-top-10-validate.yml) — read-only intent, conditional privilege escalation, HITL/no auto-remediation.
 
@@ -64,30 +64,26 @@ cd ansible/playbooks
 # 1. Review playbook tasks before running
 less ac-3-access-enforcement.yml
 
-# 2. Dry-run where supported (does not execute mutating tasks; verify behavior per module)
-ansible-playbook -i inventory.yml ac-3-access-enforcement.yml \
-  --check --diff --limit target_host
+# 2. Set ITIL change ID for evidence metadata (wrapper scripts + OSCAL)
+export GRCTOOLKIT_CHANGE_ID="CHG-2026-001"
 
-# 3. After-hours execution with interactive sudo (operator present)
-ansible-playbook -i inventory.yml ac-3-access-enforcement.yml \
-  --limit target_host --ask-become-pass
+# 3. Dry-run (read-only playbooks; verify connectivity and become)
+ansible-playbook -i inventory.production.yml ac-3-access-enforcement.yml \
+  --check --diff --limit prod_targets
 
-# 4. OWASP LLM read-only probe (app/HTTP checks; preferred low-risk profile)
+# 4. After-hours execution — grc-audit NOPASSWD for GRC_AUDIT wrappers only
+ansible-playbook -i inventory.production.yml ac-3-access-enforcement.yml \
+  --limit prod_targets
+
+# 5. Direct wrapper probe (optional; same sudoers entrypoints)
+sudo -u grc-audit /usr/local/sbin/grc-audit-au-2
+
+# 6. OWASP LLM read-only probe (app/HTTP checks; preferred low-risk profile)
 cd llm
 ansible-playbook -i inventory.yml owasp-llm-top-10-validate.yml
 ```
 
-**Inventory example (production — template only; customize per org):**
-
-```yaml
-all:
-  hosts:
-    target_host:
-      ansible_host: 10.0.1.50
-      ansible_user: grc-audit
-      ansible_become: true
-      ansible_connection: ssh
-```
+**Production inventory template:** [`ansible/playbooks/inventory.production.example.yml`](../ansible/playbooks/inventory.production.example.yml) — copy to a **private** repo; customize hosts and SSH.
 
 See [`ansible/playbooks/inventory.yml`](../ansible/playbooks/inventory.yml) for **localhost lab** demo only.
 
@@ -97,20 +93,53 @@ See [`ansible/playbooks/inventory.yml`](../ansible/playbooks/inventory.yml) for 
 
 Before IT Security runs playbooks:
 
-- [ ] Change ticket approved and window scheduled
-- [ ] Dedicated **audit service account** (no interactive login; SSH key from jump host only)
-- [ ] Operator can read: `/etc`, `/var/log/audit`, `systemctl status` (read-only)
-- [ ] **Optional:** `/etc/sudoers.d/grc-audit` with explicit command allow-list (legal/security review required — template below is illustrative only)
-- [ ] Inventory file committed to **private** config repo — never secrets in GRCToolKit git
-- [ ] Confirm playbooks reviewed for mutating tasks (`systemd: state: started` etc.) — use `--check` first
+- [ ] Change ticket approved and window scheduled; record ticket ID (e.g. `CHG-2026-001`)
+- [ ] Create dedicated **`grc-audit`** UNIX account (no password login; SSH key from jump host only)
+- [ ] Install probe wrappers to `/usr/local/sbin/` — see [`ansible/scripts/grc-audit-probes/README.md`](../ansible/scripts/grc-audit-probes/README.md)
+- [ ] Deploy `/etc/sudoers.d/grc-audit` from [`ansible/templates/sudoers.d/grc-audit`](../ansible/templates/sudoers.d/grc-audit); validate with `visudo -cf /etc/sudoers.d/grc-audit`
+- [ ] Grant **file read** via POSIX group/ACL on `/var/log/audit` where possible to reduce sudo surface
+- [ ] Deny `grc-audit` write to `/etc`, `/usr`, and service management outside `GRC_AUDIT` Cmnd_Alias
+- [ ] Production inventory in **private** config repo — never host IPs or keys in GRCToolKit git
+- [ ] Confirm playbooks use `grc_audit_mode: read_only` ([`group_vars/all.yml`](../ansible/playbooks/group_vars/all.yml))
 - [ ] **Do not** expose local runner API (`:8081`) beyond `127.0.0.1`
 
-**Illustrative sudoers snippet (org must review):**
+### grc-audit service account
+
+| Property | Value |
+|----------|--------|
+| Login | SSH key from jump host only; no password |
+| Shell | `/sbin/nologin` or restricted; operators run `ansible-playbook` from jump host |
+| Sudo | **NOPASSWD** only for `GRC_AUDIT` wrapper scripts — never blanket `ALL` |
+| Evidence | Wrappers emit JSON with `change_id` when `GRCTOOLKIT_CHANGE_ID` is set |
+
+### Sudoers deployment (illustrative — org legal/security review required)
+
+Template: [`ansible/templates/sudoers.d/grc-audit`](../ansible/templates/sudoers.d/grc-audit)
 
 ```sudoers
-# Example only — replace user, host, and commands per policy
-grc-audit ALL=(root) NOPASSWD: /bin/systemctl status *, /usr/bin/stat, /bin/grep
+Cmnd_Alias GRC_AUDIT = /usr/local/sbin/grc-audit-ac-3, \
+                        /usr/local/sbin/grc-audit-ac-6, \
+                        /usr/local/sbin/grc-audit-au-2, \
+                        /usr/local/sbin/grc-audit-sc-7
+
+Defaults!GRC_AUDIT !authenticate
+
+grc-audit ALL=(root) NOPASSWD: GRC_AUDIT
 ```
+
+Per-command mapping (Option B interim): [ANSIBLE-AUDIT-COMMAND-MATRIX.md](ANSIBLE-AUDIT-COMMAND-MATRIX.md)
+
+### ITIL / HITL change-ticket linkage
+
+Sudoers cannot bind to a ticket UUID natively. For audit trail:
+
+1. SysAdmin approves **Standard Change** (ticket ID e.g. `CHG-2026-001`).
+2. Operator exports OSCAL plan from GRCToolKit; runs validation during the window.
+3. Set `export GRCTOOLKIT_CHANGE_ID="CHG-2026-001"` before Ansible or wrapper runs.
+4. Evidence JSON/PDF metadata should include `changeId` + timestamp.
+5. Optional: SysAdmin drops `/etc/grc-audit/approved-run` with ticket ID at window start; wrappers may refuse if missing (org policy).
+
+This is **audit trail**, not cryptographic enforcement — see [HITL Framework](HITL-FRAMEWORK.md).
 
 ---
 
@@ -142,26 +171,28 @@ For QA without GCP cost:
 
 ---
 
-## Known v1 limitations
+## Known limitations
 
 | Limitation | Mitigation |
 |------------|------------|
-| Core playbooks use `become: yes` | Manual `--ask-become-pass`; post-v1 read-only refactor |
-| AC-3 may **start/enable** services via `systemd` | Use `--check` first; do not run unattended on production |
-| AC-6 `find /` can be expensive | Scope to lab hosts; post-v1 path limits |
-| Browser cannot prompt for sudo | Production = CLI handoff, not UI |
-| UI/API v1 restricted to **localhost** | Remote inventory rejected by runner API |
+| Playbooks still use `become` for some probes | `grc-audit` limited to `GRC_AUDIT` wrappers; see command matrix |
+| AC-6 scoped `find` can be expensive on large hosts | Limit `grc_audit_find_paths`; run in maintenance window |
+| Browser cannot prompt for sudo | Production = CLI handoff from jump host, not UI |
+| UI/API restricted to **localhost** | Remote inventory rejected by runner API |
+| Sudoers template is illustrative | Org legal/security review before production deploy |
 
 ---
 
-## Post-v1 roadmap (not in first release)
+## Post-v1 roadmap
 
 Tracked in [PM-TODO.md](PM-TODO.md):
 
-- Read-only refactor for AC-3, AC-6, AU-2, SC-7
-- `grc_audit_mode: read_only` group vars
-- Production inventory templates (SSH, become, change window vars)
-- Jump-host runner with change-ticket gate (no browser-triggered prod scans)
+- [x] Read-only refactor for AC-3, AC-6, AU-2, SC-7
+- [x] `grc_audit_mode: read_only` group vars
+- [x] Production inventory template (`inventory.production.example.yml`)
+- [x] `grc-audit` sudoers template + probe wrappers + command matrix
+- [ ] Jump-host runner with change-ticket gate (no browser-triggered prod scans)
+- [ ] Pilot: one Linux host, one control (e.g. AU-2); validate `/var/log/secure` sudo audit log
 
 ---
 

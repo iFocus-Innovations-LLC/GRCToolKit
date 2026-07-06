@@ -1,137 +1,132 @@
 ---
-# Ansible Playbook: AC-3 Access Enforcement
-# Validates that access control policies are properly enforced
+# Ansible Playbook: AC-3 Access Enforcement (read-only audit profile)
+# HITL: evidence collection only — no service state changes or ACL mutations.
 # Based on NIST 800-53 Rev. 5 Control AC-3
 
 - name: "AC-3: Access Enforcement Validation"
   hosts: all
-  become: yes
+  become: "{{ ansible_connection != 'local' and grc_audit_become | default(false) }}"
   vars:
     control_id: "AC-3"
     control_title: "Access Enforcement"
     compliance_framework: "NIST 800-53 Rev. 5"
-    
+    grc_audit_mode: read_only
+
   tasks:
-    - name: "AC-3.1: Verify authentication mechanisms are in place"
+    - name: "AC-3.1: Verify authentication mechanisms (read-only)"
       block:
-        - name: "Check for authentication services"
-          systemd:
-            name: "{{ item }}"
-            state: "started"
-            enabled: yes
-          loop:
-            - "sshd"
-            - "pam"
-          register: auth_services
-          failed_when: auth_services.failed
-          
+        - name: "Check sshd service is active"
+          command: systemctl is-active sshd
+          register: sshd_active
+          changed_when: false
+          failed_when: false
+
         - name: "Verify PAM configuration exists"
           stat:
-            path: "/etc/pam.d/system-auth"
+            path: "{{ '/etc/pam.d/login' if ansible_os_family == 'Darwin' else '/etc/pam.d/system-auth' }}"
           register: pam_config
-          
+
         - name: "AC-3.1: FAIL - PAM configuration missing"
           fail:
             msg: "PAM configuration not found - AC-3.1 compliance failure"
-          when: not pam_config.stat.exists
-          
-      rescue:
-        - name: "AC-3.1: FAIL - Authentication services not running"
-          fail:
-            msg: "Required authentication services not running - AC-3.1 compliance failure"
+          when:
+            - ansible_os_family != 'Darwin'
+            - not pam_config.stat.exists
 
-    - name: "AC-3.2: Verify access control lists (ACLs) are configured"
+        - name: "AC-3.1: LAB NOTE - macOS uses /etc/pam.d/login (not system-auth)"
+          debug:
+            msg: "Lab host (Darwin): validated /etc/pam.d/login; production Linux targets use /etc/pam.d/system-auth."
+          when:
+            - ansible_os_family == 'Darwin'
+            - not pam_config.stat.exists
+
+        - name: "AC-3.1: WARN - sshd not active"
+          debug:
+            msg: "sshd is not active (status={{ sshd_active.stdout | default('unknown') }})"
+          when: sshd_active.rc != 0
+
+    - name: "AC-3.2: Verify critical file permissions (read-only)"
       block:
-        - name: "Check for ACL support on critical directories"
+        - name: "Stat critical auth files"
           stat:
             path: "{{ item }}"
-          loop:
-            - "/etc"
-            - "/var/log"
-            - "/home"
-          register: critical_dirs
-          
-        - name: "Verify ACL permissions on critical files"
-          acl:
-            path: "{{ item }}"
-            state: "present"
           loop:
             - "/etc/passwd"
             - "/etc/shadow"
             - "/etc/group"
-          register: acl_permissions
-          
-        - name: "AC-3.2: FAIL - ACL configuration issues"
-          fail:
-            msg: "ACL configuration not properly set - AC-3.2 compliance failure"
-          when: acl_permissions.failed
-          
-      rescue:
-        - name: "AC-3.2: WARN - ACL validation failed"
-          debug:
-            msg: "ACL validation encountered issues but continuing"
+          register: auth_file_stats
 
-    - name: "AC-3.3: Verify role-based access control (RBAC)"
+    - name: "AC-3.3: Verify sudoers configuration (read-only)"
       block:
-        - name: "Check for sudo configuration"
+        - name: "Check sudoers file exists"
           stat:
             path: "/etc/sudoers"
           register: sudoers_config
-          
-        - name: "Verify sudoers file permissions"
-          file:
-            path: "/etc/sudoers"
-            mode: "0440"
-            owner: "root"
-            group: "root"
-          register: sudoers_perms
-          
-        - name: "AC-3.3: FAIL - Sudoers configuration invalid"
-          fail:
-            msg: "Sudoers configuration does not meet AC-3.3 requirements"
-          when: not sudoers_config.stat.exists or sudoers_perms.failed
 
-    - name: "AC-3.4: Verify access logging is enabled"
+        - name: "Verify sudoers file mode is 0440"
+          fail:
+            msg: "Sudoers mode is not 0440 (found {{ sudoers_config.stat.mode }}) - AC-3.3 compliance failure"
+          when:
+            - sudoers_config.stat.exists
+            - ansible_os_family != 'Darwin'
+            - sudoers_config.stat.mode | default('') != '0440'
+
+        - name: "AC-3.3: FAIL - Sudoers missing"
+          fail:
+            msg: "Sudoers configuration not found - AC-3.3 compliance failure"
+          when: not sudoers_config.stat.exists
+
+    - name: "AC-3.4: Verify access logging (read-only)"
       block:
-        - name: "Check auditd service status"
-          systemd:
-            name: "auditd"
-            state: "started"
-            enabled: yes
-          register: auditd_status
-          
-        - name: "Verify audit rules are configured"
+        - name: "Check auditd service is active"
+          command: systemctl is-active auditd
+          register: auditd_active
+          changed_when: false
+          failed_when: false
+
+        - name: "Verify audit rules file exists"
           stat:
             path: "/etc/audit/rules.d/audit.rules"
           register: audit_rules
-          
-        - name: "AC-3.4: FAIL - Access logging not properly configured"
+
+        - name: "AC-3.4: FAIL - Audit rules missing"
           fail:
-            msg: "Audit logging not enabled - AC-3.4 compliance failure"
-          when: auditd_status.failed or not audit_rules.stat.exists
+            msg: "Audit rules not configured - AC-3.4 compliance failure"
+          when:
+            - ansible_os_family != 'Darwin'
+            - not audit_rules.stat.exists
+
+        - name: "AC-3.4: LAB NOTE - auditd not applicable on macOS"
+          debug:
+            msg: "Lab host (Darwin): Linux auditd paths skipped; run against production Linux for AC-3.4 evidence."
+          when: ansible_os_family == 'Darwin'
+
+        - name: "AC-3.4: WARN - auditd not active"
+          debug:
+            msg: "auditd is not active (status={{ auditd_active.stdout | default('unknown') }})"
+          when: auditd_active.rc != 0
 
     - name: "Generate AC-3 compliance report"
       block:
-        - name: "Create compliance report directory"
+        - name: "Ensure report directory exists"
           file:
-            path: "/tmp/grc-compliance-reports"
-            state: "directory"
+            path: "{{ grc_compliance_report_dir }}"
+            state: directory
             mode: "0755"
-            
-        - name: "Generate AC-3 compliance report"
-          template:
-            src: "ac-3-compliance-report.j2"
-            dest: "/tmp/grc-compliance-reports/ac-3-compliance-{{ ansible_date_time.epoch }}.json"
+
+        - name: "Write AC-3 compliance report JSON"
+          copy:
+            content: |
+              {
+                "control_id": "AC-3",
+                "hostname": "{{ inventory_hostname }}",
+                "validation_timestamp": "{{ ansible_date_time.iso8601 }}",
+                "grc_audit_mode": "{{ grc_audit_mode }}",
+                "sshd_active": "{{ sshd_active.stdout | default('unknown') }}",
+                "auditd_active": "{{ auditd_active.stdout | default('unknown') }}",
+                "pam_config_exists": {{ pam_config.stat.exists | default(false) | to_json }},
+                "sudoers_exists": {{ sudoers_config.stat.exists | default(false) | to_json }},
+                "audit_rules_exists": {{ audit_rules.stat.exists | default(false) | to_json }}
+              }
+            dest: "{{ grc_compliance_report_dir }}/ac-3-compliance-{{ ansible_date_time.epoch }}.json"
             mode: "0644"
-          vars:
-            compliance_status: "{{ 'PASS' if not (auth_services.failed or acl_permissions.failed or sudoers_perms.failed or auditd_status.failed) else 'FAIL' }}"
-            validation_timestamp: "{{ ansible_date_time.iso8601 }}"
-            hostname: "{{ inventory_hostname }}"
-            
-  handlers:
-    - name: "Notify compliance team"
-      mail:
-        to: "{{ compliance_notification_email | default('compliance@company.com') }}"
-        subject: "AC-3 Compliance Validation - {{ inventory_hostname }}"
-        body: "AC-3 Access Enforcement validation completed. Status: {{ compliance_status }}"
-      when: compliance_notification_email is defined

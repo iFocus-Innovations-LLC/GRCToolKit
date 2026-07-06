@@ -3,7 +3,19 @@
 Lightweight backlog for post-production initiatives and cross-cutting release gates.
 For technical roadmap detail, see [ROADMAP.md](ROADMAP.md).
 
-**Last updated:** 2026-07-02
+**Last updated:** 2026-07-05
+
+---
+
+## Ansible audit / grc-audit sudoers (post-v1)
+
+- [x] Read-only refactor: AC-3, AC-6, AU-2, SC-7 (`grc_audit_mode: read_only`)
+- [x] [ANSIBLE-AUDIT-COMMAND-MATRIX.md](ANSIBLE-AUDIT-COMMAND-MATRIX.md)
+- [x] Probe wrappers: `ansible/scripts/grc-audit-probes/`
+- [x] Sudoers template: `ansible/templates/sudoers.d/grc-audit`
+- [x] Production inventory example: `ansible/playbooks/inventory.production.example.yml`
+- [x] Ops guide: [ANSIBLE-AUDIT-OPERATIONS.md](ANSIBLE-AUDIT-OPERATIONS.md) — grc-audit handoff
+- [ ] Pilot one Linux host (AU-2); confirm sudo audit log in `/var/log/secure`
 
 ---
 
