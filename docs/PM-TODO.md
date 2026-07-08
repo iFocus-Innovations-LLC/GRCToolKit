@@ -13,7 +13,7 @@ For technical roadmap detail, see [ROADMAP.md](ROADMAP.md).
 
 - [ ] Merge `dev` → `main` with governance, CI green, GCP QA path validated
 - [ ] Production release tag (e.g. v2.1.0 or v3.0.0)
-- [ ] Open-source governance live on `main` (CONTRIBUTING, CODEOWNERS, issue/PR templates)
+- [ ] Open-source governance live on `main` (CONTRIBUTING, CODE_OF_CONDUCT on `main` since #35 — confirm GitHub sidebar badges on public repo)
 - [ ] GCP dev path documented and tested per [SECRETS-SETUP.md](SECRETS-SETUP.md)
 
 ### P1 — Shields Up robotics (after production)

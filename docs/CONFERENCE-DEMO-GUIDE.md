@@ -1,318 +1,173 @@
-# 🎯 GRC Toolkit Conference Demo Guide
+# Conference & Customer Demo Guide (CISO / C-Suite)
 
-## **Fall 2024 Technical Conference MVP Demo**
-
-### 🚀 **Demo Overview**
-
-The GRC Toolkit with OSCAL integration represents a breakthrough in automated compliance validation, combining AI-powered scenario analysis with NIST OSCAL framework and Ansible automation to deliver enterprise-grade GRC solutions.
+**Audience:** CISO, VP Risk, GRC leads, technical evaluators  
+**Duration:** 12–18 minutes (live) + 5 minutes Q&A  
+**Last updated:** 2026-07-07
 
 ---
 
-## 🎬 **Demo Script (15-20 minutes)**
+## Executive summary (30 seconds)
 
-### **Opening (2 minutes)**
-> *"Today I'm excited to demonstrate how we've revolutionized GRC compliance by combining AI, automation, and industry standards. The GRC Toolkit reduces compliance assessment time from months to minutes while providing auditor-ready documentation."*
+> *"GRCToolKit turns a plain-language risk question into NIST 800-53 controls, runs read-only validation, and produces auditor-ready OSCAL evidence — in minutes, not months. Today you’ll see the lab demo on a laptop; production uses approved change windows and least-privilege audit accounts — never unattended browser scans."*
 
-**Key Points:**
-- **Problem**: Manual compliance is time-consuming, error-prone, and expensive
-- **Solution**: AI-powered automation with OSCAL framework
-- **Result**: 80% reduction in manual effort, standardized documentation
+**Three outcomes to land:**
 
-### **Live Demo (10-12 minutes)**
-
-#### **Step 1: Scenario Analysis (3 minutes)**
-1. **Navigate to**: `http://localhost:8085`
-2. **Enter scenario**: *"How do I secure access to our cloud database containing customer financial data?"*
-3. **Click**: "Analyze Scenario"
-4. **Show**: AI recommends AC-3, AC-6, SC-7 controls
-5. **Highlight**: Natural language to NIST 800-53 mapping
-
-**Talking Points:**
-- *"The AI understands natural language scenarios and maps them to specific NIST controls"*
-- *"Notice how it prioritizes controls based on the scenario context"*
-- *"This eliminates the need for compliance experts to manually research controls"*
-
-#### **Step 2: Automated Validation (4 minutes)**
-1. **Click**: "Validate Controls" button
-2. **Show**: Ansible playbooks executing validation
-3. **Demonstrate**: Real-time compliance checking
-4. **Highlight**: Evidence collection and findings
-
-**Talking Points:**
-- *"We're now executing Ansible playbooks to validate actual system configurations"*
-- *"This is real-time compliance validation, not just documentation"*
-- *"Notice how it collects evidence and provides specific findings"*
-
-#### **Step 3: OSCAL Report Generation (3 minutes)**
-1. **Click**: "Generate Audit Report" button
-2. **Show**: OSCAL-compliant assessment results
-3. **Download**: Professional audit documentation
-4. **Highlight**: Auditor-ready format
-
-**Talking Points:**
-- *"The system generates OSCAL-compliant reports for standardized compliance documentation"*
-- *"This is the same format used by major compliance frameworks"*
-- *"Auditors can immediately understand and validate the results"*
-
-### **Technical Deep Dive (3-5 minutes)**
-
-#### **Architecture Highlights**
-- **OSCAL Integration**: NIST-standardized compliance framework
-- **Ansible Automation**: Infrastructure as Code for compliance
-- **AI-Powered Analysis**: Natural language to control mapping
-- **Container Security**: Non-root execution, graceful shutdown
-- **Kubernetes Ready**: Production deployment with secrets management
-
-#### **Security Features**
-- **API Key Management**: Kubernetes secrets, runtime injection
-- **Container Security**: Non-root user, minimal attack surface
-- **Graceful Shutdown**: Proper signal handling, cleanup
-- **Audit Trail**: Complete compliance documentation
+| Outcome | What they see |
+|---------|----------------|
+| **Speed** | Scenario → controls in under a minute |
+| **Evidence** | Live Ansible validation + OSCAL JSON/PDF |
+| **Trust** | HITL guardrails, read-only production posture, no auto-remediation |
 
 ---
 
-## 🎭 **Demo Scenarios**
+## Pre-demo setup (5 minutes before)
 
-### **Standard GRC Scenarios**
-
-#### **Scenario 1: Cloud Database Security**
-**Input**: *"How do I secure access to our cloud database containing customer financial data?"*
-**Expected Controls**: AC-3, AC-6, SC-7, AU-2
-**Demo Focus**: Access control and audit logging
-
-#### **Scenario 2: Healthcare Data Protection**
-**Input**: *"What controls are needed for protecting patient health information in our EHR system?"*
-**Expected Controls**: AC-3, AC-6, SC-28, AU-2
-**Demo Focus**: Data protection and privacy controls
-
-#### **Scenario 3: Financial System Compliance**
-**Input**: *"How do I implement audit logging for our financial transaction system?"*
-**Expected Controls**: AU-2, AU-3, AU-4, AU-5
-**Demo Focus**: Audit and accountability controls
-
-#### **Scenario 4: Network Security**
-**Input**: *"What network security controls should I implement for our corporate network?"*
-**Expected Controls**: SC-7, SC-8, SC-9, SC-10
-**Demo Focus**: Network boundary protection
-
-### **🚀 Post-Quantum Cryptography (PQC) Migration Scenarios**
-
-#### **Scenario 5: Financial Services PQC Migration**
-**Input**: *"We're a financial services organization with 20-year data retention requirements. How do we prepare for post-quantum cryptography migration?"*
-**Expected Controls**: SC-12, SC-13, SC-17, SC-28
-**Demo Focus**: 
-- Long-term cryptographic protection
-- Data shelf-life assessment
-- Quantum risk scoring
-- Migration roadmap planning
-**Key Features**:
-- PQC scenario recognition
-- Cryptographic asset inventory
-- Quantum risk assessment
-- 2030/2035 deadline tracking
-
-#### **Scenario 6: Healthcare PQC Compliance**
-**Input**: *"What PQC controls are needed for protecting patient health information with HIPAA compliance obligations?"*
-**Expected Controls**: SC-12, SC-13, SC-28, AC-3
-**Demo Focus**:
-- Patient data protection with PQC
-- HIPAA compliance alignment
-- Quantum vulnerability assessment
-- Migration priority identification
-**Key Features**:
-- PQC control mapping to HIPAA
-- Risk-based prioritization
-- Compliance timeline management
-
-#### **Scenario 7: Federal Agency PQC Readiness**
-**Input**: *"How do we assess PQC readiness for our classified information systems to meet FISMA requirements?"*
-**Expected Controls**: SC-12, SC-13, SC-17, SC-28, AU-2
-**Demo Focus**:
-- FISMA compliance with PQC
-- Classified system protection
-- NIST FIPS 203/204/205 alignment
-- Executive reporting
-**Key Features**:
-- FIPS 203/204/205 integration
-- OSCAL-compliant PQC assessment
-- Board-ready documentation
-- Automated compliance tracking
-
-#### **Scenario 8: Critical Infrastructure PQC Migration**
-**Input**: *"What PQC migration strategy should we implement for our OT/ICS environments in critical infrastructure?"*
-**Expected Controls**: SC-7, SC-12, SC-13, SC-17
-**Demo Focus**:
-- Operational technology security
-- ICS/SCADA PQC protection
-- Hybrid cryptographic approaches
-- Deployment automation
-**Key Features**:
-- Ansible PQC automation
-- Hybrid crypto deployment
-- Testing and validation
-- Rollback capabilities
-
----
-
-## 🛠️ **Technical Setup**
-
-### **Prerequisites**
-- Docker installed and running
-- Port 8085 available
-- Internet connection for Gemini API
-
-### **Quick Start**
 ```bash
-# Clone and setup
-git clone <repository-url>
-cd GRCToolKit
-
-# Build and run
-docker build -t grc-toolkit-oscal .
-docker run -d -p 8085:8080 -e GEMINI_API_KEY="your-api-key" --name grc-toolkit-mvp grc-toolkit-oscal
-
-# Access demo
-open http://localhost:8085
+export GEMINI_API_KEY="your-key-from-google-ai-studio"
+./scripts/run-local.sh
 ```
 
-### **Demo Environment**
-- **URL**: `http://localhost:8085`
-- **Container**: `grc-toolkit-mvp`
-- **Status**: Healthy and ready
-- **Features**: All OSCAL integration active
+Open **http://127.0.0.1:8080/local-index.html** (not the raw `grctoolkit.html` — the script injects your key into `local-index.html` only).
+
+**Optional:** `brew install ansible` so **Validate Controls** runs real playbooks (runner API on `127.0.0.1:8081`).
+
+**Docker alternative:**
+
+```bash
+docker build -t grc-toolkit .
+docker run -p 8080:8080 -e GEMINI_API_KEY=$GEMINI_API_KEY grc-toolkit
+# Open http://localhost:8080/
+```
 
 ---
 
-## 📊 **Key Metrics to Highlight**
+## Demo script
 
-### **Efficiency Gains**
-- **Manual Assessment**: 2-3 months
-- **Automated Assessment**: 2-3 hours
-- **Time Reduction**: 95%
-- **Cost Savings**: 80% reduction in compliance costs
+### 1. Frame the problem (2 min)
 
-### **Quality Improvements**
-- **Consistency**: Standardized validation across all systems
-- **Accuracy**: Automated evidence collection reduces human error
-- **Coverage**: Comprehensive control validation
-- **Documentation**: Professional audit-ready reports
+**CISO talking points:**
 
-### **Technical Benefits**
-- **OSCAL Compliance**: Industry-standard format
-- **Ansible Integration**: Infrastructure as Code
-- **AI-Powered**: Natural language understanding
-- **Container Security**: Production-ready deployment
+- Control mapping is still manual: analysts grep spreadsheets, consultants bill hours.
+- Evidence collection is inconsistent across teams and environments.
+- Auditors want **standardized artifacts** (OSCAL), not slide decks.
+
+**Do not lead with:** Ansible modules, Gemini model IDs, or container UID details.
 
 ---
 
-## 🎯 **Audience Engagement**
+### 2. Scenario → controls (3 min)
 
-### **Questions to Expect**
-1. **"How does this integrate with existing compliance tools?"**
-   - OSCAL provides standardized APIs for tool integration
-   - Ansible playbooks can be customized for specific environments
-   - REST APIs available for external system integration
+1. Enter: *"How do you enforce least privilege on my system?"*
+2. Click **Analyze Scenario**.
+3. Show recommended controls (expect **AC-6**, often **AC-3**, **AU-2**).
 
-2. **"What about different compliance frameworks?"**
-   - OSCAL supports multiple frameworks (NIST, ISO 27001, SOX)
-   - Framework-agnostic architecture
-   - Easy to extend for new compliance requirements
+**Say:**
 
-3. **"How do you handle false positives?"**
-   - AI provides context-aware recommendations
-   - Ansible playbooks include validation logic
-   - Human review process for complex scenarios
+> *"The engine maps natural language to NIST SP 800-53 Rev. 5 — the same catalog federal agencies use. Your team reviews recommendations; nothing is applied automatically."*
 
-4. **"What about enterprise deployment?"**
-   - Kubernetes-native with secrets management
-   - Horizontal scaling capabilities
-   - Enterprise security features
-
-### **Demo Tips**
-- **Keep it interactive**: Ask audience for scenario suggestions
-- **Show real results**: Use actual system validation
-- **Highlight automation**: Emphasize the "set and forget" nature
-- **Demonstrate quality**: Show professional documentation output
+**If asked about AI risk:** Point to [HITL Framework](HITL-FRAMEWORK.md) — human review tiers, confidence scoring, audit trail for overrides.
 
 ---
 
-## 🚀 **Future Roadmap**
+### 3. Validate controls (4 min)
 
-### **Core Platform Enhancements**
-- **Multi-Framework Support**: ISO 27001, SOX, HIPAA
-- **Continuous Monitoring**: Real-time compliance validation
-- **ML-Powered Insights**: Predictive compliance analytics
-- **Integration APIs**: RESTful APIs for external tools
-- **User Authentication**: Firebase Authentication and data persistence
-- **Advanced UI**: Enhanced filtering, dashboards, and collaboration
+1. Click **Validate Controls**.
+2. Show **Live Ansible on localhost** — playbooks execute read-only probes.
+3. Walk through **Validation Summary** (pass/fail, findings).
 
-### **Post-Quantum Cryptography (PQC) Migration Features**
+**Say:**
 
-#### **Phase 1: Core PQC Capabilities (Q1 2026)**
-- **PQC Scenario Analysis**: AI-powered PQC migration scenario recognition
-- **Cryptographic Asset Inventory**: Automated discovery and cataloging
-- **Quantum Risk Assessment**: Risk scoring and prioritization
-- **PQC Control Mapping**: FIPS 203/204/205 to NIST 800-53 integration
+> *"This is evidence collection, not remediation. Playbooks are read-only in our current profile — they don’t start services or change configs. On macOS lab hosts you’ll see honest gaps for Linux-only checks; production targets Linux with a dedicated `grc-audit` account and least-privilege sudo."*
 
-#### **Phase 2: Migration Roadmap (Q2 2026)**
-- **Four-Phase Roadmap**: Structured migration planning and tracking
-- **Timeline Management**: 2030/2035 deadline monitoring
-- **Automated Reporting**: Executive summaries and dashboards
-
-#### **Phase 3: Automation and Intelligence (Q3 2026)**
-- **Ansible PQC Automation**: ML-KEM, ML-DSA, SLH-DSA deployment
-- **Vendor Solution Database**: PQC solution catalog and evaluation
-- **Continuous Threat Monitoring**: Quantum computing threat intelligence
-- **Cryptographic Agility Assessment**: Architecture flexibility evaluation
-
-#### **Phase 4: Enterprise Features (Q4 2026)**
-- **Multi-Tenant Support**: Role-based access and organization management
-- **Advanced Analytics**: Compliance trends and predictive analytics
-- **API Integration**: RESTful APIs and third-party connectors
-- **Mobile Application**: iOS and Android executive apps
-
-For detailed roadmap information, see [ROADMAP.md](ROADMAP.md).
-
-### **Enterprise Features**
-- **Role-Based Access**: Multi-tenant compliance management
-- **Workflow Integration**: Approval processes and notifications
-- **Custom Playbooks**: Organization-specific validation
-- **Advanced Analytics**: Compliance trend analysis
+**Production handoff (one sentence):** See [ANSIBLE-AUDIT-OPERATIONS.md](ANSIBLE-AUDIT-OPERATIONS.md) — ITIL change window, jump host, SysAdmin RACI.
 
 ---
 
-## 📈 **Business Value Proposition**
+### 4. OSCAL evidence package (3 min)
 
-### **For Compliance Teams**
-- **Reduced Manual Effort**: 80% time savings
-- **Improved Accuracy**: Automated validation reduces errors
-- **Standardized Documentation**: Consistent audit reports
-- **Real-time Monitoring**: Continuous compliance validation
+1. After validation, click **Download OSCAL Report (PDF)**.
+2. Briefly show JSON structure + PDF sections (assessment plan, findings, manual-validation notes where sudo is required).
 
-### **For IT Teams**
-- **Infrastructure as Code**: Ansible playbooks for compliance
-- **Automated Deployment**: Kubernetes-native solution
-- **Security by Design**: Built-in security controls
-- **Scalable Architecture**: Enterprise-ready deployment
+**Say:**
 
-### **For Auditors**
-- **Standardized Format**: OSCAL-compliant documentation
-- **Evidence Collection**: Automated proof gathering
-- **Traceability**: Complete audit trail
-- **Professional Reports**: Ready for regulatory review
+> *"OSCAL is NIST’s machine-readable compliance language. Your auditors and GRC tools can ingest this without a custom export. Ticket ID and change-window metadata can be bound in production runs."*
 
 ---
 
-## 🎉 **Demo Conclusion**
+### 5. Close — business value (2 min)
 
-> *"The GRC Toolkit represents the future of compliance automation. By combining AI, industry standards, and automation, we've created a solution that not only reduces costs and effort but also improves the quality and consistency of compliance validation. This is how we make compliance a competitive advantage rather than a burden."*
+| Stakeholder | Value |
+|-------------|--------|
+| **GRC / Risk** | Faster control selection, consistent evidence |
+| **Security ops** | Read-only validation, `grc-audit` sudo model, no silent mutation |
+| **Audit** | OSCAL JSON/PDF, traceable run metadata |
+| **Executive** | Shorter assessment cycles; defensible artifacts for board/regulators |
 
-### **Call to Action**
-- **Try the demo**: `http://localhost:8085`
-- **Explore the code**: Open source on GitHub
-- **Join the community**: Contribute to OSCAL integration
-- **Contact us**: For enterprise deployment support
+**Call to action:**
+
+- Try locally: `./scripts/run-local.sh`
+- Contribute: [CONTRIBUTING.md](../CONTRIBUTING.md) · [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md)
+- Enterprise path: GCP/Kubernetes per [OVERVIEW.md](OVERVIEW.md) and [DEPLOYMENT.md](DEPLOYMENT.md)
 
 ---
 
-**🎯 Ready for your Fall 2024 technical conference presentation!**
+## Recommended demo scenarios
+
+### Primary (least privilege — tested locally)
+
+**Input:** *"How do you enforce least privilege on my system?"*  
+**Controls:** AC-6, AC-3, AU-2  
+**Why:** Maps to live playbooks; validation passes on macOS lab with Linux gaps noted.
+
+### Cloud / data access
+
+**Input:** *"How do I secure access to our cloud database containing customer financial data?"*  
+**Controls:** AC-3, AC-6, SC-7, AU-2
+
+### Audit logging
+
+**Input:** *"How do I implement audit logging for our financial transaction system?"*  
+**Controls:** AU-2, AU-3, AU-4, AU-5
+
+### PQC (differentiator)
+
+**Input:** *"We're a financial services organization with 20-year data retention. How do we prepare for post-quantum cryptography migration?"*  
+**Controls:** SC-12, SC-13, SC-17, SC-28 — tie to [PQC Integration Summary](PQC-INTEGRATION-SUMMARY.md).
+
+---
+
+## CISO Q&A cheat sheet
+
+| Question | Short answer |
+|----------|----------------|
+| **Does this auto-fix findings?** | No. HITL Tier 3 — remediation requires documented human approval. |
+| **Can we run this against production from the browser?** | No in v1. UI/API are localhost lab only; production = jump host + change ticket. |
+| **How is privilege limited on targets?** | Dedicated `grc-audit` account; sudo limited to fixed probe scripts — [command matrix](ANSIBLE-AUDIT-COMMAND-MATRIX.md). |
+| **What frameworks besides NIST?** | OSCAL catalog is NIST 800-53 R5 today; architecture is framework-agnostic. |
+| **How do we integrate with ServiceNow / Archer?** | OSCAL JSON export; APIs and connectors on roadmap — [ROADMAP.md](ROADMAP.md). |
+| **What about false positives?** | Human review of AI recommendations; read-only probes collect evidence for analyst judgment. |
+
+---
+
+## Technical appendix (for evaluators)
+
+- **UI:** `grctoolkit.html` → `local-index.html` via `scripts/run-local.sh`
+- **Engine:** Gemini v1beta structured JSON (`gemini-2.5-flash` default)
+- **Validation:** `ansible/playbooks/` — AC-3, AC-6, AU-2, SC-7 (read-only)
+- **Skills:** `skills/nist-validator/` — K8s-scoped control validation (explore for cluster audits)
+- **Reports:** `scripts/oscal_pdf.py` + local runner API
+
+---
+
+## Demo checklist
+
+- [ ] `GEMINI_API_KEY` exported
+- [ ] `./scripts/run-local.sh` running; browser on `local-index.html`
+- [ ] Ansible installed (optional but recommended for live validation)
+- [ ] Scenario rehearsed once end-to-end
+- [ ] PDF download tested (runner API healthy: `curl http://127.0.0.1:8081/health`)
+- [ ] Production handoff talking point ready ([ANSIBLE-AUDIT-OPERATIONS.md](ANSIBLE-AUDIT-OPERATIONS.md))
+
+---
+
+**Related:** [GCP Demo Guide](GCP-DEMO-GUIDE.md) · [QA Testing Guide](QA-TESTING-GUIDE.md) · [Project Overview](OVERVIEW.md)
