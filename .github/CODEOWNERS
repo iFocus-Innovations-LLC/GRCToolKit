@@ -34,7 +34,7 @@ nginx.conf                          @iFocus-Innovations-LLC
 
 # ── Core application ──────────────────────────────────────────────────────────
 grctoolkit.html                     @iFocus-Innovations-LLC
-grc-dataprotction.yaml              @iFocus-Innovations-LLC
+grc-dataprotection.yaml              @iFocus-Innovations-LLC
 
 # ── Dependency & version files ────────────────────────────────────────────────
 requirements*.txt                   @iFocus-Innovations-LLC
