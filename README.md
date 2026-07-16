@@ -102,7 +102,7 @@ This application provides a modern UI for interacting with a GRC Compliance Engi
 - **Quantum Risk Assessment**: Scoring based on algorithm vulnerability and data sensitivity.
 - **Migration Roadmap**: Four-phase planning (Preparation, Baseline, Execution, Monitoring).
 - **PQC Ansible Automation**: Playbooks for deploying ML-KEM (FIPS 203), ML-DSA (FIPS 204), and SLH-DSA (FIPS 205).
-- **Compliance Timeline**: Tracking 2030/2035 deadlines for quantum readiness.
+- **Compliance Timeline**: Multi-mandate tracking — DoW 2030 support / 2031 use (+ CNSA 2.0 for NSS); optional NIST 2030/2035 civilian track. See [DoW PQC Strategy alignment](docs/ROADMAP.md#dow-pqc-strategy-alignment).
 
 ### 📄 OSCAL & Automation
 - **OSCAL Integration**: Full NIST 800-53 R5 OSCAL catalog integration.
@@ -146,7 +146,7 @@ GRCToolKit is evolving into a comprehensive PQC migration management platform, b
 
 #### Phase 2: Migration Roadmap (Q2 2026)
 - **Four-Phase Roadmap**: Structured PQC migration planning (Preparation → Baseline Understanding → Planning & Execution → Monitoring & Evaluation)
-- **Timeline Management**: Progress tracking with 2030 deprecation and 2035 disallowance deadline monitoring
+- **Timeline Management**: Multi-mandate engine — DoW support/use gates (2030/2031), CNSA 2.0 category milestones, optional NIST 2030/2035 civilian track
 - **Automated Reporting**: Executive summaries and compliance status dashboards
 
 #### Phase 3: Automation and Intelligence (Q3 2026)
@@ -162,6 +162,8 @@ GRCToolKit is evolving into a comprehensive PQC migration management platform, b
 - **Mobile Application**: iOS and Android apps for executive access and reporting
 
 **Post-production (planned):** [Shields Up — robotics security](docs/ROADMAP.md#post-production-shields-up--robotics-security-phase-4) — read-only OWASP/RSF routine checks for ROS 2 and robotic AI stacks (after core platform production release; see [PM-TODO.md](docs/PM-TODO.md)).
+
+**DoW PQC Strategy:** GRCToolKit maps to the Commercial Solutions track and LOE 2/5 evidence workflows — see [DoW PQC Strategy alignment](docs/ROADMAP.md#dow-pqc-strategy-alignment) and [PM-TODO P2](docs/PM-TODO.md).
 
 For detailed roadmap information, see [ROADMAP.md](docs/ROADMAP.md).
 
@@ -184,7 +186,7 @@ For detailed roadmap information, see [ROADMAP.md](docs/ROADMAP.md).
 - Quantum risk assessment and prioritization
 - Four-phase migration roadmap tracking
 - Automated PQC deployment with Ansible
-- Compliance timeline monitoring (2030/2035 deadlines)
+- Compliance timeline monitoring (DoW 2030/2031 + optional NIST 2030/2035)
 
 ### Regulatory Reporting
 - Standardized compliance reports (OSCAL format)

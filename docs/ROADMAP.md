@@ -19,7 +19,7 @@ GRCToolKit is evolving into a comprehensive Post-Quantum Cryptography (PQC) migr
 | NIST 800-53 | Reference libraries, manual mapping | AI scenario mapping + catalog integration |
 | Automation | Limited or proprietary | Open Ansible playbooks (AC/AU/SC, PQC, OWASP LLM) |
 | AI role | Policy chat, generic assistants | Structured control recommendations with **HITL** gates |
-| PQC migration | Emerging slide-deck topic | Playbooks, inventory, FIPS 203/204/205 roadmap |
+| PQC migration | Emerging slide-deck topic | Inventory, OSCAL evidence, FIPS 203/204/205 + DoW Commercial Solutions alignment |
 | Deployment model | Vendor-hosted SaaS | Open source; self-hosted Docker/GKE/Helm |
 | Physical AI / robots | Out of scope | **Shields Up** (Phase 4+): RSF, OWASP LLM, routine read-only scans |
 
@@ -29,17 +29,20 @@ GRCToolKit is evolving into a comprehensive Post-Quantum Cryptography (PQC) migr
 - FedRAMP- or IL-authorized managed service
 - Fully autonomous remediation (HITL is required by design)
 - Complete CSF 2.0 database or multi-tenant SaaS at launch
+- NSA Type 1 / High Assurance ECU (HA-ECU) certification, NSA Key Management Infrastructure (KMI), or DoW CIO pre-deployment approval authority
 
 ### Strategic narrative (for partners and evaluators)
 
-> Legacy GRC tools excel at governance workflows. **GRCToolKit.ai** is open source infrastructure for **automated NIST 800-53 validation**, **OSCAL evidence**, and **HITL-guarded AI** — with a roadmap into PQC and robotic / Physical AI security. We give engineers and auditors something they can **run, inspect, and extend**.
+> Legacy GRC tools excel at governance workflows. **GRCToolKit.ai** is open source infrastructure for **automated NIST 800-53 validation**, **OSCAL evidence**, and **HITL-guarded AI** — with a roadmap into PQC (aligned to the [DoW PQC Strategy](#dow-pqc-strategy-alignment) Commercial Solutions track) and robotic / Physical AI security. We give engineers and auditors something they can **run, inspect, and extend**.
 
 ### Roadmap alignment
 
 | Phase | Focus | Market message |
 |-------|--------|----------------|
 | **Now — production gate** | OSCAL, Ansible, HITL, PQC core, GCP deploy | Prove the automatable GRC stack |
+| **PQC — DoW LOE 2/5** | Inventory, OSCAL evidence, HITL-gated commercial validation | Align with DoW Commercial Solutions track |
 | **Phase 4+ — Shields Up** | Robotics, OWASP LLM, RSF | Extend validation to Physical AI |
+| **Future — ADK agents** | Scheduled HITL-gated triage + token throttle | Autonomous assessment without GCP overcharge |
 | **Future — sim / ovrtx** | Synthetic lab, sensor evidence (post v0.1) | Demo and train without production robot risk |
 
 ---
@@ -121,6 +124,7 @@ GRCToolKit is evolving into a comprehensive Post-Quantum Cryptography (PQC) migr
   - Knowledge graph integration
   - Integration with other GRC tools
   - Custom model training capabilities
+  - **Hosted multi-step agents** via [ADK](https://adk.dev/) (see [Agentic GRC runtime](#agentic-grc-runtime-adk--token-throttling))
 
 ### 7. Integration with Other GRC Tools
 - **Objective**: Ecosystem connectivity
@@ -144,6 +148,82 @@ GRCToolKit's existing capabilities provide an ideal foundation for PQC migration
 - ✅ **Report Generation**: Can produce PQC migration documentation
 - ✅ **AI Agent**: Can be trained on PQC scenarios
 
+Federal / DoW positioning is governed by the section below — not by a generic “2030/2035 only” narrative.
+
+---
+
+## DoW PQC Strategy alignment
+
+**Governing external reference:** [Department of War Post Quantum Cryptography Strategy](https://dowcio.war.gov/Portals/0/Documents/Library/DoW-PQC-Strategy.pdf) (approved for open publication Apr 2026; released Jun 2026).
+
+**Vision (DoW):** All DoW NSS and non-NSS employ interoperable, agile, secure, and post-quantum cryptographic systems.
+
+**GRCToolKit.ai fit (locked):** Open-source infrastructure for the **Commercial Solutions** track and **LOE 2 / LOE 5 evidence workflows** — cryptographic inventory, OSCAL assessment artifacts, and HITL-gated Ansible validation. We do **not** claim HA-ECU / Type 1 certification, NSA KMI, or DoW CIO approval authority.
+
+```mermaid
+flowchart TB
+  subgraph dow [DoW PQC Strategy]
+    LOE1[LOE1 Governance]
+    LOE2[LOE2 Inventory and Plan]
+    LOE3[LOE3 Develop and Analyze]
+    LOE4[LOE4 Commercial Solutions]
+    LOE5[LOE5 Deploy Quantum Resistant]
+  end
+  subgraph gtk [GRCToolKit.ai fit]
+    HITL[HITL audit trail]
+    Inv[Ansible crypto inventory]
+    OSCAL[OSCAL evidence]
+    Deploy[HITL deploy validate]
+    CNSA[CNSA 2.0 awareness mapping]
+  end
+  LOE1 --> HITL
+  LOE2 --> Inv
+  LOE2 --> OSCAL
+  LOE3 --> CNSA
+  LOE4 --> CNSA
+  LOE5 --> Deploy
+```
+
+### Multi-mandate deadline model
+
+DoW and civilian/NIST timelines are **not the same**. GRCToolKit must track them as separate mandate tracks:
+
+| Mandate | Gate | Date |
+|---------|------|------|
+| **DoW** | Support PQC or phase out | **2030-12-31** |
+| **DoW** | Use PQC (unless otherwise noted) | **2031-12-31** |
+| **DoW NSS** | CNSA 2.0 | Per NSA CNSA 2.0 product-category timelines (incl. **2033** long-tail categories) |
+| **NIST / broader federal (civilian NSM-10-style)** | Deprecate / disallow classical asymmetric | **2030 / 2035** (optional track for non-DoW customers) |
+
+> Product and demos aimed at DoW / defense industrial base evaluators use the **2030 support / 2031 use** gates (plus CNSA 2.0 for NSS). The legacy 2030/2035 pair remains only as the **civilian** track — not as a substitute for DoW dates.
+
+### Two acquisition tracks
+
+| Track | Scope | GRCToolKit posture |
+|-------|--------|-------------------|
+| **Commercial Solutions** | NIST-standardized PQC (FIPS 203/204/205), commodity IT/cloud, CSfC-style paths | **In scope** — inventory, risk, OSCAL evidence, HITL-gated playbooks |
+| **High Assurance ECU (HA-ECU)** | NSA-certified devices, KMI-dependent | **Out of scope** — partner/reference only; document dependencies, do not simulate Type 1 certification |
+
+### Five Lines of Effort → GRCToolKit capability map
+
+| LOE | DoW focus | GRCToolKit capability | Status |
+|-----|-----------|----------------------|--------|
+| **LOE 1 — Optimize Governance** | Oversight, policy, authorities, workforce | HITL tiers, AU-2 audit trail, RACI-friendly ops docs | **Now** (HITL); roadmap for richer migration-lead workflows |
+| **LOE 2 — Baseline Inventory and Plan** | NSS + non-NSS crypto inventory, impact assessments, migration roadmaps | Ansible `pqc/inventory`, risk assess, OSCAL artifacts, milestone schema | **Now** (scaffold); roadmap for NSS/non-NSS tags + pathway completeness |
+| **LOE 3 — Develop and Analyze** | Algorithms, agility, commercial solution analysis | FIPS mapping, crypto-agility assessment (planned), CNSA 2.0 awareness | **Roadmap** |
+| **LOE 4 — Integrate Commercial Solutions** | CSfC/NIST/NIAP PQC profiles, enterprise PKI, secure signing | Vendor catalog (planned), algorithm-suite awareness (NIST vs CNSA 2.0) | **Roadmap** |
+| **LOE 5 — Deploy Quantum Resistant Devices** | Field PQC across IT and supporting systems | HITL-gated deploy/validate playbooks (ML-KEM, ML-DSA, SLH-DSA, hybrid) | **Now** (demo stubs); roadmap for deprecation-complete validation |
+
+### Essential requirements (encode in product narrative and playbooks)
+
+1. **Maintain mission capability** during migration (no silent break-glass remediations).
+2. **Vulnerability deprecation** — “done” means vulnerable algorithms are gone from the full data pathway, not merely that ML-KEM is enabled.
+3. **Do not introduce new security risks** — HITL required; no autonomous remediation on production systems.
+4. **Confidentiality and authentication/signatures both required** — encryption-only migration does **not** count as PQC complete (HNDL + Trust Now, Forge Later / forged-signature risk).
+5. **Reject false quantum substitutes** — do not claim QKD, quantum networking, or pre-shared-key approaches that lack PQC asymmetric key establishment as quantum resistance.
+
+**Tracker:** [PM-TODO.md](PM-TODO.md) **P2 — DoW PQC Strategy alignment**.
+
 ---
 
 ## MVP Development Priorities
@@ -159,13 +239,16 @@ GRCToolKit's existing capabilities provide an ideal foundation for PQC migration
   - Quantum risk keyword detection
 
 #### 1.2 Cryptographic Asset Inventory
-- **Objective**: Discover and catalog cryptographic implementations
+- **Objective**: Discover and catalog cryptographic implementations (DoW LOE 2)
 - **Features**:
   - Automated cryptographic asset discovery
   - Integration with OSCAL catalog structure
   - Asset classification by quantum vulnerability
   - Data shelf-life assessment for prioritization
   - Algorithm type detection (RSA, ECC, DSA, AES, etc.)
+  - **NSS vs non-NSS** tagging (user-declared in Community; policy field in Enterprise)
+  - Algorithm suite awareness: **NIST FIPS** vs **CNSA 2.0** (NSS path)
+  - Pathway completeness fields (transit, at-rest, signing, supply-chain hops)
 
 #### 1.3 PQC Risk Assessment Engine
 - **Objective**: Quantum risk scoring and prioritization
@@ -174,13 +257,16 @@ GRCToolKit's existing capabilities provide an ideal foundation for PQC migration
   - Data sensitivity and confidentiality assessment
   - System criticality and business impact analysis
   - Timeline to quantum threat evaluation
-  - "Harvest now, decrypt later" risk identification
+  - "Harvest now, decrypt later" (HNDL) risk identification
+  - **Trust Now, Forge Later (TNFL)** — forged signature / firmware / PKI impersonation risk
+  - Flag **confidentiality-only** migrations as incomplete (auth/signatures required for PQC-complete)
   - Integration with existing AI compliance engine
 
 #### 1.4 PQC Control Mapping
 - **Objective**: Map PQC standards to NIST 800-53 controls
 - **Features**:
   - NIST FIPS 203, 204, 205 to NIST 800-53 mapping
+  - **CNSA 2.0** algorithm-suite awareness for NSS-oriented assessments
   - CSF 2.0 integration for PQC-related functions
   - OSCAL-formatted PQC control catalog
   - Control priority and dependency mapping
@@ -208,13 +294,14 @@ GRCToolKit's existing capabilities provide an ideal foundation for PQC migration
     - Performance metrics
 
 #### 2.2 Timeline and Milestone Management
-- **Objective**: Track PQC migration progress
+- **Objective**: Track PQC migration progress against a **multi-mandate timeline engine**
 - **Features**:
   - Progress tracking dashboard
   - Milestone and deadline management
-  - 2030 deprecation deadline tracking
-  - 2035 disallowance deadline tracking
-  - Automated deadline alerts
+  - **DoW support gate** (2030-12-31) and **DoW use gate** (2031-12-31)
+  - **CNSA 2.0** product-category milestone references (incl. 2033 long-tail categories)
+  - Optional **NIST / civilian** track: 2030 deprecation / 2035 disallowance
+  - Automated deadline alerts per selected mandate track
   - Gantt chart visualization
 
 #### 2.3 Automated Progress Reporting
@@ -312,8 +399,69 @@ GRCToolKit's existing capabilities provide an ideal foundation for PQC migration
   - Enterprise support portal and SLAs
   - Training catalog (HITL, OSCAL auditor, Shields Up operator)
   - **Usage metering API** for agentic token workflows (BYOK + bundled pools)
-  - Optional hosted agent runtime (future)
+  - **Hosted agent runtime** on [Google ADK](https://adk.dev/) (Python) — Cloud Run / GKE; requires [token throttle policy](#agentic-grc-runtime-adk--token-throttling) before enabling schedulers in GCP QA
   - Shields Up fleet architecture assist (Gold+)
+
+---
+
+## Agentic GRC runtime (ADK) + token throttling
+
+**Framework:** [Agent Development Kit (ADK)](https://adk.dev/) — preferred stack for hosted multi-step GRC agents (graph workflows, [human input / HITL](https://adk.dev/graphs/human-input/), tool confirmations, [safety guardrails](https://adk.dev/safety/), deploy to Cloud Run / GKE / Agent Runtime).
+
+**Product language (locked):** “Autonomous GRC” means **scheduled assessment and triage** agents. Remediation remains **HITL-gated** (AU-2). Never claim silent auto-remediation.
+
+**Tech default (locked):** **Python ADK** for the server-side runtime (fits Ansible runner and GCP deploy). Community Edition keeps browser Gemini **BYOK** one-shot analysis until metering lands.
+
+```mermaid
+flowchart LR
+  Sched[CloudScheduler_throttled]
+  Agent[ADK_GRC_graph]
+  Tools[ReadOnly_tools]
+  HITL[RequestInput_HITL]
+  Audit[AU2_audit_trail]
+  Sched --> Agent
+  Agent --> Tools
+  Tools --> HITL
+  HITL -->|approved| Remediate[Remediation_tool]
+  HITL -->|denied| Audit
+  Remediate --> Audit
+```
+
+### Why ADK
+
+| ADK capability | GRCToolKit need |
+|----------------|-----------------|
+| Graph workflows + deterministic nodes | Scenario → controls → Ansible evidence → OSCAL without unbounded LLM loops |
+| Human input / tool confirmation | Maps to existing HITL policy (pause before remediation) |
+| Safety: callbacks, in-tool guardrails, agent vs user auth | Zero-trust + least-privilege Ansible tools |
+| Context management / token tracking | Foundation for metering + cost control |
+| Cloud Run / GKE deploy | Matches existing Helm/GKE path |
+
+### Target agent workflows
+
+- Continuous control-validation triage (read-only probes → AI summary → OSCAL)
+- PQC inventory refresh and gate-status reporting (DoW Commercial Solutions track)
+- Shields Up AI triage of routine probe findings
+
+All write/remediate tools require ADK HITL (`RequestInput` or tool confirmation) before execution.
+
+### GCP test-env throttle policy (required before scheduled agents)
+
+Must be in place before enabling Cloud Scheduler (or equivalent) in `grctoolkit-dev` / QA:
+
+| Control | Default for GCP QA |
+|---------|-------------------|
+| Scheduler cadence | Daily default; **hourly max** in QA |
+| Concurrency | **1** agent run per project |
+| Token / request budget | Daily hard cap + circuit breaker (pause scheduled runs when exceeded) |
+| Model | Prefer **Gemini Flash** / Flash-Lite for test; raise model only with budget headroom |
+| Dry-run mode | Graph may run read-only tools **without** LLM where possible |
+| Retries | Exponential backoff on 429; no tight retry loops |
+| Project budgets | GCP budget alerts remain mandatory ([DEPLOYMENT.md](DEPLOYMENT.md)); agent throttle is the **app-level** control |
+
+Community interactive BYOK stays on-demand (user-triggered). Scheduled ADK runtime is the **Enterprise / hosted** path — see [BRAND-AND-EDITIONS.md](BRAND-AND-EDITIONS.md) agentic token economics.
+
+**Tracker:** [PM-TODO.md](PM-TODO.md) **P3 — Agentic tokens, ADK runtime, GCP throttle**.
 
 ---
 
@@ -389,10 +537,11 @@ ansible/playbooks/pqc/
 
 ### Target Market Segments
 
-1. **Federal Government**
-   - FISMA compliance
-   - Classified systems
-   - NIST SP 800-53 requirements
+1. **Federal Government / DoW-adjacent**
+   - FISMA and NIST SP 800-53 requirements
+   - DoW PQC Strategy Commercial Solutions track (LOE 2 inventory → LOE 5 HITL-gated validation)
+   - Defense Industrial Base (DIB) cryptographic inventory and OSCAL evidence for FAR/PQC readiness
+   - NSS awareness via CNSA 2.0 mapping (not HA-ECU certification)
 
 2. **Financial Services**
    - Long-term data retention
@@ -471,9 +620,9 @@ Full tier definitions, brand ladder, and token economics: **[BRAND-AND-EDITIONS.
 - Executive Reporting with board-ready documentation
 
 ### For Compliance Officers
-- NIST Alignment (800-53 R5, FIPS 203/204/205)
-- Audit-Ready Documentation
-- Timeline Management (2030/2035 deadlines)
+- NIST Alignment (800-53 R5, FIPS 203/204/205) and CNSA 2.0 awareness for NSS paths
+- Audit-Ready Documentation (OSCAL)
+- Timeline Management (DoW 2030/2031 gates; optional NIST 2030/2035 civilian track)
 - Regulatory Intelligence monitoring
 
 ### For IT Directors and Architects
@@ -492,13 +641,13 @@ Full tier definitions, brand ladder, and token economics: **[BRAND-AND-EDITIONS.
 
 ## Competitive Differentiation
 
-- ✅ Only GRC platform with integrated PQC migration capabilities
-- ✅ AI-powered automation reduces manual effort by 80%
-- ✅ OSCAL-compliant for government and enterprise adoption
-- ✅ Ansible automation for hands-free deployment
-- ✅ Production-ready with Kubernetes scalability
-- ✅ Comprehensive four-phase migration roadmap
-- ✅ Real-time quantum threat monitoring
+- Strategy-mapped PQC tooling for the **DoW Commercial Solutions** track (LOE 2 inventory + LOE 5 HITL-gated validation) — not a completed DoW migration platform
+- AI-assisted scenario → NIST 800-53 mapping with **HITL** guardrails
+- OSCAL-native assessment evidence engineers can inspect and extend (MIT open source)
+- Ansible playbooks for control validation and PQC migration workflows (demo stubs today; production hardening on roadmap)
+- Multi-mandate timeline model: DoW 2030/2031 + CNSA 2.0 awareness + optional NIST 2030/2035 civilian track
+- Kubernetes-ready self-host deployment (Docker / Helm / GKE)
+- Explicit scope honesty: no HA-ECU/Type 1/KMI claims; no FedRAMP/IL authorization claims
 
 ---
 
@@ -523,6 +672,13 @@ Full tier definitions, brand ladder, and token economics: **[BRAND-AND-EDITIONS.
 - **Context**: OT/ICS environments
 - **Focus**: Operational technology security
 - **Controls**: SC-7, SC-12, SC-13, SC-17
+
+### Scenario 5: DoW Commercial Solutions track (LOE 2 → LOE 5)
+- **Context**: Component or DIB team preparing cryptographic inventory and commercial PQC migration evidence under the [DoW PQC Strategy](https://dowcio.war.gov/Portals/0/Documents/Library/DoW-PQC-Strategy.pdf)
+- **Focus**: Inventory → quantum risk (HNDL + TNFL) → support/use gate status (2030/2031) → OSCAL report; HITL before any deploy playbook
+- **Track**: Commercial Solutions only (not HA-ECU)
+- **Controls**: SC-12, SC-13, SC-17, AU-2
+- **Tracker**: [PM-TODO.md](PM-TODO.md) P2 (Conference / DoW demo narrative)
 
 ---
 
@@ -598,14 +754,16 @@ Optional product name **Shields Up** under the GRCToolKit / future sentinel bran
 
 ## Conclusion
 
-GRCToolKit is uniquely positioned to become the leading platform for PQC migration management. The existing OSCAL integration, AI-powered compliance engine, and Ansible automation provide a solid foundation for rapid PQC capability development. By targeting the NIST conference presentation as a launch vehicle and positioning the MVP as the first comprehensive PQC GRC solution, iFocus Innovations can capture significant market share in this emerging space.
+GRCToolKit is positioned as open-source **infrastructure for automated NIST validation, OSCAL evidence, and HITL-guarded PQC workflows** — with explicit alignment to the DoW PQC Strategy’s **Commercial Solutions** track (LOE 2 inventory and planning; LOE 5 HITL-gated deployment evidence). Existing OSCAL integration, AI-assisted control mapping, and Ansible automation provide a foundation for that evidence path; HA-ECU / Type 1 certification remains out of scope.
 
-The alignment between the PQC Migration GRC Framework and GRCToolKit's technical capabilities creates a powerful narrative: the framework provides the strategic vision, and GRCToolKit provides the tactical execution platform. This combination addresses the complete PQC migration lifecycle from assessment through implementation to continuous monitoring.
+The multi-mandate deadline model (DoW 2030 support / 2031 use, CNSA 2.0 for NSS, optional NIST 2030/2035 civilian track) keeps federal demos and product planning honest. NIST conference and DoW-oriented demos should prove **inventory → risk → gate status → OSCAL**, not overclaim completed department-wide migration.
 
 ---
 
-**Last Updated**: 2026-07-02  
-**Version**: 2.1  
-**Status**: Active Development
+**Last Updated**: 2026-07-16  
+**Version**: 2.3  
+**Status**: Active Development  
+**External PQC reference**: [DoW Post Quantum Cryptography Strategy](https://dowcio.war.gov/Portals/0/Documents/Library/DoW-PQC-Strategy.pdf)  
+**Agent framework reference**: [Google ADK](https://adk.dev/)
 
 
