@@ -1,6 +1,6 @@
 # GRCToolKit — Brand Ladder and Editions
 
-**Last updated:** 2026-07-02  
+**Last updated:** 2026-07-16  
 **Maintainer:** [iFocus Innovations LLC](https://github.com/iFocus-Innovations-LLC)
 
 ---
@@ -63,7 +63,7 @@ Enterprise adds **relationship, SLAs, training, token economics, and optional ho
 
 ## GRCToolKit Enterprise tiers
 
-Support and training tiers. **Pricing TBD** — see [PM-TODO.md](PM-TODO.md) P2/P3.
+Support and training tiers. **Pricing TBD** — see [PM-TODO.md](PM-TODO.md) P3 (agentic tokens).
 
 | Tier | Support | Training | Shields Up | Agentic tokens |
 |------|---------|----------|------------|----------------|
@@ -104,14 +104,16 @@ Part of the **path to GRCToolKit Enterprise**. See [SHIELDS-UP-ROBOTICS.md](SHIE
 
 ## Agentic token economics (overview)
 
-Agentic workflows consume **input/output tokens** (scenario analysis, AI PR review, Shields Up triage, OpenClaw-style agents).
+Agentic workflows consume **input/output tokens** (scenario analysis, AI PR review, Shields Up triage, ADK-hosted scheduled agents).
 
 | Model | Description |
 |-------|-------------|
 | **BYOK** | Community and all tiers — customer supplies Gemini, Anthropic, or Vertex keys |
 | **Bundled pools** | Enterprise Silver+ — prepaid token allocation per month |
 | **Overage** | Gold+ — documented pass-through or margin policy (macro-sensitive) |
-| **Audit** | All tiers — HITL audit trail should record model ID, approximate tokens, approver (future product work; see PM-TODO P3) |
+| **Audit** | All tiers — HITL audit trail should record model ID, approximate tokens, approver (see [PM-TODO P3](PM-TODO.md#p3--agentic-tokens-adk-runtime-gcp-throttle)) |
+
+**Hosted runtime (planned):** [Google ADK](https://adk.dev/) (Python) on Cloud Run / GKE, with GCP QA **token throttle** (scheduler cadence, concurrency = 1, daily budget, circuit breaker). See [ROADMAP — Agentic GRC runtime](ROADMAP.md#agentic-grc-runtime-adk--token-throttling).
 
 Detailed metering and pricing: [PM-TODO.md](PM-TODO.md) § P3.
 
@@ -129,5 +131,5 @@ See also [OVERVIEW.md](OVERVIEW.md#why-grctoolkit-vs-traditional-grc) and [ROADM
 
 - [OVERVIEW.md](OVERVIEW.md) — Executive overview
 - [ROADMAP.md](ROADMAP.md) — Technical and commercial roadmap
-- [PM-TODO.md](PM-TODO.md) — P2 Enterprise, P3 tokens, P4 macro watchlist
+- [PM-TODO.md](PM-TODO.md) — P2 DoW PQC, P3 ADK tokens/throttle, P0–P1 production gates
 - [LICENSE](../LICENSE) — MIT (Community Edition software)
