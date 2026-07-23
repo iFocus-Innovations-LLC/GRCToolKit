@@ -3,7 +3,7 @@
 Lightweight backlog for post-production initiatives and cross-cutting release gates.
 For technical roadmap detail, see [ROADMAP.md](ROADMAP.md).
 
-**Last updated:** 2026-07-16
+**Last updated:** 2026-07-23
 
 ---
 
@@ -96,6 +96,54 @@ GRCToolKit aligns to the **Commercial Solutions** track and **LOE 2 / LOE 5** ev
 
 - Fully autonomous remediation
 - Unbounded multi-agent loops in shared GCP QA project
+
+### P4 — Windows Ansible + Chocolatey
+
+**Bootstrap:** [Chocolatey](https://chocolatey.org/)  
+**Roadmap:** [ROADMAP.md — Windows OS Ansible validation (Chocolatey)](ROADMAP.md#windows-os-ansible-validation-chocolatey)
+
+Windows is a **parallel** validation track. Linux `grc-audit` / systemd playbooks do not apply.
+
+#### Docs / design
+
+- [x] ROADMAP Windows + Chocolatey section published
+- [x] Inventory group `windows_targets` documented (`inventory.production.example.yml` comments)
+- [x] Ops note in [ANSIBLE-AUDIT-OPERATIONS.md](ANSIBLE-AUDIT-OPERATIONS.md): WinRM/Chocolatey path separate from Linux grc-audit
+
+#### Product (after P0 or when WinRM lab available)
+
+- [ ] Chocolatey bootstrap playbook (lab): ensure Chocolatey present; HITL-gated package installs only
+- [ ] Read-only Windows validation playbooks for AC/AU baseline controls (JSON evidence)
+- [ ] Map probes → NIST 800-53 + OSCAL export pattern under `ansible/playbooks/windows/`
+- [ ] Add `windows_targets` to runner allowlist only when connection is lab-safe (no UI remote Windows in v1 without SysAdmin RACI)
+
+#### Explicit out of scope
+
+- Unattended Chocolatey upgrades on production
+- Intune / MECM replacement
+- Claiming full CIS / Windows Benchmark coverage in MVP
+
+### P5 — Mobile Android/iOS groundwork
+
+**Roadmap:** [ROADMAP.md — Mobile app-level groundwork](ROADMAP.md#44-mobile-app-level-groundwork-android-and-ios)  
+**Stack path:** Responsive web → PWA → Capacitor shells for Android and iOS
+
+Companion app for executives/analysts (status, HITL, reports) — not a jump-host replacement.
+
+#### Docs / design
+
+- [x] ROADMAP §4.4 expanded (PWA → Capacitor, security constraints, non-goals)
+- [ ] Mobile UX constraints + HITL flows documented (link [HITL-FRAMEWORK.md](HITL-FRAMEWORK.md))
+- [ ] Responsive / PWA acceptance checklist for demo UI
+- [ ] Capacitor (or chosen shell) spike doc: Android + iOS layout, secrets, CI signing (no secrets in git)
+- [ ] Deep-link plan for HITL approve/deny from notifications (Enterprise)
+- [ ] Store listing placeholders (privacy, data collection) — TBD legal
+
+#### Explicit out of scope (this phase)
+
+- Shipping Capacitor/iOS/Android project scaffolds in-repo
+- App Store / Play submissions
+- Remote Ansible or Shields Up control from mobile
 
 ---
 

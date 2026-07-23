@@ -1,6 +1,6 @@
 # GRCToolKit — Brand Ladder and Editions
 
-**Last updated:** 2026-07-16  
+**Last updated:** 2026-07-23  
 **Maintainer:** [iFocus Innovations LLC](https://github.com/iFocus-Innovations-LLC)
 
 ---
@@ -131,5 +131,5 @@ See also [OVERVIEW.md](OVERVIEW.md#why-grctoolkit-vs-traditional-grc) and [ROADM
 
 - [OVERVIEW.md](OVERVIEW.md) — Executive overview
 - [ROADMAP.md](ROADMAP.md) — Technical and commercial roadmap
-- [PM-TODO.md](PM-TODO.md) — P2 DoW PQC, P3 ADK tokens/throttle, P0–P1 production gates
+- [PM-TODO.md](PM-TODO.md) — P2 DoW PQC, P3 ADK tokens/throttle, P4 Windows/Chocolatey, P5 Mobile Android/iOS, P0–P1 production gates
 - [LICENSE](../LICENSE) — MIT (Community Edition software)
