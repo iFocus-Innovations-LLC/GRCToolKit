@@ -47,7 +47,19 @@ GRCToolKit has been enhanced with comprehensive PQC migration capabilities, buil
 ### Phase 2: Migration Roadmap (Structure)
 - ✅ Four-phase roadmap structure
 - ✅ Milestone tracking framework
-- ✅ Timeline management (2030/2035 deadlines)
+- ✅ Timeline management (civilian **2030/2035** deadlines in engine/schema today)
+
+#### Mandate tracks (docs + product backlog)
+
+DoW and civilian/NIST timelines are **not the same**. Current modules still encode the civilian 2030 deprecation / 2035 disallowance pair. The **target multi-mandate model** (roadmap) is:
+
+| Mandate track | Gates | Status |
+|---------------|-------|--------|
+| **Civilian / NIST-style** | Deprecate ~2030 / disallow ~2035 | **In engine today** (`pqc-compliance-engine.js`, `pqc_timeline`) |
+| **DoW** | Support PQC by **2030-12-31**; use PQC by **2031-12-31** | Roadmap — [PM-TODO P2](PM-TODO.md), [ROADMAP DoW alignment](ROADMAP.md#dow-pqc-strategy-alignment) |
+| **DoW NSS / CNSA 2.0** | Per NSA CNSA 2.0 product-category dates | Roadmap (awareness mapping only) |
+
+Schema follow-up: extend `deadline_type` / seed examples for DoW support, DoW use, CNSA category, and civilian 2030/2035 — even if docs-only until the timeline engine ships.
 
 ### Phase 3: Automation (Ansible)
 - ✅ Asset discovery playbook
@@ -76,7 +88,7 @@ GRCToolKit has been enhanced with comprehensive PQC migration capabilities, buil
 - Extended OSCAL catalog with PQC annotations
 - PQC assessment plans in OSCAL format
 - PQC assessment results with quantum risk data
-- Timeline properties for 2030/2035 deadlines
+- Timeline properties for civilian 2030/2035 deadlines (DoW support/use gates are roadmap — see mandate tracks above)
 
 ### Ansible Automation
 - Complete playbook suite for PQC migration

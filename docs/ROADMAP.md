@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-GRCToolKit is evolving into a comprehensive Post-Quantum Cryptography (PQC) migration management platform, building on its existing NIST 800-53 R5 and OSCAL foundation. This roadmap outlines the strategic enhancements and PQC integration strategy to position GRCToolKit as the leading platform for automated PQC migration compliance.
+GRCToolKit is evolving as open-source **infrastructure for automated NIST validation, OSCAL evidence, and HITL-guarded PQC workflows**, building on its existing NIST 800-53 R5 and OSCAL foundation. This roadmap outlines strategic enhancements and PQC integration — including DoW Commercial Solutions track alignment and multi-mandate deadline tracking — without claiming a completed enterprise migration platform.
 
 **Market thesis:** Most GRC applications optimize for governance workflows and attestations. GRCToolKit optimizes for **automated control validation**, **OSCAL-native evidence**, and **HITL-guarded AI** in environments engineers actually run — cloud, Kubernetes, and (post-production) Physical AI / robotics. See [Market positioning](#market-positioning-grctoolkit-vs-traditional-grc) and the [Executive Overview](OVERVIEW.md#why-grctoolkit-vs-traditional-grc).
 
