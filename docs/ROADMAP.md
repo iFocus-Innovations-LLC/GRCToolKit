@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-GRCToolKit is evolving into a comprehensive Post-Quantum Cryptography (PQC) migration management platform, building on its existing NIST 800-53 R5 and OSCAL foundation. This roadmap outlines the strategic enhancements and PQC integration strategy to position GRCToolKit as the leading platform for automated PQC migration compliance.
+GRCToolKit is evolving as open-source **infrastructure for automated NIST validation, OSCAL evidence, and HITL-guarded PQC workflows**, building on its existing NIST 800-53 R5 and OSCAL foundation. This roadmap outlines strategic enhancements and PQC integration — including DoW Commercial Solutions track alignment and multi-mandate deadline tracking — without claiming a completed enterprise migration platform.
 
 **Market thesis:** Most GRC applications optimize for governance workflows and attestations. GRCToolKit optimizes for **automated control validation**, **OSCAL-native evidence**, and **HITL-guarded AI** in environments engineers actually run — cloud, Kubernetes, and (post-production) Physical AI / robotics. See [Market positioning](#market-positioning-grctoolkit-vs-traditional-grc) and the [Executive Overview](OVERVIEW.md#why-grctoolkit-vs-traditional-grc).
 
@@ -175,12 +175,13 @@ flowchart TB
     OSCAL[OSCAL evidence]
     Deploy[HITL deploy validate]
     CNSA[CNSA 2.0 awareness mapping]
+    CommPath[Commercial PQC path / profile awareness]
   end
   LOE1 --> HITL
   LOE2 --> Inv
   LOE2 --> OSCAL
   LOE3 --> CNSA
-  LOE4 --> CNSA
+  LOE4 --> CommPath
   LOE5 --> Deploy
 ```
 
@@ -645,7 +646,7 @@ Full tier definitions, brand ladder, and token economics: **[BRAND-AND-EDITIONS.
 - AI-assisted scenario → NIST 800-53 mapping with **HITL** guardrails
 - OSCAL-native assessment evidence engineers can inspect and extend (MIT open source)
 - Ansible playbooks for control validation and PQC migration workflows (demo stubs today; production hardening on roadmap)
-- Multi-mandate timeline model: DoW 2030/2031 + CNSA 2.0 awareness + optional NIST 2030/2035 civilian track
+- Multi-mandate timeline model **(roadmap)**: DoW 2030/2031 + CNSA 2.0 awareness + optional NIST 2030/2035 civilian track — engine still implements the civilian 2030/2035 track; product work tracked in [PM-TODO P2](PM-TODO.md)
 - Kubernetes-ready self-host deployment (Docker / Helm / GKE)
 - Explicit scope honesty: no HA-ECU/Type 1/KMI claims; no FedRAMP/IL authorization claims
 
@@ -760,8 +761,8 @@ The multi-mandate deadline model (DoW 2030 support / 2031 use, CNSA 2.0 for NSS,
 
 ---
 
-**Last Updated**: 2026-07-16  
-**Version**: 2.3  
+**Last Updated**: 2026-07-22  
+**Roadmap doc version**: 2.3 (product remains **v2.1.0-dev**)  
 **Status**: Active Development  
 **External PQC reference**: [DoW Post Quantum Cryptography Strategy](https://dowcio.war.gov/Portals/0/Documents/Library/DoW-PQC-Strategy.pdf)  
 **Agent framework reference**: [Google ADK](https://adk.dev/)
