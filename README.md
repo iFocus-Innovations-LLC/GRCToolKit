@@ -102,7 +102,7 @@ This application provides a modern UI for interacting with a GRC Compliance Engi
 - **Quantum Risk Assessment**: Scoring based on algorithm vulnerability and data sensitivity.
 - **Migration Roadmap**: Four-phase planning (Preparation, Baseline, Execution, Monitoring).
 - **PQC Ansible Automation**: Playbooks for deploying ML-KEM (FIPS 203), ML-DSA (FIPS 204), and SLH-DSA (FIPS 205).
-- **Compliance Timeline**: Civilian 2030/2035 track in the engine today. **Target model (roadmap):** multi-mandate DoW 2030 support / 2031 use (+ CNSA 2.0 for NSS) with optional NIST 2030/2035 civilian track — see [DoW PQC Strategy alignment](docs/ROADMAP.md#dow-pqc-strategy-alignment) and [PM-TODO P2](docs/PM-TODO.md).
+- **Compliance Timeline**: Multi-mandate tracking — DoW 2030 support / 2031 use (+ CNSA 2.0 for NSS); optional NIST 2030/2035 civilian track. See [DoW PQC Strategy alignment](docs/ROADMAP.md#dow-pqc-strategy-alignment).
 
 ### 📄 OSCAL & Automation
 - **OSCAL Integration**: Full NIST 800-53 R5 OSCAL catalog integration.
@@ -186,7 +186,7 @@ For detailed roadmap information, see [ROADMAP.md](docs/ROADMAP.md).
 - Quantum risk assessment and prioritization
 - Four-phase migration roadmap tracking
 - Automated PQC deployment with Ansible
-- Compliance timeline monitoring (2030/2035 civilian track today; multi-mandate DoW 2030/2031 + optional NIST track on roadmap)
+- Compliance timeline monitoring (DoW 2030/2031 + optional NIST 2030/2035)
 
 ### Regulatory Reporting
 - Standardized compliance reports (OSCAL format)

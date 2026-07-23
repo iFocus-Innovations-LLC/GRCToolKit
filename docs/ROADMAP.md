@@ -175,13 +175,12 @@ flowchart TB
     OSCAL[OSCAL evidence]
     Deploy[HITL deploy validate]
     CNSA[CNSA 2.0 awareness mapping]
-    CommPath[Commercial PQC path / profile awareness]
   end
   LOE1 --> HITL
   LOE2 --> Inv
   LOE2 --> OSCAL
   LOE3 --> CNSA
-  LOE4 --> CommPath
+  LOE4 --> CNSA
   LOE5 --> Deploy
 ```
 
@@ -646,7 +645,7 @@ Full tier definitions, brand ladder, and token economics: **[BRAND-AND-EDITIONS.
 - AI-assisted scenario → NIST 800-53 mapping with **HITL** guardrails
 - OSCAL-native assessment evidence engineers can inspect and extend (MIT open source)
 - Ansible playbooks for control validation and PQC migration workflows (demo stubs today; production hardening on roadmap)
-- Multi-mandate timeline model **(roadmap)**: DoW 2030/2031 + CNSA 2.0 awareness + optional NIST 2030/2035 civilian track — engine still implements the civilian 2030/2035 track; product work tracked in [PM-TODO P2](PM-TODO.md)
+- Multi-mandate timeline model: DoW 2030/2031 + CNSA 2.0 awareness + optional NIST 2030/2035 civilian track
 - Kubernetes-ready self-host deployment (Docker / Helm / GKE)
 - Explicit scope honesty: no HA-ECU/Type 1/KMI claims; no FedRAMP/IL authorization claims
 
@@ -761,8 +760,8 @@ The multi-mandate deadline model (DoW 2030 support / 2031 use, CNSA 2.0 for NSS,
 
 ---
 
-**Last Updated**: 2026-07-22  
-**Roadmap doc version**: 2.3 (product remains **v2.1.0-dev**)  
+**Last Updated**: 2026-07-16  
+**Version**: 2.3  
 **Status**: Active Development  
 **External PQC reference**: [DoW Post Quantum Cryptography Strategy](https://dowcio.war.gov/Portals/0/Documents/Library/DoW-PQC-Strategy.pdf)  
 **Agent framework reference**: [Google ADK](https://adk.dev/)

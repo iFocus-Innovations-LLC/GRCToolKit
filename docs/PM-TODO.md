@@ -38,7 +38,7 @@ For technical roadmap detail, see [ROADMAP.md](ROADMAP.md).
 - [ ] AI report template (reuse `compliance-docs/` patterns)
 - [ ] HITL gate: no remediation without human approval
 - [ ] Lab environment: Dockerized ROS 2 + rosbridge test target
-- [ ] Conference / robotics demo narrative (optional; Shields Up lab story — not DoW PQC)
+- [ ] Conference / DoW demo narrative (optional Phase 2) — see **P2** DoW Commercial Solutions demo
 - [ ] PM sign-off before merge to `main`
 
 ### P2 — DoW PQC Strategy alignment
@@ -51,7 +51,7 @@ GRCToolKit aligns to the **Commercial Solutions** track and **LOE 2 / LOE 5** ev
 #### Docs / positioning (immediate)
 
 - [x] ROADMAP DoW LOE map + multi-mandate deadline model published
-- [x] OVERVIEW + README deadline language updated to multi-mandate target model (DoW 2030/2031 + CNSA; 2030/2035 labeled as civilian track / engine today)
+- [x] OVERVIEW + README deadline language updated to multi-mandate (DoW 2030/2031 + CNSA; retain 2030/2035 as civilian track)
 - [ ] Conference / DoW demo narrative written against LOE 2/5 Commercial Solutions track (inventory → risk → support/use gates → OSCAL; HITL before deploy)
 
 #### Product backlog (post–production gate or parallel on `dev`)

@@ -78,9 +78,8 @@ For roadmap detail, see [ROADMAP.md](ROADMAP.md#market-positioning-grctoolkit-vs
 ### Post-quantum cryptography (PQC)
 - Cryptographic asset inventory and quantum risk scoring
 - Four-phase migration roadmap (Preparation → Baseline → Execution → Monitoring)
-- Timeline tracking for the civilian 2030/2035 track in the engine today  
-- **Roadmap / target model:** multi-mandate timelines — DoW 2030 support / 2031 use + CNSA 2.0 awareness; optional NIST 2030/2035 civilian track  
-  → [DoW PQC Strategy alignment](ROADMAP.md#dow-pqc-strategy-alignment) · [PM-TODO P2](PM-TODO.md)
+- Multi-mandate timelines: DoW 2030/2031 + CNSA 2.0 awareness; optional NIST 2030/2035 civilian track  
+  → [DoW PQC Strategy alignment](ROADMAP.md#dow-pqc-strategy-alignment)
 - Ansible automation for ML-KEM, ML-DSA, and SLH-DSA (FIPS 203/204/205)  
   → [PQC Integration Summary](PQC-INTEGRATION-SUMMARY.md)
 
