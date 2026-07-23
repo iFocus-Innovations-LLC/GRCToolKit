@@ -87,6 +87,16 @@ ansible-playbook -i inventory.yml owasp-llm-top-10-validate.yml
 
 See [`ansible/playbooks/inventory.yml`](../ansible/playbooks/inventory.yml) for **localhost lab** demo only.
 
+### Windows targets (roadmap)
+
+Linux `grc-audit` / SSH / sudoers paths above **do not** apply to Microsoft Windows. A parallel track will use:
+
+- Inventory group `windows_targets` (WinRM or documented SSH-on-Windows)
+- [Chocolatey](https://chocolatey.org/) for lab/QA bootstrap (HITL before package install/upgrade)
+- Future playbooks under `ansible/playbooks/windows/`
+
+See [ROADMAP — Windows OS Ansible validation](ROADMAP.md#windows-os-ansible-validation-chocolatey) and [PM-TODO P4](PM-TODO.md#p4--windows-ansible--chocolatey). Do not enable remote Windows from the v1 UI/runner without SysAdmin RACI.
+
 ---
 
 ## System Administrator checklist

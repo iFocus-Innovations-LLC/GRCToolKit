@@ -17,7 +17,7 @@ GRCToolKit is evolving as open-source **infrastructure for automated NIST valida
 | Primary user | GRC analyst, audit PM | Security engineer, auditor, platform team |
 | Control evidence | Documents, tickets, manual attestation | OSCAL artifacts + Ansible probe output |
 | NIST 800-53 | Reference libraries, manual mapping | AI scenario mapping + catalog integration |
-| Automation | Limited or proprietary | Open Ansible playbooks (AC/AU/SC, PQC, OWASP LLM) |
+| Automation | Limited or proprietary | Open Ansible playbooks (AC/AU/SC, PQC, OWASP LLM); **Windows + Chocolatey** on roadmap |
 | AI role | Policy chat, generic assistants | Structured control recommendations with **HITL** gates |
 | PQC migration | Emerging slide-deck topic | Inventory, OSCAL evidence, FIPS 203/204/205 + DoW Commercial Solutions alignment |
 | Deployment model | Vendor-hosted SaaS | Open source; self-hosted Docker/GKE/Helm |
@@ -43,6 +43,8 @@ GRCToolKit is evolving as open-source **infrastructure for automated NIST valida
 | **PQC — DoW LOE 2/5** | Inventory, OSCAL evidence, HITL-gated commercial validation | Align with DoW Commercial Solutions track |
 | **Phase 4+ — Shields Up** | Robotics, OWASP LLM, RSF | Extend validation to Physical AI |
 | **Future — ADK agents** | Scheduled HITL-gated triage + token throttle | Autonomous assessment without GCP overcharge |
+| **Future — Windows + Chocolatey** | WinRM inventory, read-only Windows probes | Validate Microsoft OS targets alongside Linux |
+| **Future — Mobile Android/iOS** | PWA → Capacitor companion apps | HITL approvals and reports on the go |
 | **Future — sim / ovrtx** | Synthetic lab, sensor evidence (post v0.1) | Demo and train without production robot risk |
 
 ---
@@ -381,14 +383,26 @@ DoW and civilian/NIST timelines are **not the same**. GRCToolKit must track them
   - SDK for common languages
   - Integration marketplace
 
-#### 4.4 Mobile Application for Executives
-- **Objective**: Executive access and reporting
-- **Features**:
-  - iOS and Android apps
-  - Executive dashboards
-  - Push notifications for critical issues
-  - Offline report viewing
-  - Mobile-optimized workflows
+#### 4.4 Mobile app-level groundwork (Android and iOS)
+
+- **Objective**: Executive / analyst **companion** for compliance status, HITL approvals, and report viewing on Android and iOS — not a replacement for Ansible jump-host operations
+- **Stack path (locked):** Progressive groundwork on the existing HTML/Tailwind + Gemini UI:
+  1. Responsive web / mobile-friendly layouts
+  2. PWA checklist (installability, offline report viewing where safe)
+  3. **Capacitor** (or equivalent) shells for App Store / Play Store packaging
+- **MVP mobile surfaces:**
+  - Compliance status dashboards
+  - HITL approval queue (approve / deny with AU-2 audit trail)
+  - OSCAL / PDF report download and offline viewing
+- **Security constraints (must hold):**
+  - No Gemini or other API keys hardcoded in mobile binaries — BYOK / Enterprise pools via secure storage or backend
+  - HITL approvals require authenticated identity
+  - Remediations **never** auto-run from push notifications
+- **Explicit non-goals for v1 mobile:**
+  - Remote Ansible execution from the phone
+  - Shields Up robot control surfaces
+- **Enterprise tie-in:** Push for critical findings, deep-link approve/deny, and token-aware usage align with [BRAND-AND-EDITIONS.md](BRAND-AND-EDITIONS.md)
+- **Tracker:** [PM-TODO.md](PM-TODO.md) **P5 — Mobile Android/iOS groundwork**
 
 #### 4.5 GRCToolKit Enterprise (commercial)
 
@@ -530,6 +544,60 @@ ansible/playbooks/pqc/
 ├── hybrid-crypto.yml     # Deploy hybrid approaches
 └── validate.yml          # Test PQC implementations
 ```
+
+**Planned (Windows track):** `ansible/playbooks/windows/` — see [Windows OS Ansible validation](#windows-os-ansible-validation-chocolatey).
+
+---
+
+## Windows OS Ansible validation (Chocolatey)
+
+**Goal:** Extend automated NIST control validation beyond Linux/localhost to **Microsoft Windows** targets, using [Chocolatey](https://chocolatey.org/) to simplify lab/QA bootstrap.
+
+**Honesty:** Linux `grc-audit` probes and systemd/auditd-oriented AC/AU/SC playbooks **do not** apply to Windows. Windows is a **parallel** track with its own inventory group and playbook tree.
+
+```mermaid
+flowchart LR
+  Inv[windows_targets_inventory]
+  Boot[Chocolatey_bootstrap]
+  Probe[ReadOnly_Windows_probes]
+  OSCAL[OSCAL_JSON_evidence]
+  HITL[HITL_before_choco_install]
+  Inv --> Boot
+  Boot --> Probe
+  Probe --> OSCAL
+  Probe --> HITL
+```
+
+### Bootstrap (Chocolatey)
+
+- Use **Chocolatey Open Source** for package-manager simplicity on Windows lab and QA hosts ([chocolatey.org](https://chocolatey.org/))
+- Bootstrap installs only **approved** prerequisites (e.g. OpenSSH / WinRM-related tooling as needed for Ansible connectivity)
+- Any Chocolatey **install or upgrade** on a target requires **HITL** approval and AU-2 audit trail — same rule as Linux remediations
+
+### Inventory
+
+- Add group **`windows_targets`** with `ansible_connection: winrm` (or documented SSH-on-Windows alternative), `ansible_user`, and connection vars
+- Real hostnames, IPs, and credentials stay in a **private** inventory — never commit secrets to GRCToolKit git
+- Local MVP inventory ([ansible/playbooks/inventory.yml](../ansible/playbooks/inventory.yml)) remains Linux/macOS localhost for demos
+
+### Future playbook tree
+
+```
+ansible/playbooks/windows/
+├── bootstrap.yml       # Ensure Chocolatey present; HITL-gated package installs
+├── validate-ac.yml     # Read-only access-control oriented checks → JSON evidence
+├── validate-au.yml     # Read-only audit/logging oriented checks → JSON evidence
+└── (map probes → NIST 800-53 + OSCAL export patterns)
+```
+
+### Out of scope (this track)
+
+- Replacing Intune / MECM
+- Chocolatey for Business Central Management as a product dependency
+- Unattended Chocolatey upgrades on production
+- Claiming full CIS / Windows Benchmark coverage in MVP
+
+**Tracker:** [PM-TODO.md](PM-TODO.md) **P4 — Windows Ansible + Chocolatey**.
 
 ---
 
@@ -760,10 +828,11 @@ The multi-mandate deadline model (DoW 2030 support / 2031 use, CNSA 2.0 for NSS,
 
 ---
 
-**Last Updated**: 2026-07-16  
-**Version**: 2.3  
+**Last Updated**: 2026-07-23  
+**Version**: 2.4  
 **Status**: Active Development  
 **External PQC reference**: [DoW Post Quantum Cryptography Strategy](https://dowcio.war.gov/Portals/0/Documents/Library/DoW-PQC-Strategy.pdf)  
-**Agent framework reference**: [Google ADK](https://adk.dev/)
+**Agent framework reference**: [Google ADK](https://adk.dev/)  
+**Windows bootstrap reference**: [Chocolatey](https://chocolatey.org/)
 
 
