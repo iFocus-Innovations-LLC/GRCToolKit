@@ -56,6 +56,7 @@ Detailed documentation for the GRCToolKit can be found in the `docs/` directory:
   - [PQC Integration Summary](docs/PQC-INTEGRATION-SUMMARY.md) - Post-Quantum Cryptography migration strategy.
   - [OSCAL Integration](docs/OSCAL-INTEGRATION.md) - Open Security Controls Assessment Language implementation.
   - [Roadmap](docs/ROADMAP.md) - Project development phases and future enhancements.
+  - [Release & Branching](docs/RELEASE-BRANCHING.md) - Branch model, QA/Demo freeze tags, CI gates.
 
 - **Deployment & Operations**:
   - [Helm & Terraform](docs/HELM-TERRAFORM.md) - Helm chart for any Kubernetes; optional GCP Terraform bootstrap.

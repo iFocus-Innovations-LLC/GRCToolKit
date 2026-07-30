@@ -3,7 +3,7 @@
 Lightweight backlog for post-production initiatives and cross-cutting release gates.
 For technical roadmap detail, see [ROADMAP.md](ROADMAP.md).
 
-**Last updated:** 2026-07-23
+**Last updated:** 2026-07-30
 
 ---
 
@@ -144,6 +144,29 @@ Companion app for executives/analysts (status, HITL, reports) — not a jump-hos
 - Shipping Capacitor/iOS/Android project scaffolds in-repo
 - App Store / Play submissions
 - Remote Ansible or Shields Up control from mobile
+
+### P6 — GenAI model / agent market research
+
+**Goal:** Track progress of commercial and open LLMs/agents for possible future use — **without** adding a second paid LLM to MVP CI or product.
+
+- [ ] Quarterly scan: cost/token efficiency, HITL/tool-confirmation fitness, gov-friendly hosting
+- [ ] Revisit optional multi-model **CI** peer review only after P0 + budget policy
+- [ ] Revisit optional alternate **runtime** models (beyond Gemini BYOK) only with Enterprise token economics
+- [ ] Keep MVP: Gemini BYOK in-app; human + Trivy/hardening CI only
+
+**Explicit out of scope until research approved**
+
+- Anthropic/Claude (or other) API keys required for green CI
+- Unbounded multi-vendor agent loops in shared GCP QA
+
+### P7 — CISA OSS alignment follow-through
+
+**Source:** [CISA OSS Security Principles and Practices](https://www.cisa.gov/resources-tools/resources/open-source-software-security-principles-and-practices)  
+**Doc:** [SECURITY.md — CISA alignment](SECURITY.md#cisa-open-source-software-security-alignment)
+
+- [x] Document MVP alignment table (honest “aligned toward”)
+- [ ] SBOM generation for release container images (2026 minimum elements)
+- [ ] Publish consumer-oriented trust / provenance notes as needed
 
 ---
 

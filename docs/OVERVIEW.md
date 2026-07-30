@@ -93,7 +93,7 @@ For roadmap detail, see [ROADMAP.md](ROADMAP.md#market-positioning-grctoolkit-vs
 
 ### Open source governance
 - MIT license, contributing guide, code of conduct, CODEOWNERS
-- CI: container hardening, image pin checks, MVP demo tests, AI peer review on PRs
+- CI: container hardening, image pin checks, MVP demo tests, Trivy/Scout scanning (human CODEOWNERS review — no LLM peer-review job in MVP)
 - Security policy and private vulnerability reporting path  
   → [SECURITY.md](SECURITY.md) · [CONTRIBUTING.md](../CONTRIBUTING.md)
 
@@ -247,4 +247,4 @@ We are transparent about maturity so evaluators — including government innovat
 
 ---
 
-*Last updated: 2026-07-23 · GRCToolKit.ai v2.1.0-dev*
+*Last updated: 2026-07-30 · GRCToolKit.ai v2.1.0-dev*

@@ -148,6 +148,23 @@ grep -R "runs-on: ubuntu-" .github/workflows
 - Log API key usage patterns
 - Alert on secret access anomalies
 
+---
+
+## CISA Open Source Software security alignment
+
+GRCToolKit aims to **align toward** [CISA Open Source Software: Security Principles and Practices](https://www.cisa.gov/resources-tools/resources/open-source-software-security-principles-and-practices) (July 2026). This is **not** a CISA certification claim.
+
+| CISA theme | MVP posture | Gap / backlog |
+|------------|-------------|----------------|
+| Responsible OSS publish/consume | MIT license, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY reporting | Keep governance current on `main` |
+| Secure development / CI | Non-root containers, image pin checks, Trivy/Scout, human CODEOWNERS review | No LLM-based CI reviewer in MVP (token cost) |
+| Vulnerability management | Private reporting via SECURITY.md; scanner workflows on PRs | Formal response SLAs as project grows |
+| SBOM | Aspirational (noted in Shields Up / robotics docs) | Generate/publish SBOM for release images (see [2026 Minimum Elements for an SBOM](https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom)) — PM-TODO |
+| Trust assessment (C4-oriented) | Transparent repo, CODEOWNERS, HITL before remediation | Document consumer trust checklist as needed |
+| Open source AI | Gemini BYOK; HITL; no silent auto-remediation; secrets via env/Secret Manager | Multi-model evaluation deferred (PM-TODO P6) |
+
+Branching and release hygiene supporting secure OSS practice: [RELEASE-BRANCHING.md](RELEASE-BRANCHING.md).
+
 ## 🔄 Secret Rotation
 
 To rotate the API key:
@@ -167,3 +184,4 @@ To rotate the API key:
 - [Kubernetes Secrets Documentation](https://kubernetes.io/docs/concepts/configuration/secret/)
 - [Container Security Best Practices](https://kubernetes.io/docs/concepts/security/)
 - [NIST Cybersecurity Framework](https://www.nist.gov/cyberframework)
+- [CISA Open Source Software: Security Principles and Practices](https://www.cisa.gov/resources-tools/resources/open-source-software-security-principles-and-practices)

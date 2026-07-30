@@ -475,7 +475,23 @@ Must be in place before enabling Cloud Scheduler (or equivalent) in `grctoolkit-
 
 Community interactive BYOK stays on-demand (user-triggered). Scheduled ADK runtime is the **Enterprise / hosted** path — see [BRAND-AND-EDITIONS.md](BRAND-AND-EDITIONS.md) agentic token economics.
 
+**MVP CI note:** Anthropic/Claude peer-review is **not** used in QA-ready MVP pipelines (token cost). Human CODEOWNERS + scanner gates only. Future multi-model CI is under [PM-TODO P6](PM-TODO.md#p6--genai-model--agent-market-research).
+
 **Tracker:** [PM-TODO.md](PM-TODO.md) **P3 — Agentic tokens, ADK runtime, GCP throttle**.
+
+---
+
+## GenAI model and agent market research
+
+**Objective:** Stay informed on GenAI development without expanding MVP token spend.
+
+- Monitor commercial and open models/agents beyond Gemini for cost efficiency, HITL fitness, and hosting constraints
+- Do **not** add a second LLM vendor to product or CI until research + budget policy approve it
+- Optional outcomes: alternate runtime adapters; optional multi-model PR review (post-MVP)
+
+**Tracker:** [PM-TODO.md](PM-TODO.md) **P6**.
+
+**OSS security framing:** Align toward [CISA OSS Security Principles and Practices](https://www.cisa.gov/resources-tools/resources/open-source-software-security-principles-and-practices) — see [SECURITY.md](SECURITY.md#cisa-open-source-software-security-alignment).
 
 ---
 
@@ -828,11 +844,12 @@ The multi-mandate deadline model (DoW 2030 support / 2031 use, CNSA 2.0 for NSS,
 
 ---
 
-**Last Updated**: 2026-07-23  
-**Version**: 2.4  
-**Status**: Active Development  
+**Last Updated**: 2026-07-30  
+**Version**: 2.5  
+**Status**: Active Development (QA/Demo freeze via `v2.1.0-qa-demo` after this MVP CI cleanup lands — see [RELEASE-BRANCHING.md](RELEASE-BRANCHING.md))  
 **External PQC reference**: [DoW Post Quantum Cryptography Strategy](https://dowcio.war.gov/Portals/0/Documents/Library/DoW-PQC-Strategy.pdf)  
 **Agent framework reference**: [Google ADK](https://adk.dev/)  
-**Windows bootstrap reference**: [Chocolatey](https://chocolatey.org/)
+**Windows bootstrap reference**: [Chocolatey](https://chocolatey.org/)  
+**OSS security reference**: [CISA OSS Security Principles and Practices](https://www.cisa.gov/resources-tools/resources/open-source-software-security-principles-and-practices)
 
 
