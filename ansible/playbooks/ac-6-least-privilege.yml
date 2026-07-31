@@ -6,28 +6,34 @@
 - name: "AC-6: Least Privilege Validation"
   hosts: all
   become: "{{ ansible_connection != 'local' and grc_audit_become | default(false) }}"
+  environment:
+    PATH: "{{ grc_bin_path | default('/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
   vars:
     control_id: "AC-6"
     control_title: "Least Privilege"
     compliance_framework: "NIST 800-53 Rev. 5"
     grc_audit_mode: read_only
 
+  pre_tasks:
+    - name: Load OS / K8s platform path map
+      ansible.builtin.include_tasks: tasks/load_platform_vars.yml
+
   tasks:
     - name: "AC-6.1: Verify user account privileges (read-only)"
       block:
         - name: "Check for NOPASSWD sudoers entries"
-          command: grep -E '^[^#]*NOPASSWD' /etc/sudoers
+          ansible.builtin.command: "grep -E '^[^#]*NOPASSWD' {{ grc_sudoers }}"
           register: nopasswd_sudoers
           changed_when: false
           failed_when: false
 
         - name: "AC-6.1: WARN - NOPASSWD sudoers found"
-          debug:
+          ansible.builtin.debug:
             msg: "NOPASSWD sudoers entries found - review for least privilege compliance"
           when: nopasswd_sudoers.rc == 0
 
         - name: "List UID 0 accounts"
-          command: "awk -F: '$3==0 {print $1}' /etc/passwd"
+          ansible.builtin.command: "awk -F: '$3==0 {print $1}' {{ grc_passwd }}"
           register: root_users
           changed_when: false
 

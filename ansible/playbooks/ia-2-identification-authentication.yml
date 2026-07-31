@@ -1,0 +1,93 @@
+---
+# Ansible Playbook: IA-2 Identification and Authentication (read-only audit profile)
+# HITL: evidence collection only — no sshd or PAM mutations.
+# Based on NIST 800-53 Rev. 5 Control IA-2
+
+- name: "IA-2: Identification and Authentication Validation"
+  hosts: all
+  become: "{{ ansible_connection != 'local' and grc_audit_become | default(false) }}"
+  environment:
+    PATH: "{{ grc_bin_path | default('/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  vars:
+    control_id: "IA-2"
+    control_title: "Identification and Authentication (Organizational Users)"
+    compliance_framework: "NIST 800-53 Rev. 5"
+    grc_audit_mode: read_only
+
+  pre_tasks:
+    - name: Load OS / K8s platform path map
+      ansible.builtin.include_tasks: tasks/load_platform_vars.yml
+
+  tasks:
+    - name: "IA-2.1: Locate sshd configuration (read-only)"
+      block:
+        - name: "Stat sshd_config"
+          ansible.builtin.stat:
+            path: "{{ grc_sshd_config }}"
+          register: sshd_config
+
+        - name: "IA-2.1: LAB NOTE - sshd_config missing"
+          ansible.builtin.debug:
+            msg: "sshd_config not found at {{ grc_sshd_config }} (platform={{ grc_platform_id }})."
+          when: not sshd_config.stat.exists
+
+    - name: "IA-2.2: Read key authentication directives"
+      when: sshd_config.stat.exists
+      block:
+        - name: "Probe PasswordAuthentication"
+          ansible.builtin.shell: "grep -E '^[[:space:]]*PasswordAuthentication[[:space:]]+' {{ grc_sshd_config }} | awk '{print $2}' | tail -1"
+          register: ssh_password_auth
+          changed_when: false
+          failed_when: false
+
+        - name: "Probe PubkeyAuthentication"
+          ansible.builtin.shell: "grep -E '^[[:space:]]*PubkeyAuthentication[[:space:]]+' {{ grc_sshd_config }} | awk '{print $2}' | tail -1"
+          register: ssh_pubkey_auth
+          changed_when: false
+          failed_when: false
+
+        - name: "Probe PermitRootLogin"
+          ansible.builtin.shell: "grep -E '^[[:space:]]*PermitRootLogin[[:space:]]+' {{ grc_sshd_config }} | awk '{print $2}' | tail -1"
+          register: ssh_permit_root
+          changed_when: false
+          failed_when: false
+
+    - name: "IA-2.3: PAM / auth framework presence"
+      block:
+        - name: "Stat PAM auth path"
+          ansible.builtin.stat:
+            path: "{{ grc_pam_auth }}"
+          register: pam_auth
+
+        - name: "IA-2.3: WARN - PAM auth path missing"
+          ansible.builtin.debug:
+            msg: "PAM auth path missing at {{ grc_pam_auth }} — organizational user authentication evidence incomplete."
+          when: not pam_auth.stat.exists
+
+    - name: "Generate IA-2 compliance report"
+      block:
+        - name: "Ensure report directory exists"
+          ansible.builtin.file:
+            path: "{{ grc_compliance_report_dir }}"
+            state: directory
+            mode: "0755"
+
+        - name: "Write IA-2 compliance report JSON"
+          ansible.builtin.copy:
+            content: |
+              {
+                "control_id": "IA-2",
+                "hostname": "{{ inventory_hostname }}",
+                "platform_id": "{{ grc_platform_id }}",
+                "validation_timestamp": "{{ ansible_date_time.iso8601 }}",
+                "grc_audit_mode": "{{ grc_audit_mode }}",
+                "sshd_config": "{{ grc_sshd_config }}",
+                "sshd_config_exists": {{ sshd_config.stat.exists | default(false) | to_json }},
+                "PasswordAuthentication": "{{ ssh_password_auth.stdout | default('unset') }}",
+                "PubkeyAuthentication": "{{ ssh_pubkey_auth.stdout | default('unset') }}",
+                "PermitRootLogin": "{{ ssh_permit_root.stdout | default('unset') }}",
+                "pam_auth": "{{ grc_pam_auth }}",
+                "pam_auth_exists": {{ pam_auth.stat.exists | default(false) | to_json }}
+              }
+            dest: "{{ grc_compliance_report_dir }}/ia-2-compliance-{{ ansible_date_time.epoch }}.json"
+            mode: "0644"

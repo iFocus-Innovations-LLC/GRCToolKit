@@ -1,0 +1,85 @@
+---
+# Default GRC validation path map (Linux-oriented; OS files overlay these).
+# Loaded by tasks/load_platform_vars.yml before control probes.
+
+grc_platform_id: generic-linux
+grc_init_system: systemd
+grc_bin_path: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Identity / access
+grc_passwd: /etc/passwd
+grc_shadow: /etc/shadow
+grc_group: /etc/group
+grc_sudoers: /etc/sudoers
+grc_sshd_config: /etc/ssh/sshd_config
+grc_pam_auth: /etc/pam.d/sshd
+grc_pam_system: /etc/pam.d/system-auth
+grc_pam_login: /etc/pam.d/login
+grc_pam_password:
+  - /etc/pam.d/common-password
+  - /etc/pam.d/system-auth
+  - /etc/pam.d/passwd
+grc_login_defs: /etc/login.defs
+grc_pwquality: /etc/security/pwquality.conf
+
+# Audit / logging
+grc_audit_rules: /etc/audit/rules.d/audit.rules
+grc_auditd_conf: /etc/audit/auditd.conf
+grc_audit_log_dir: /var/log/audit
+grc_audit_log: /var/log/audit/audit.log
+grc_rsyslog_conf: /etc/rsyslog.conf
+grc_syslog_conf: /etc/syslog.conf
+grc_asl_conf: /etc/asl.conf
+grc_asl_dir: /etc/asl
+grc_var_log: /var/log
+grc_auth_log: /var/log/auth.log
+grc_secure_log: /var/log/secure
+grc_system_log: /var/log/messages
+
+# Crypto / web TLS
+grc_openssl_cnf: /etc/ssl/openssl.cnf
+grc_nginx_conf: /etc/nginx/nginx.conf
+grc_apache_conf: /etc/apache2/apache2.conf
+grc_httpd_conf: /etc/httpd/conf/httpd.conf
+
+# Firewall / boundary (SC-7)
+grc_iptables_rules: /etc/iptables/rules.v4
+grc_ufw_conf: /etc/ufw
+
+# Sysctl samples (CM-6) — OS overlays replace this list
+grc_sysctl_keys:
+  - net.ipv4.ip_forward
+  - net.ipv4.conf.all.accept_redirects
+  - net.ipv4.conf.all.accept_source_route
+
+# Disk encryption probe mode: cryptsetup | fdesetup | none
+grc_disk_encryption_probe: cryptsetup
+
+# High-risk services for CM-7 (systemd unit names)
+grc_high_risk_services:
+  - telnet
+  - telnet.socket
+  - rsh
+  - rlogin
+  - vsftpd
+  - ftp
+
+# Monitoring binaries (SI-4)
+grc_monitor_bins:
+  - rsyslogd
+  - syslogd
+  - osqueryi
+  - osqueryd
+  - falconctl
+  - auditd
+
+grc_monitor_units:
+  - rsyslog
+  - auditd
+  - osqueryd
+
+# Kubernetes / container (defaults off; k8s_overlay sets true)
+grc_k8s_in_cluster: false
+grc_is_container: false
+grc_k8s_service_account: /var/run/secrets/kubernetes.io/serviceaccount
+grc_k8s_api_host_env: KUBERNETES_SERVICE_HOST

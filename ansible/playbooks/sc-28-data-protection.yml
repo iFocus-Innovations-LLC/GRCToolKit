@@ -1,0 +1,77 @@
+---
+# Ansible Playbook: SC-28 Protection of Information at Rest (read-only audit profile)
+# HITL: evidence collection only — no encryption enablement or disk mutations.
+# Based on NIST 800-53 Rev. 5 Control SC-28
+
+- name: "SC-28: Protection of Information at Rest Validation"
+  hosts: all
+  become: "{{ ansible_connection != 'local' and grc_audit_become | default(false) }}"
+  environment:
+    PATH: "{{ grc_bin_path | default('/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  vars:
+    control_id: "SC-28"
+    control_title: "Protection of Information at Rest"
+    compliance_framework: "NIST 800-53 Rev. 5"
+    grc_audit_mode: read_only
+
+  pre_tasks:
+    - name: Load OS / K8s platform path map
+      ansible.builtin.include_tasks: tasks/load_platform_vars.yml
+
+  tasks:
+    - name: "SC-28.1: Disk encryption posture (platform probe)"
+      block:
+        - name: "Darwin FileVault status"
+          ansible.builtin.command: fdesetup status
+          register: filevault_status
+          changed_when: false
+          failed_when: false
+          when: grc_disk_encryption_probe == 'fdesetup'
+
+        - name: "Linux cryptsetup presence"
+          ansible.builtin.command: which cryptsetup
+          register: cryptsetup_bin
+          changed_when: false
+          failed_when: false
+          when: grc_disk_encryption_probe == 'cryptsetup'
+
+        - name: "Linux lsblk crypto columns"
+          ansible.builtin.shell: "lsblk -o NAME,TYPE,FSTYPE,MOUNTPOINT 2>/dev/null | grep -Ei 'crypt|luks' | head -20 || true"
+          register: luks_lsblk
+          changed_when: false
+          failed_when: false
+          when: grc_disk_encryption_probe == 'cryptsetup'
+
+    - name: "SC-28.2: Sensitive path permissions (read-only)"
+      block:
+        - name: "Stat sensitive data paths"
+          ansible.builtin.stat:
+            path: "{{ item }}"
+          loop: "{{ [grc_shadow, '/var/lib', (ansible_env.HOME | default('/tmp')) + '/.ssh'] | select('string') | reject('equalto', '') | list }}"
+          register: sensitive_paths
+          failed_when: false
+
+    - name: "Generate SC-28 compliance report"
+      block:
+        - name: "Ensure report directory exists"
+          ansible.builtin.file:
+            path: "{{ grc_compliance_report_dir }}"
+            state: directory
+            mode: "0755"
+
+        - name: "Write SC-28 compliance report JSON"
+          ansible.builtin.copy:
+            content: |
+              {
+                "control_id": "SC-28",
+                "hostname": "{{ inventory_hostname }}",
+                "platform_id": "{{ grc_platform_id }}",
+                "disk_encryption_probe": "{{ grc_disk_encryption_probe }}",
+                "validation_timestamp": "{{ ansible_date_time.iso8601 }}",
+                "grc_audit_mode": "{{ grc_audit_mode }}",
+                "filevault_status": "{{ filevault_status.stdout | default('n/a') | replace('\"', '') }}",
+                "cryptsetup_available": "{{ cryptsetup_bin.rc | default('n/a') }}",
+                "luks_lsblk_sample": "{{ luks_lsblk.stdout | default('') | replace('\\n', ' ') | replace('\"', '') }}"
+              }
+            dest: "{{ grc_compliance_report_dir }}/sc-28-compliance-{{ ansible_date_time.epoch }}.json"
+            mode: "0644"

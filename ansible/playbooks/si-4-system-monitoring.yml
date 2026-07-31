@@ -1,0 +1,96 @@
+---
+# Ansible Playbook: SI-4 System Monitoring (read-only audit profile)
+# HITL: evidence collection only — does not install or start agents.
+# Based on NIST 800-53 Rev. 5 Control SI-4
+
+- name: "SI-4: System Monitoring Validation"
+  hosts: all
+  become: "{{ ansible_connection != 'local' and grc_audit_become | default(false) }}"
+  environment:
+    PATH: "{{ grc_bin_path | default('/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  vars:
+    control_id: "SI-4"
+    control_title: "System Monitoring"
+    compliance_framework: "NIST 800-53 Rev. 5"
+    grc_audit_mode: read_only
+
+  pre_tasks:
+    - name: Load OS / K8s platform path map
+      ansible.builtin.include_tasks: tasks/load_platform_vars.yml
+
+  tasks:
+    - name: "SI-4.1: Logging / monitoring agent presence (read-only)"
+      block:
+        - name: "Which monitoring binaries"
+          ansible.builtin.command: "which {{ item }}"
+          loop: "{{ grc_monitor_bins }}"
+          register: monitor_bins
+          changed_when: false
+          failed_when: false
+
+        - name: "systemctl is-active for common monitors"
+          ansible.builtin.command: "systemctl is-active {{ item }}"
+          loop: "{{ grc_monitor_units }}"
+          register: monitor_units
+          changed_when: false
+          failed_when: false
+          when:
+            - grc_init_system == 'systemd'
+            - grc_monitor_units | length > 0
+
+    - name: "SI-4.1b: In-cluster Kubernetes SA evidence"
+      when: grc_k8s_in_cluster | bool
+      block:
+        - name: "Stat Kubernetes service account"
+          ansible.builtin.stat:
+            path: "{{ grc_k8s_service_account }}/token"
+          register: k8s_sa_token
+
+        - name: "SI-4.1b: NOTE - K8s API host"
+          ansible.builtin.debug:
+            msg: "In-cluster validation: KUBERNETES_SERVICE_HOST is set; SA token exists={{ k8s_sa_token.stat.exists | default(false) }}."
+
+    - name: "SI-4.2: Log directory health"
+      block:
+        - name: "Stat var_log"
+          ansible.builtin.stat:
+            path: "{{ grc_var_log }}"
+          register: var_log
+
+        - name: "Count recent log files under var_log (depth 1)"
+          ansible.builtin.shell: "find {{ grc_var_log }} -maxdepth 1 -type f 2>/dev/null | wc -l | tr -d ' '"
+          register: var_log_files
+          changed_when: false
+          failed_when: false
+          when: var_log.stat.exists | default(false)
+
+        - name: "SI-4.2: WARN - var_log missing"
+          ansible.builtin.debug:
+            msg: "{{ grc_var_log }} not found — system monitoring evidence incomplete."
+          when: not (var_log.stat.exists | default(false))
+
+    - name: "Generate SI-4 compliance report"
+      block:
+        - name: "Ensure report directory exists"
+          ansible.builtin.file:
+            path: "{{ grc_compliance_report_dir }}"
+            state: directory
+            mode: "0755"
+
+        - name: "Write SI-4 compliance report JSON"
+          ansible.builtin.copy:
+            content: |
+              {
+                "control_id": "SI-4",
+                "hostname": "{{ inventory_hostname }}",
+                "platform_id": "{{ grc_platform_id }}",
+                "k8s_in_cluster": {{ grc_k8s_in_cluster | to_json }},
+                "validation_timestamp": "{{ ansible_date_time.iso8601 }}",
+                "grc_audit_mode": "{{ grc_audit_mode }}",
+                "var_log": "{{ grc_var_log }}",
+                "var_log_exists": {{ var_log.stat.exists | default(false) | to_json }},
+                "var_log_file_count": "{{ var_log_files.stdout | default('unknown') }}",
+                "note": "Agent presence checks are informational; no agents were installed or started."
+              }
+            dest: "{{ grc_compliance_report_dir }}/si-4-compliance-{{ ansible_date_time.epoch }}.json"
+            mode: "0644"

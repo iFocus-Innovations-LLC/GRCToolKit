@@ -1,0 +1,31 @@
+---
+# Example inventory for native Kubernetes validation (cloud-agnostic).
+# Works the same pattern on GKE, EKS, AKS, or self-managed clusters.
+#
+# Patterns:
+#   1) In-cluster Job/Pod — ansible_connection: local inside the Job;
+#      mount node root at /host for node-level path remapping (see vars/platform/k8s_overlay.yml).
+#   2) Jump host → SSH to node pool instances (use inventory.production.example.yml style).
+#
+# Do NOT trigger remote cluster scans from the browser UI in v1.
+#
+# Usage (from ansible/playbooks inside a Job with hostPath /host):
+#   ansible-playbook -i inventory.k8s.example.yml si-4-system-monitoring.yml
+#
+# Cloud notes:
+#   - GKE: Workload Identity for API reads; DaemonSet/Job with hostPath for node probes
+#   - EKS: IRSA for API reads; same hostPath convention
+#   - AKS: Workload identity / managed identity; same hostPath convention
+
+all:
+  children:
+    k8s_validation:
+      hosts:
+        localhost:
+          ansible_connection: local
+          ansible_python_interpreter: auto_silent
+          # Optional: override host mount root if not /host
+          # grc_k8s_host_root: /host
+      vars:
+        grc_audit_mode: read_only
+        grc_audit_become: false

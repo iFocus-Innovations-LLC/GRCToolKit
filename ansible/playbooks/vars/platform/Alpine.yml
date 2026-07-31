@@ -1,0 +1,20 @@
+---
+# Alpine Linux (ansible_os_family: Alpine) — common in containers
+
+grc_platform_id: alpine
+grc_init_system: openrc
+grc_bin_path: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+grc_pam_system: /etc/pam.d/base-auth
+grc_pam_auth: /etc/pam.d/sshd
+grc_pam_password:
+  - /etc/pam.d/base-password
+grc_login_defs: /etc/login.defs
+grc_auth_log: /var/log/messages
+grc_secure_log: /var/log/messages
+grc_system_log: /var/log/messages
+grc_rsyslog_conf: /etc/rsyslog.conf
+grc_audit_rules: /etc/audit/audit.rules
+grc_high_risk_services:
+  - telnet
+  - vsftpd

@@ -1,0 +1,82 @@
+---
+# Ansible Playbook: AU-3 Content of Audit Records (read-only audit profile)
+# HITL: evidence collection only — no audit rule mutations.
+# Based on NIST 800-53 Rev. 5 Control AU-3
+
+- name: "AU-3: Content of Audit Records Validation"
+  hosts: all
+  become: "{{ ansible_connection != 'local' and grc_audit_become | default(false) }}"
+  environment:
+    PATH: "{{ grc_bin_path | default('/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  vars:
+    control_id: "AU-3"
+    control_title: "Content of Audit Records"
+    compliance_framework: "NIST 800-53 Rev. 5"
+    grc_audit_mode: read_only
+
+  pre_tasks:
+    - name: Load OS / K8s platform path map
+      ansible.builtin.include_tasks: tasks/load_platform_vars.yml
+
+  tasks:
+    - name: "AU-3.1: Locate audit / syslog configuration"
+      block:
+        - name: "Stat audit rules"
+          ansible.builtin.stat:
+            path: "{{ grc_audit_rules }}"
+          register: audit_rules
+          when: grc_audit_rules | length > 0
+
+        - name: "Stat syslog / rsyslog / asl configs"
+          ansible.builtin.stat:
+            path: "{{ item }}"
+          loop: "{{ [grc_rsyslog_conf, grc_syslog_conf, grc_asl_conf, grc_asl_dir] | select('string') | reject('equalto', '') | list }}"
+          register: syslog_cfgs
+          failed_when: false
+
+    - name: "AU-3.2: Sample audit rule content categories"
+      when:
+        - grc_audit_rules | length > 0
+        - audit_rules.stat.exists | default(false)
+      block:
+        - name: "Count non-comment audit rules"
+          ansible.builtin.shell: "grep -cE '^[^#]' {{ grc_audit_rules }} 2>/dev/null || echo 0"
+          register: audit_rule_count
+          changed_when: false
+          failed_when: false
+
+        - name: "Probe identity/auth related rule keywords"
+          ansible.builtin.shell: "grep -Eic 'identity|auth|logon|session|user' {{ grc_audit_rules }} 2>/dev/null || echo 0"
+          register: audit_content_hits
+          changed_when: false
+          failed_when: false
+
+    - name: "AU-3.2: NOTE - no audit.rules on this platform"
+      ansible.builtin.debug:
+        msg: "No grc_audit_rules path for platform {{ grc_platform_id }}; using syslog/ASL evidence only."
+      when: grc_audit_rules | length == 0
+
+    - name: "Generate AU-3 compliance report"
+      block:
+        - name: "Ensure report directory exists"
+          ansible.builtin.file:
+            path: "{{ grc_compliance_report_dir }}"
+            state: directory
+            mode: "0755"
+
+        - name: "Write AU-3 compliance report JSON"
+          ansible.builtin.copy:
+            content: |
+              {
+                "control_id": "AU-3",
+                "hostname": "{{ inventory_hostname }}",
+                "platform_id": "{{ grc_platform_id }}",
+                "validation_timestamp": "{{ ansible_date_time.iso8601 }}",
+                "grc_audit_mode": "{{ grc_audit_mode }}",
+                "audit_rules_path": "{{ grc_audit_rules }}",
+                "audit_rules_exists": {{ audit_rules.stat.exists | default(false) | to_json }},
+                "audit_rule_count": "{{ audit_rule_count.stdout | default('n/a') }}",
+                "auth_related_rule_hits": "{{ audit_content_hits.stdout | default('n/a') }}"
+              }
+            dest: "{{ grc_compliance_report_dir }}/au-3-compliance-{{ ansible_date_time.epoch }}.json"
+            mode: "0644"

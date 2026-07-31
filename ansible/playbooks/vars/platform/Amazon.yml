@@ -1,0 +1,13 @@
+---
+# Amazon Linux — RedHat family paths
+grc_platform_id: amazon
+grc_pam_system: /etc/pam.d/system-auth
+grc_pam_auth: /etc/pam.d/sshd
+grc_pam_password:
+  - /etc/pam.d/system-auth
+  - /etc/pam.d/password-auth
+grc_auth_log: /var/log/secure
+grc_secure_log: /var/log/secure
+grc_system_log: /var/log/messages
+grc_apache_conf: /etc/httpd/conf/httpd.conf
+grc_iptables_rules: /etc/sysconfig/iptables

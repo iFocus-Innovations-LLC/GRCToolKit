@@ -1,0 +1,97 @@
+---
+# Ansible Playbook: SC-8 Transmission Confidentiality and Integrity (read-only)
+# HITL: evidence collection only — no TLS/sshd cipher mutations.
+# Based on NIST 800-53 Rev. 5 Control SC-8
+
+- name: "SC-8: Transmission Confidentiality Validation"
+  hosts: all
+  become: "{{ ansible_connection != 'local' and grc_audit_become | default(false) }}"
+  environment:
+    PATH: "{{ grc_bin_path | default('/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  vars:
+    control_id: "SC-8"
+    control_title: "Transmission Confidentiality and Integrity"
+    compliance_framework: "NIST 800-53 Rev. 5"
+    grc_audit_mode: read_only
+
+  pre_tasks:
+    - name: Load OS / K8s platform path map
+      ansible.builtin.include_tasks: tasks/load_platform_vars.yml
+
+  tasks:
+    - name: "SC-8.1: sshd crypto posture (read-only)"
+      block:
+        - name: "Stat sshd_config"
+          ansible.builtin.stat:
+            path: "{{ grc_sshd_config }}"
+          register: sshd_config
+
+        - name: "Probe Ciphers line"
+          ansible.builtin.shell: "grep -E '^[[:space:]]*Ciphers[[:space:]]+' {{ grc_sshd_config }} | tail -1"
+          register: ssh_ciphers
+          changed_when: false
+          failed_when: false
+          when: sshd_config.stat.exists
+
+        - name: "Probe MACs line"
+          ansible.builtin.shell: "grep -E '^[[:space:]]*MACs[[:space:]]+' {{ grc_sshd_config }} | tail -1"
+          register: ssh_macs
+          changed_when: false
+          failed_when: false
+          when: sshd_config.stat.exists
+
+        - name: "Probe KexAlgorithms line"
+          ansible.builtin.shell: "grep -E '^[[:space:]]*KexAlgorithms[[:space:]]+' {{ grc_sshd_config }} | tail -1"
+          register: ssh_kex
+          changed_when: false
+          failed_when: false
+          when: sshd_config.stat.exists
+
+    - name: "SC-8.2: TLS stack presence (read-only)"
+      block:
+        - name: "Check openssl availability"
+          ansible.builtin.command: which openssl
+          register: openssl_bin
+          changed_when: false
+          failed_when: false
+
+        - name: "OpenSSL version"
+          ansible.builtin.command: openssl version
+          register: openssl_version
+          changed_when: false
+          failed_when: false
+          when: openssl_bin.rc == 0
+
+        - name: "Stat common TLS server configs"
+          ansible.builtin.stat:
+            path: "{{ item }}"
+          loop: "{{ [grc_nginx_conf, grc_apache_conf, grc_httpd_conf, grc_openssl_cnf] | select('string') | reject('equalto', '') | list | unique }}"
+          register: tls_cfgs
+          failed_when: false
+
+    - name: "Generate SC-8 compliance report"
+      block:
+        - name: "Ensure report directory exists"
+          ansible.builtin.file:
+            path: "{{ grc_compliance_report_dir }}"
+            state: directory
+            mode: "0755"
+
+        - name: "Write SC-8 compliance report JSON"
+          ansible.builtin.copy:
+            content: |
+              {
+                "control_id": "SC-8",
+                "hostname": "{{ inventory_hostname }}",
+                "platform_id": "{{ grc_platform_id }}",
+                "validation_timestamp": "{{ ansible_date_time.iso8601 }}",
+                "grc_audit_mode": "{{ grc_audit_mode }}",
+                "sshd_config": "{{ grc_sshd_config }}",
+                "sshd_config_exists": {{ sshd_config.stat.exists | default(false) | to_json }},
+                "Ciphers": "{{ ssh_ciphers.stdout | default('unset') | replace('\"', '') }}",
+                "MACs": "{{ ssh_macs.stdout | default('unset') | replace('\"', '') }}",
+                "KexAlgorithms": "{{ ssh_kex.stdout | default('unset') | replace('\"', '') }}",
+                "openssl_version": "{{ openssl_version.stdout | default('unavailable') }}"
+              }
+            dest: "{{ grc_compliance_report_dir }}/sc-8-compliance-{{ ansible_date_time.epoch }}.json"
+            mode: "0644"

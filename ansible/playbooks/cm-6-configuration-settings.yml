@@ -1,0 +1,80 @@
+---
+# Ansible Playbook: CM-6 Configuration Settings (read-only audit profile)
+# HITL: evidence collection only — reports actual settings; never applies hardening.
+# Based on NIST 800-53 Rev. 5 Control CM-6
+
+- name: "CM-6: Configuration Settings Validation"
+  hosts: all
+  become: "{{ ansible_connection != 'local' and grc_audit_become | default(false) }}"
+  environment:
+    PATH: "{{ grc_bin_path | default('/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  vars:
+    control_id: "CM-6"
+    control_title: "Configuration Settings"
+    compliance_framework: "NIST 800-53 Rev. 5"
+    grc_audit_mode: read_only
+
+  pre_tasks:
+    - name: Load OS / K8s platform path map
+      ansible.builtin.include_tasks: tasks/load_platform_vars.yml
+
+  tasks:
+    - name: "CM-6.1: Sample sysctl hardening keys (read-only)"
+      block:
+        - name: "Read selected sysctl values"
+          ansible.builtin.shell: "sysctl -n {{ item }} 2>/dev/null || echo unset"
+          loop: "{{ grc_sysctl_keys }}"
+          register: sysctl_samples
+          changed_when: false
+          failed_when: false
+
+    - name: "CM-6.2: sshd Protocol / MaxAuthTries (read-only)"
+      block:
+        - name: "Stat sshd_config"
+          ansible.builtin.stat:
+            path: "{{ grc_sshd_config }}"
+          register: sshd_config
+
+        - name: "Probe MaxAuthTries"
+          ansible.builtin.shell: "grep -E '^[[:space:]]*MaxAuthTries[[:space:]]+' {{ grc_sshd_config }} | awk '{print $2}' | tail -1"
+          register: max_auth_tries
+          changed_when: false
+          failed_when: false
+          when: sshd_config.stat.exists
+
+        - name: "Probe Protocol"
+          ansible.builtin.shell: "grep -E '^[[:space:]]*Protocol[[:space:]]+' {{ grc_sshd_config }} | awk '{print $2}' | tail -1"
+          register: ssh_protocol
+          changed_when: false
+          failed_when: false
+          when: sshd_config.stat.exists
+
+    - name: "CM-6.3: Report note"
+      ansible.builtin.debug:
+        msg: "CM-6 reports observed settings only (platform={{ grc_platform_id }}); remediation requires HITL change window."
+
+    - name: "Generate CM-6 compliance report"
+      block:
+        - name: "Ensure report directory exists"
+          ansible.builtin.file:
+            path: "{{ grc_compliance_report_dir }}"
+            state: directory
+            mode: "0755"
+
+        - name: "Write CM-6 compliance report JSON"
+          ansible.builtin.copy:
+            content: |
+              {
+                "control_id": "CM-6",
+                "hostname": "{{ inventory_hostname }}",
+                "platform_id": "{{ grc_platform_id }}",
+                "validation_timestamp": "{{ ansible_date_time.iso8601 }}",
+                "grc_audit_mode": "{{ grc_audit_mode }}",
+                "sshd_config": "{{ grc_sshd_config }}",
+                "MaxAuthTries": "{{ max_auth_tries.stdout | default('unset') }}",
+                "Protocol": "{{ ssh_protocol.stdout | default('unset') }}",
+                "sysctl_keys": {{ grc_sysctl_keys | to_json }},
+                "sysctl_samples": {{ sysctl_samples.results | default([]) | map(attribute='stdout') | list | to_json }}
+              }
+            dest: "{{ grc_compliance_report_dir }}/cm-6-compliance-{{ ansible_date_time.epoch }}.json"
+            mode: "0644"

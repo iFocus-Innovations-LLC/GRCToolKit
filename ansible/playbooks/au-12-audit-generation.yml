@@ -1,0 +1,77 @@
+---
+# Ansible Playbook: AU-12 Audit Generation (read-only audit profile)
+# HITL: evidence collection only — does not start auditd or alter loggers.
+# Based on NIST 800-53 Rev. 5 Control AU-12
+
+- name: "AU-12: Audit Generation Validation"
+  hosts: all
+  become: "{{ ansible_connection != 'local' and grc_audit_become | default(false) }}"
+  environment:
+    PATH: "{{ grc_bin_path | default('/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  vars:
+    control_id: "AU-12"
+    control_title: "Audit Generation"
+    compliance_framework: "NIST 800-53 Rev. 5"
+    grc_audit_mode: read_only
+
+  pre_tasks:
+    - name: Load OS / K8s platform path map
+      ansible.builtin.include_tasks: tasks/load_platform_vars.yml
+
+  tasks:
+    - name: "AU-12.1: Check audit generation services (systemd platforms)"
+      when: grc_init_system == 'systemd'
+      block:
+        - name: "Check auditd active"
+          ansible.builtin.command: systemctl is-active auditd
+          register: auditd_active
+          changed_when: false
+          failed_when: false
+
+        - name: "Check rsyslog / syslog-ng active"
+          ansible.builtin.command: "systemctl is-active {{ item }}"
+          loop:
+            - rsyslog
+            - syslog-ng
+          register: syslog_units
+          changed_when: false
+          failed_when: false
+
+    - name: "AU-12.1: NOTE - non-systemd init"
+      ansible.builtin.debug:
+        msg: "Init system is {{ grc_init_system }} (platform={{ grc_platform_id }}); systemd unit probes skipped."
+      when: grc_init_system != 'systemd'
+
+    - name: "AU-12.2: Key log path presence"
+      block:
+        - name: "Stat key log paths"
+          ansible.builtin.stat:
+            path: "{{ item }}"
+          loop: "{{ [grc_audit_log_dir, grc_auth_log, grc_secure_log, grc_system_log, grc_var_log] | select('string') | reject('equalto', '') | list | unique }}"
+          register: log_paths
+          failed_when: false
+
+    - name: "Generate AU-12 compliance report"
+      block:
+        - name: "Ensure report directory exists"
+          ansible.builtin.file:
+            path: "{{ grc_compliance_report_dir }}"
+            state: directory
+            mode: "0755"
+
+        - name: "Write AU-12 compliance report JSON"
+          ansible.builtin.copy:
+            content: |
+              {
+                "control_id": "AU-12",
+                "hostname": "{{ inventory_hostname }}",
+                "platform_id": "{{ grc_platform_id }}",
+                "init_system": "{{ grc_init_system }}",
+                "validation_timestamp": "{{ ansible_date_time.iso8601 }}",
+                "grc_audit_mode": "{{ grc_audit_mode }}",
+                "auditd_active": "{{ auditd_active.stdout | default('n/a') }}",
+                "auth_log": "{{ grc_auth_log }}",
+                "secure_log": "{{ grc_secure_log }}"
+              }
+            dest: "{{ grc_compliance_report_dir }}/au-12-compliance-{{ ansible_date_time.epoch }}.json"
+            mode: "0644"
