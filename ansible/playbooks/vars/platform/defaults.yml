@@ -45,6 +45,10 @@ grc_httpd_conf: /etc/httpd/conf/httpd.conf
 # Firewall / boundary (SC-7)
 grc_iptables_rules: /etc/iptables/rules.v4
 grc_ufw_conf: /etc/ufw
+# Interface listing: Linux uses iproute2; Darwin uses ifconfig (see Darwin.yml)
+grc_net_iface_list_cmd: "ip link show"
+grc_net_loopback_cmd: "ip link show lo"
+grc_firewall_probe_mode: linux_netfilter  # linux_netfilter | darwin_pf
 
 # Sysctl samples (CM-6) — OS overlays replace this list
 grc_sysctl_keys:

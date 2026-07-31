@@ -19,69 +19,114 @@
       ansible.builtin.include_tasks: tasks/load_platform_vars.yml
 
   tasks:
-    - name: "SC-7.1: Verify firewall services (read-only)"
+    - name: "SC-7.1: Verify firewall services — Linux netfilter (read-only)"
+      when: grc_firewall_probe_mode | default('linux_netfilter') == 'linux_netfilter'
       block:
         - name: "Check iptables service status"
-          command: systemctl is-active iptables
+          ansible.builtin.command: systemctl is-active iptables
           register: iptables_active
           changed_when: false
           failed_when: false
+          when: grc_init_system == 'systemd'
 
         - name: "Check UFW service status"
-          command: systemctl is-active ufw
+          ansible.builtin.command: systemctl is-active ufw
           register: ufw_active
           changed_when: false
           failed_when: false
+          when: grc_init_system == 'systemd'
 
         - name: "SC-7.1: WARN - No active firewall service"
-          debug:
+          ansible.builtin.debug:
             msg: "Neither iptables nor ufw appears active - review boundary protection"
-          when: iptables_active.rc != 0 and ufw_active.rc != 0
+          when:
+            - iptables_active.rc is defined
+            - ufw_active.rc is defined
+            - iptables_active.rc != 0
+            - ufw_active.rc != 0
 
-    - name: "SC-7.2: Verify firewall rules (read-only)"
+    - name: "SC-7.1: Verify firewall services — Darwin pf (read-only)"
+      when: grc_firewall_probe_mode | default('linux_netfilter') == 'darwin_pf'
+      block:
+        - name: "pfctl enabled check (read-only)"
+          ansible.builtin.command: pfctl -s info
+          register: pf_info
+          changed_when: false
+          failed_when: false
+
+        - name: "Application firewall state (socketfilterfw)"
+          ansible.builtin.command: /usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate
+          register: app_fw_state
+          changed_when: false
+          failed_when: false
+
+        - name: "SC-7.1: NOTE - Darwin firewall evidence"
+          ansible.builtin.debug:
+            msg: >-
+              Platform {{ grc_platform_id }}: pfctl rc={{ pf_info.rc | default('n/a') }},
+              app_fw={{ app_fw_state.stdout | default('unavailable') }}
+
+    - name: "SC-7.2: Verify firewall rules — Linux (read-only)"
+      when: grc_firewall_probe_mode | default('linux_netfilter') == 'linux_netfilter'
       block:
         - name: "List iptables chains"
-          command: iptables -L
+          ansible.builtin.command: iptables -L
           register: iptables_list
           changed_when: false
           failed_when: false
 
         - name: "Check UFW status"
-          command: ufw status
+          ansible.builtin.command: ufw status
           register: ufw_status
+          changed_when: false
+          failed_when: false
+
+    - name: "SC-7.2: Verify firewall rules — Darwin pf (read-only)"
+      when: grc_firewall_probe_mode | default('linux_netfilter') == 'darwin_pf'
+      block:
+        - name: "List pf rules (read-only)"
+          ansible.builtin.command: pfctl -sr
+          register: pf_rules
           changed_when: false
           failed_when: false
 
     - name: "SC-7.3: Verify network interfaces (read-only)"
       block:
         - name: "List network interfaces"
-          command: ip link show
+          ansible.builtin.command: "{{ grc_net_iface_list_cmd }}"
           register: network_interfaces
           changed_when: false
+          failed_when: false
 
-        - name: "Check loopback is up"
-          command: ip link show lo
+        - name: "Check loopback is present"
+          ansible.builtin.command: "{{ grc_net_loopback_cmd }}"
           register: loopback_status
           changed_when: false
           failed_when: false
+
+        - name: "SC-7.3: WARN - interface listing failed"
+          ansible.builtin.debug:
+            msg: "Interface list command failed ({{ grc_net_iface_list_cmd }}) — review PATH/platform map."
+          when: network_interfaces.rc | default(1) != 0
 
     - name: "SC-7.4: Verify network security config files (read-only)"
       block:
         - name: "Stat network configuration files"
           ansible.builtin.stat:
             path: "{{ item }}"
-          loop: "{{ [grc_iptables_rules, grc_ufw_conf, '/etc/sysctl.conf'] | select('string') | reject('equalto', '') | list }}"
+          loop: "{{ [grc_iptables_rules, grc_ufw_conf, '/etc/sysctl.conf', '/etc/pf.conf'] | select('string') | reject('equalto', '') | list }}"
           register: network_config_files
           failed_when: false
 
     - name: "SC-7.5: Verify network monitoring tools (read-only)"
       block:
         - name: "Check tool availability"
-          command: "which {{ item }}"
+          ansible.builtin.command: "which {{ item }}"
           loop:
             - tcpdump
             - ss
             - nmap
+            - ifconfig
           register: network_tools
           changed_when: false
           failed_when: false
@@ -89,21 +134,26 @@
     - name: "Generate SC-7 compliance report"
       block:
         - name: "Ensure report directory exists"
-          file:
+          ansible.builtin.file:
             path: "{{ grc_compliance_report_dir }}"
             state: directory
             mode: "0755"
 
         - name: "Write SC-7 compliance report JSON"
-          copy:
+          ansible.builtin.copy:
             content: |
               {
                 "control_id": "SC-7",
                 "hostname": "{{ inventory_hostname }}",
+                "platform_id": "{{ grc_platform_id }}",
+                "firewall_probe_mode": "{{ grc_firewall_probe_mode | default('linux_netfilter') }}",
+                "net_iface_cmd": "{{ grc_net_iface_list_cmd }}",
                 "validation_timestamp": "{{ ansible_date_time.iso8601 }}",
                 "grc_audit_mode": "{{ grc_audit_mode }}",
-                "iptables_active": "{{ iptables_active.stdout | default('unknown') }}",
-                "ufw_active": "{{ ufw_active.stdout | default('unknown') }}"
+                "iptables_active": "{{ iptables_active.stdout | default('n/a') }}",
+                "ufw_active": "{{ ufw_active.stdout | default('n/a') }}",
+                "iface_list_rc": "{{ network_interfaces.rc | default('unknown') }}",
+                "loopback_rc": "{{ loopback_status.rc | default('unknown') }}"
               }
             dest: "{{ grc_compliance_report_dir }}/sc-7-compliance-{{ ansible_date_time.epoch }}.json"
             mode: "0644"

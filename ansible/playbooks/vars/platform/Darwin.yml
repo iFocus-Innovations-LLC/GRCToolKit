@@ -31,6 +31,13 @@ grc_sysctl_keys:
 
 grc_disk_encryption_probe: fdesetup
 
+# SC-7: macOS has no `ip`; use ifconfig / pfctl (read-only)
+grc_net_iface_list_cmd: "ifconfig -a"
+grc_net_loopback_cmd: "ifconfig lo0"
+grc_firewall_probe_mode: darwin_pf
+grc_iptables_rules: ""
+grc_ufw_conf: ""
+
 grc_high_risk_services: []
 
 grc_monitor_bins:
