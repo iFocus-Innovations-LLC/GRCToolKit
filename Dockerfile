@@ -15,6 +15,7 @@ RUN chown nginx:nginx /docker-entrypoint.sh && chmod 550 /docker-entrypoint.sh
 COPY ai-agent ./ai-agent/
 COPY compliance-docs ./compliance-docs/
 COPY oscal ./oscal/
+COPY assets ./assets/
 
 # Ensure nginx user can read files and write pid/cache
 RUN chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/log/nginx /tmp
