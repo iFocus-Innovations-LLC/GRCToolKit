@@ -1,57 +1,134 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GRC Toolkit AI Agent</title>
-    <!-- Tailwind CSS CDN -->
+    <title>grctoolkit.ai</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            bg: '#0a0a0f',
+                            surface: '#12121a',
+                            surface2: '#1a1a24',
+                            border: '#2a2a3a',
+                            text: '#ffffff',
+                            muted: '#e8e8ef',
+                            dim: '#9a9aab',
+                            accent: '#00E5FF',
+                            accentHover: '#33ebff',
+                            shield: '#3b5bdb',
+                            k8s: '#2dd4bf',
+                            ansible: '#f97316',
+                            lock: '#fbbf24',
+                            doc: '#7dd3fc',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
+                        mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
+                    },
+                    boxShadow: {
+                        accent: '0 0 0 1px rgba(0, 229, 255, 0.35)',
+                    }
+                }
+            }
+        };
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg: #0a0a0f;
+            --surface: #12121a;
+            --surface-2: #1a1a24;
+            --border: #2a2a3a;
+            --text: #ffffff;
+            --muted: #e8e8ef;
+            --accent: #00E5FF;
+        }
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6; /* Light gray background */
+            font-family: 'IBM Plex Sans', system-ui, sans-serif;
+            background-color: var(--bg);
+            background-image:
+                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 91, 219, 0.18), transparent),
+                radial-gradient(ellipse 60% 40% at 100% 0%, rgba(0, 229, 255, 0.06), transparent);
+            color: var(--muted);
         }
         .container {
-            max-width: 800px;
+            max-width: 880px;
         }
         .loading-spinner {
-            border: 4px solid rgba(0, 0, 0, 0.1);
-            border-left-color: #3b82f6; /* Blue */
+            border: 4px solid rgba(255, 255, 255, 0.12);
+            border-left-color: var(--accent);
             border-radius: 50%;
             width: 24px;
             height: 24px;
             animation: spin 1s linear infinite;
-            display: none; /* Hidden by default */
+            display: none;
         }
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        textarea, select, input {
+            background-color: var(--surface-2);
+            color: var(--text);
+            border-color: var(--border);
+        }
+        textarea::placeholder {
+            color: #6b6b7b;
+        }
+        select option {
+            background-color: var(--surface);
+            color: var(--text);
+        }
+        :focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+        .brand-ai {
+            color: var(--accent);
+        }
     </style>
 </head>
-<body class="flex items-center justify-center min-h-screen p-4">
-    <div class="container bg-white shadow-lg rounded-xl p-8 space-y-6 border border-gray-200">
-        <h1 class="text-4xl font-bold text-center text-gray-800 mb-6">GRC Toolkit AI Agent</h1>
-        <p class="text-center text-gray-600 mb-8">
-            Enter a scenario or question related to GRC, and the AI agent will suggest relevant NIST SP 800-53 Rev. 5 Security and Privacy Controls for Information Systems and Organizations.
-        </p>
+<body class="flex items-center justify-center min-h-screen p-4 sm:p-6">
+    <div class="container bg-brand-surface shadow-accent rounded-xl p-6 sm:p-8 space-y-6 border border-brand-border">
+        <header class="text-center space-y-3">
+            <img
+                src="/assets/brand/grctoolkit-logo-v3.png"
+                alt="grctoolkit.ai — Human-in-the-Loop GRC"
+                width="160"
+                height="160"
+                class="mx-auto w-36 h-36 sm:w-40 sm:h-40 object-contain"
+            />
+            <h1 class="text-3xl sm:text-4xl font-bold tracking-tight text-brand-text">
+                grctoolkit<span class="brand-ai">.ai</span>
+            </h1>
+            <p class="text-sm text-brand-dim tracking-wide">Powered by AI · Secured by Design</p>
+            <p class="text-brand-muted max-w-xl mx-auto text-sm sm:text-base leading-relaxed">
+                Enter a GRC scenario — the agent maps NIST SP 800-53 Rev. 5 controls with Human-in-the-Loop guardrails.
+            </p>
+        </header>
 
         <div class="space-y-4">
-            <label for="scenarioInput" class="block text-lg font-medium text-gray-700">
+            <label for="scenarioInput" class="block text-base font-medium text-brand-muted">
                 Describe your GRC scenario or question:
             </label>
             <textarea
                 id="scenarioInput"
                 rows="5"
-                class="w-full p-4 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm transition duration-150 ease-in-out resize-y"
+                class="w-full p-4 border border-brand-border rounded-lg bg-brand-surface2 text-brand-text focus:ring-1 focus:ring-brand-accent focus:border-brand-accent shadow-sm transition duration-150 ease-in-out resize-y"
                 placeholder="e.g., 'What controls are needed for securing patient health information in a cloud database?' or 'How do I manage access to critical systems?'"
             ></textarea>
 
             <div class="flex gap-3">
                 <button
                     id="analyzeButton"
-                    class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out flex items-center justify-center space-x-2"
+                    class="flex-1 bg-brand-accent hover:bg-brand-accentHover text-brand-bg font-semibold py-3 px-6 rounded-lg transition duration-300 ease-in-out flex items-center justify-center space-x-2 focus-visible:ring-2 focus-visible:ring-brand-accent"
                 >
                     <span id="buttonText">Analyze Scenario</span>
                     <div id="loadingSpinner" class="loading-spinner"></div>
@@ -59,7 +136,7 @@
                 <button
                     id="clearScenarioBtn"
                     type="button"
-                    class="px-6 py-3 bg-white hover:bg-gray-50 text-gray-700 font-semibold rounded-lg border border-gray-300 shadow-sm transition duration-300 ease-in-out"
+                    class="px-6 py-3 bg-brand-surface2 hover:bg-brand-border text-brand-muted font-semibold rounded-lg border border-brand-border transition duration-300 ease-in-out"
                     title="Clear scenario and results"
                 >
                     Clear
@@ -67,17 +144,17 @@
             </div>
         </div>
 
-        <div id="responseArea" class="mt-8 p-6 bg-gray-50 rounded-lg border border-gray-200 shadow-inner min-h-[150px] text-gray-700">
-            <p id="initialMessage" class="text-center text-gray-500">Your AI-generated NIST control recommendations will appear here.</p>
-            <div id="errorMessage" class="text-red-600 text-center hidden"></div>
+        <div id="responseArea" class="mt-2 p-5 sm:p-6 bg-brand-surface2 rounded-lg border border-brand-border min-h-[150px] text-brand-muted">
+            <p id="initialMessage" class="text-center text-brand-dim">Your AI-generated NIST control recommendations will appear here.</p>
+            <div id="errorMessage" class="text-red-400 text-center hidden"></div>
             
             <!-- Filter and Sort Controls -->
-            <div id="filterControls" class="hidden mb-6 p-4 bg-white rounded-lg border border-gray-200">
-                <div class="flex flex-wrap gap-4 items-center justify-between mb-4 pb-4 border-b border-gray-100">
+            <div id="filterControls" class="hidden mb-6 p-4 bg-brand-surface rounded-lg border border-brand-border">
+                <div class="flex flex-wrap gap-4 items-center justify-between mb-4 pb-4 border-b border-brand-border">
                     <div class="flex flex-wrap gap-4 items-center">
                         <div>
-                            <label for="priorityFilter" class="block text-sm font-medium text-gray-700 mb-1">Filter by Priority:</label>
-                            <select id="priorityFilter" class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <label for="priorityFilter" class="block text-sm font-medium text-brand-dim mb-1">Filter by Priority:</label>
+                            <select id="priorityFilter" class="px-3 py-2 border border-brand-border rounded-md text-sm bg-brand-surface2 text-brand-text focus:ring-brand-accent focus:border-brand-accent">
                                 <option value="all">All Priorities</option>
                                 <option value="High">High Priority</option>
                                 <option value="Medium">Medium Priority</option>
@@ -85,14 +162,14 @@
                             </select>
                         </div>
                         <div>
-                            <label for="categoryFilter" class="block text-sm font-medium text-gray-700 mb-1">Filter by Category:</label>
-                            <select id="categoryFilter" class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <label for="categoryFilter" class="block text-sm font-medium text-brand-dim mb-1">Filter by Category:</label>
+                            <select id="categoryFilter" class="px-3 py-2 border border-brand-border rounded-md text-sm bg-brand-surface2 text-brand-text focus:ring-brand-accent focus:border-brand-accent">
                                 <option value="all">All Categories</option>
                             </select>
                         </div>
                         <div>
-                            <label for="sortBy" class="block text-sm font-medium text-gray-700 mb-1">Sort by:</label>
-                            <select id="sortBy" class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <label for="sortBy" class="block text-sm font-medium text-brand-dim mb-1">Sort by:</label>
+                            <select id="sortBy" class="px-3 py-2 border border-brand-border rounded-md text-sm bg-brand-surface2 text-brand-text focus:ring-brand-accent focus:border-brand-accent">
                                 <option value="priority">Priority</option>
                                 <option value="id">Control ID</option>
                                 <option value="title">Title</option>
@@ -100,17 +177,17 @@
                             </select>
                         </div>
                     </div>
-                    <div class="flex gap-2">
-                        <button id="exportBtn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
+                    <div class="flex flex-wrap gap-2">
+                        <button id="exportBtn" class="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
                             Export Results
                         </button>
-                        <button id="validateControlsBtn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
+                        <button id="validateControlsBtn" class="px-4 py-2 bg-brand-shield hover:brightness-110 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
                             Validate Controls
                         </button>
-                        <button id="generateAuditReportBtn" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
+                        <button id="generateAuditReportBtn" class="px-4 py-2 border border-brand-accent text-brand-accent hover:bg-brand-accent/10 text-sm font-medium rounded-md transition duration-150 ease-in-out">
                             Generate Audit Report
                         </button>
-                        <button id="clearFiltersBtn" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
+                        <button id="clearFiltersBtn" class="px-4 py-2 bg-brand-surface2 hover:bg-brand-border text-brand-muted text-sm font-medium rounded-md border border-brand-border transition duration-150 ease-in-out">
                             Clear Filters
                         </button>
                     </div>
@@ -118,29 +195,29 @@
 
                 <!-- HITL Sentinel Dashboard -->
                 <div id="hitlSentinel" class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-2">
-                    <div class="p-3 bg-blue-50 rounded-lg border border-blue-100">
-                        <p class="text-xs font-semibold text-blue-600 uppercase tracking-wider">Sentinel Status</p>
+                    <div class="p-3 bg-brand-surface2 rounded-lg border border-brand-border">
+                        <p class="text-xs font-semibold text-brand-accent uppercase tracking-wider">Sentinel Status</p>
                         <div class="flex items-center mt-1">
-                            <span class="h-2 w-2 rounded-full bg-green-500 mr-2"></span>
-                            <span class="text-sm font-bold text-blue-900">Active / Monitoring</span>
+                            <span class="h-2 w-2 rounded-full bg-emerald-400 mr-2"></span>
+                            <span class="text-sm font-bold text-brand-text">Active / Monitoring</span>
                         </div>
                     </div>
-                    <div class="p-3 bg-indigo-50 rounded-lg border border-indigo-100">
-                        <p class="text-xs font-semibold text-indigo-600 uppercase tracking-wider">Avg. Confidence</p>
+                    <div class="p-3 bg-brand-surface2 rounded-lg border border-brand-border">
+                        <p class="text-xs font-semibold text-brand-doc uppercase tracking-wider">Avg. Confidence</p>
                         <div class="flex items-center mt-1">
-                            <span id="avgConfidence" class="text-sm font-bold text-indigo-900">--%</span>
+                            <span id="avgConfidence" class="text-sm font-bold text-brand-text">--%</span>
                         </div>
                     </div>
-                    <div class="p-3 bg-orange-50 rounded-lg border border-orange-100">
-                        <p class="text-xs font-semibold text-orange-600 uppercase tracking-wider">Review Required</p>
+                    <div class="p-3 bg-brand-surface2 rounded-lg border border-brand-border">
+                        <p class="text-xs font-semibold text-brand-ansible uppercase tracking-wider">Review Required</p>
                         <div class="flex items-center mt-1">
-                            <span id="reviewCount" class="text-sm font-bold text-orange-900">0 Controls</span>
+                            <span id="reviewCount" class="text-sm font-bold text-brand-text">0 Controls</span>
                         </div>
                     </div>
-                    <div class="p-3 bg-purple-50 rounded-lg border border-purple-100">
-                        <p class="text-xs font-semibold text-purple-600 uppercase tracking-wider">Policy Anchor</p>
+                    <div class="p-3 bg-brand-surface2 rounded-lg border border-brand-border">
+                        <p class="text-xs font-semibold text-brand-lock uppercase tracking-wider">Policy Anchor</p>
                         <div class="flex items-center mt-1">
-                            <span class="text-sm font-bold text-purple-900">NIST SP 800-53 R5</span>
+                            <span class="text-sm font-bold text-brand-text">NIST SP 800-53 R5</span>
                         </div>
                     </div>
                 </div>
@@ -421,10 +498,10 @@
                         initialMessage.classList.add('hidden');
                         errorMessage.classList.add('hidden');
                         aiResponse.classList.remove('hidden');
-                        aiResponse.innerHTML = `<div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg mb-4">
-                            <p class="text-yellow-800 text-sm"><strong>Note:</strong> Response received in plain text format. For better formatting, the AI should return structured JSON.</p>
+                        aiResponse.innerHTML = `<div class="bg-brand-surface border-l-4 border-brand-lock p-4 rounded-r-lg mb-4">
+                            <p class="text-brand-lock text-sm"><strong>Note:</strong> Response received in plain text format. For better formatting, the AI should return structured JSON.</p>
                         </div>
-                        <pre class="whitespace-pre-wrap font-mono text-sm leading-relaxed bg-white p-4 rounded border">${text}</pre>`;
+                        <pre class="whitespace-pre-wrap font-mono text-sm leading-relaxed bg-brand-bg p-4 rounded border border-brand-border text-brand-muted">${text}</pre>`;
                     }
                 } else {
                     displayMessage('No relevant controls found or an unexpected response structure. Please try a different query.', 'error');
@@ -465,9 +542,9 @@
             // Summary section
             if (data.summary) {
                 html += `
-                    <div class="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400 rounded-r-lg">
-                        <h3 class="text-lg font-semibold text-blue-800 mb-2">Summary</h3>
-                        <p class="text-blue-700">${data.summary}</p>
+                    <div class="mb-6 p-4 bg-brand-surface border-l-4 border-brand-accent rounded-r-lg">
+                        <h3 class="text-lg font-semibold text-brand-accent mb-2">Summary</h3>
+                        <p class="text-brand-muted">${data.summary}</p>
                     </div>
                 `;
             }
@@ -477,8 +554,8 @@
                 html += `
                     <div class="mb-6">
                         <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-xl font-bold text-gray-800">NIST 800-53 R.5 Controls</h3>
-                            <span id="resultsCounter" class="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                            <h3 class="text-xl font-bold text-brand-text">NIST 800-53 R.5 Controls</h3>
+                            <span id="resultsCounter" class="text-sm text-brand-dim bg-brand-surface px-3 py-1 rounded-full border border-brand-border font-mono">
                                 ${data.controls.length} control${data.controls.length !== 1 ? 's' : ''} found
                             </span>
                         </div>
@@ -487,55 +564,55 @@
 
                 data.controls.forEach(control => {
                     const relevanceColor = {
-                        'High': 'bg-red-100 border-red-300 text-red-800',
-                        'Medium': 'bg-yellow-100 border-yellow-300 text-yellow-800',
-                        'Low': 'bg-green-100 border-green-300 text-green-800'
-                    }[control.relevance] || 'bg-gray-100 border-gray-300 text-gray-800';
+                        'High': 'bg-red-950/50 border-red-500 text-red-300',
+                        'Medium': 'bg-amber-950/40 border-brand-lock text-brand-lock',
+                        'Low': 'bg-emerald-950/40 border-emerald-500 text-emerald-300'
+                    }[control.relevance] || 'bg-brand-surface border-brand-border text-brand-muted';
 
                     // HITL Confidence Score logic
                     const confidence = control.confidence || Math.floor(Math.random() * (99 - 85 + 1) + 85); // Default to high for simulation
                     const needsReview = confidence < 90;
-                    const confidenceColor = needsReview ? 'text-orange-600' : 'text-green-600';
+                    const confidenceColor = needsReview ? 'text-brand-ansible' : 'text-emerald-400';
                     
                     // Create NIST documentation link
                     const nistUrl = `https://csrc.nist.gov/Projects/risk-management/sp800-53-controls/release-search#/control/${control.id}`;
                     
                     html += `
-                        <div class="control-item border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow ${needsReview ? 'border-l-4 border-l-orange-400' : ''}" 
+                        <div class="control-item border border-brand-border bg-brand-surface rounded-lg p-4 hover:border-brand-accent/40 transition-colors ${needsReview ? 'border-l-4 border-l-brand-ansible' : ''}" 
                              data-priority="${control.relevance}" 
                              data-category="${control.category}" 
                              data-id="${control.id}"
                              data-confidence="${confidence}">
                             <div class="flex items-start justify-between mb-3">
                                 <div class="flex-1">
-                                    <div class="flex items-center gap-2 mb-1">
-                                        <h4 class="text-lg font-semibold text-gray-800">${control.id}: ${control.title}</h4>
+                                    <div class="flex items-center gap-2 mb-1 flex-wrap">
+                                        <h4 class="text-lg font-semibold text-brand-text font-mono">${control.id}: ${control.title}</h4>
                                         <a href="${nistUrl}" target="_blank" rel="noopener noreferrer" 
-                                           class="text-blue-600 hover:text-blue-800 text-sm font-medium underline">
+                                           class="text-brand-accent hover:text-brand-accentHover text-sm font-medium underline">
                                             View NIST Docs
                                         </a>
                                     </div>
-                                    <div class="flex items-center gap-3">
-                                        <p class="text-sm text-gray-600">${control.category}</p>
+                                    <div class="flex items-center gap-3 flex-wrap">
+                                        <p class="text-sm text-brand-dim">${control.category}</p>
                                         <span class="text-xs font-bold ${confidenceColor}">
                                             AI Confidence: ${confidence}%
                                         </span>
-                                        ${needsReview ? '<span class="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded uppercase">HITL Review Required</span>' : ''}
+                                        ${needsReview ? '<span class="px-2 py-0.5 border border-brand-ansible text-brand-ansible text-[10px] font-bold rounded uppercase">HITL Review Required</span>' : ''}
                                     </div>
                                 </div>
                                 <div class="flex flex-col items-end gap-2">
                                     <span class="px-3 py-1 rounded-full text-xs font-medium border ${relevanceColor}">
                                         ${control.relevance} Priority
                                     </span>
-                                    <button onclick="toggleHitlReview('${control.id}')" class="text-[10px] text-gray-500 hover:text-blue-600 underline">
+                                    <button onclick="toggleHitlReview('${control.id}')" class="text-[10px] text-brand-dim hover:text-brand-accent underline">
                                         Manual Review
                                     </button>
                                 </div>
                             </div>
-                            <div class="space-y-2">
-                                <p class="text-gray-700"><strong>Description:</strong> ${control.description}</p>
-                                <p class="text-gray-700"><strong>Rationale:</strong> ${control.rationale}</p>
-                                ${control.implementation_notes ? `<p class="text-gray-700"><strong>Implementation Notes:</strong> ${control.implementation_notes}</p>` : ''}
+                            <div class="space-y-2 text-brand-muted">
+                                <p><strong class="text-brand-text">Description:</strong> ${control.description}</p>
+                                <p><strong class="text-brand-text">Rationale:</strong> ${control.rationale}</p>
+                                ${control.implementation_notes ? `<p><strong class="text-brand-text">Implementation Notes:</strong> ${control.implementation_notes}</p>` : ''}
                             </div>
                         </div>
                     `;
@@ -551,16 +628,16 @@
             if (data.csf_mappings && data.csf_mappings.length > 0) {
                 html += `
                     <div class="mb-6">
-                        <h3 class="text-xl font-bold text-gray-800 mb-4">NIST CSF 2.0 Mappings</h3>
+                        <h3 class="text-xl font-bold text-brand-text mb-4">NIST CSF 2.0 Mappings</h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 `;
 
                 data.csf_mappings.forEach(mapping => {
                     html += `
-                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                            <h4 class="font-semibold text-gray-800">${mapping.function}</h4>
-                            <p class="text-sm text-gray-600">${mapping.category}</p>
-                            <p class="text-xs text-gray-500 mt-1">${mapping.subcategory}</p>
+                        <div class="bg-brand-surface border border-brand-border rounded-lg p-4">
+                            <h4 class="font-semibold text-brand-text">${mapping.function}</h4>
+                            <p class="text-sm text-brand-dim">${mapping.category}</p>
+                            <p class="text-xs text-brand-dim/80 mt-1">${mapping.subcategory}</p>
                         </div>
                     `;
                 });
@@ -575,15 +652,15 @@
             if (data.recommendations && data.recommendations.length > 0) {
                 html += `
                     <div class="mb-6">
-                        <h3 class="text-xl font-bold text-gray-800 mb-4">Additional Recommendations</h3>
+                        <h3 class="text-xl font-bold text-brand-text mb-4">Additional Recommendations</h3>
                         <ul class="space-y-2">
                 `;
 
                 data.recommendations.forEach(recommendation => {
                     html += `
                         <li class="flex items-start space-x-2">
-                            <span class="text-blue-500 mt-1">•</span>
-                            <span class="text-gray-700">${recommendation}</span>
+                            <span class="text-brand-accent mt-1">•</span>
+                            <span class="text-brand-muted">${recommendation}</span>
                         </li>
                     `;
                 });
@@ -744,12 +821,12 @@
         window.toggleHitlReview = function(controlId) {
             const controlEl = document.querySelector(`.control-item[data-id="${controlId}"]`);
             if (controlEl) {
-                const isReviewed = controlEl.classList.contains('bg-blue-50');
+                const isReviewed = controlEl.classList.contains('ring-1');
                 if (isReviewed) {
-                    controlEl.classList.remove('bg-blue-50', 'border-blue-400');
+                    controlEl.classList.remove('ring-1', 'ring-brand-accent', 'border-brand-accent');
                     alert(`Review cleared for ${controlId}`);
                 } else {
-                    controlEl.classList.add('bg-blue-50', 'border-blue-400');
+                    controlEl.classList.add('ring-1', 'ring-brand-accent', 'border-brand-accent');
                     alert(`Purple Team review completed for ${controlId}`);
                 }
             }
@@ -967,63 +1044,67 @@
                 .replace(/"/g, '&quot;');
 
             let html = `
-                <div class="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400 rounded-r-lg">
-                    <h3 class="text-lg font-semibold text-blue-800 mb-2">🔍 Control Validation Results</h3>
-                    <p class="text-blue-700">${escapeHtml(modeLabel)}</p>
+                <div class="mb-6 p-4 bg-brand-surface border-l-4 border-brand-accent rounded-r-lg">
+                    <h3 class="text-lg font-semibold text-brand-accent mb-2">Control Validation Results</h3>
+                    <p class="text-brand-muted">${escapeHtml(modeLabel)}</p>
                 </div>
                 
                 <div class="mb-6">
-                    <h3 class="text-xl font-bold text-gray-800 mb-4">Validation Summary</h3>
+                    <h3 class="text-xl font-bold text-brand-text mb-4">Validation Summary</h3>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-                            <h4 class="font-semibold text-green-800">Overall Status</h4>
-                            <p class="text-green-700 text-2xl font-bold">${results.overallStatus.toUpperCase()}</p>
+                        <div class="bg-brand-surface border border-emerald-700/50 rounded-lg p-4">
+                            <h4 class="font-semibold text-emerald-400">Overall Status</h4>
+                            <p class="text-emerald-300 text-2xl font-bold">${results.overallStatus.toUpperCase()}</p>
                         </div>
-                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                            <h4 class="font-semibold text-blue-800">Playbooks Executed</h4>
-                            <p class="text-blue-700 text-2xl font-bold">${results.playbookResults.length}</p>
+                        <div class="bg-brand-surface border border-brand-border rounded-lg p-4">
+                            <h4 class="font-semibold text-brand-accent">Playbooks Executed</h4>
+                            <p class="text-brand-text text-2xl font-bold">${results.playbookResults.length}</p>
                         </div>
-                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                            <h4 class="font-semibold text-purple-800">Target Hosts</h4>
-                            <p class="text-purple-700 text-lg">${results.targetHosts.join(', ')}</p>
+                        <div class="bg-brand-surface border border-brand-border rounded-lg p-4">
+                            <h4 class="font-semibold text-brand-doc">Target Hosts</h4>
+                            <p class="text-brand-muted text-lg font-mono">${results.targetHosts.join(', ')}</p>
                         </div>
                     </div>
                 </div>
                 
                 <div class="mb-6">
-                    <h3 class="text-xl font-bold text-gray-800 mb-4">Playbook Results</h3>
+                    <h3 class="text-xl font-bold text-brand-text mb-4">Playbook Results</h3>
                     <div class="space-y-4">
             `;
             
             results.playbookResults.forEach(result => {
-                const statusColor = result.status === 'completed' ? 'green' : 'red';
+                const statusBadge = result.status === 'completed'
+                    ? 'bg-emerald-950/50 text-emerald-300 border border-emerald-600'
+                    : 'bg-red-950/50 text-red-300 border border-red-600';
                 const liveBadge = result.live
-                    ? '<span class="ml-2 px-2 py-0.5 text-xs rounded bg-emerald-100 text-emerald-800">LIVE</span>'
-                    : '<span class="ml-2 px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-600">SIMULATED</span>';
+                    ? '<span class="ml-2 px-2 py-0.5 text-xs rounded bg-emerald-950/50 text-emerald-300 border border-emerald-600">LIVE</span>'
+                    : '<span class="ml-2 px-2 py-0.5 text-xs rounded bg-brand-surface2 text-brand-dim border border-brand-border">SIMULATED</span>';
                 const logText = [result.output, result.stderr].filter(Boolean).join('\n').trim();
                 html += `
-                    <div class="border border-gray-200 rounded-lg p-4">
-                        <div class="flex items-center justify-between mb-2">
-                            <h4 class="text-lg font-semibold text-gray-800">${escapeHtml(result.playbook)}${liveBadge}</h4>
-                            <span class="px-3 py-1 rounded-full text-sm font-medium bg-${statusColor}-100 text-${statusColor}-800">
+                    <div class="border border-brand-border bg-brand-surface rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+                            <h4 class="text-lg font-semibold text-brand-text">${escapeHtml(result.playbook)}${liveBadge}</h4>
+                            <span class="px-3 py-1 rounded-full text-sm font-medium ${statusBadge}">
                                 ${result.status.toUpperCase()}
                             </span>
                         </div>
-                        ${logText ? `<pre class="text-xs text-gray-700 bg-gray-100 p-3 rounded overflow-x-auto max-h-64 whitespace-pre-wrap">${escapeHtml(logText)}</pre>` : ''}
+                        ${logText ? `<pre class="text-xs text-brand-muted bg-brand-bg p-3 rounded border border-brand-border overflow-x-auto max-h-64 whitespace-pre-wrap font-mono">${escapeHtml(logText)}</pre>` : ''}
                         <div class="mt-3">
-                            <h5 class="font-medium text-gray-800 mb-2">Findings:</h5>
+                            <h5 class="font-medium text-brand-text mb-2">Findings:</h5>
                             <ul class="space-y-1">
                 `;
                 
                 result.findings.forEach(finding => {
-                    const findingColor = finding.status === 'PASS' ? 'green' : 'red';
+                    const findingOk = finding.status === 'PASS';
+                    const findingDot = findingOk ? 'text-emerald-400' : 'text-red-400';
+                    const findingLabel = findingOk ? 'text-emerald-300' : 'text-red-300';
                     html += `
                         <li class="flex items-start space-x-2">
-                            <span class="text-${findingColor}-500 mt-1">•</span>
+                            <span class="${findingDot} mt-1">•</span>
                             <div>
-                                <span class="font-medium text-${findingColor}-800">${escapeHtml(finding.control)}: ${escapeHtml(finding.status)}</span>
-                                <p class="text-gray-700 text-sm">${escapeHtml(finding.message)}</p>
-                                <pre class="text-gray-600 text-xs mt-1 whitespace-pre-wrap bg-white border rounded p-2 max-h-40 overflow-y-auto">${escapeHtml(finding.evidence)}</pre>
+                                <span class="font-medium ${findingLabel} font-mono">${escapeHtml(finding.control)}: ${escapeHtml(finding.status)}</span>
+                                <p class="text-brand-muted text-sm">${escapeHtml(finding.message)}</p>
+                                <pre class="text-brand-dim text-xs mt-1 whitespace-pre-wrap bg-brand-bg border border-brand-border rounded p-2 max-h-40 overflow-y-auto font-mono">${escapeHtml(finding.evidence)}</pre>
                             </div>
                         </li>
                     `;
@@ -1040,15 +1121,15 @@
                     </div>
                 </div>
                 
-                <div class="mt-6 p-4 bg-gray-50 rounded-lg">
-                    <h4 class="font-semibold text-gray-800 mb-2">📋 OSCAL Assessment Plan</h4>
-                    <p class="text-gray-700 text-sm mb-3">This validation was conducted using NIST OSCAL framework for standardized compliance assessment.</p>
+                <div class="mt-6 p-4 bg-brand-surface rounded-lg border border-brand-border">
+                    <h4 class="font-semibold text-brand-text mb-2">OSCAL Assessment Plan</h4>
+                    <p class="text-brand-muted text-sm mb-3">This validation was conducted using NIST OSCAL framework for standardized compliance assessment.</p>
                     <button id="downloadOscalPlanBtn"
                             type="button"
-                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
+                            class="px-4 py-2 bg-brand-accent hover:bg-brand-accentHover text-brand-bg text-sm font-medium rounded-md transition duration-150 ease-in-out">
                         Download OSCAL Report (PDF)
                     </button>
-                    <p id="downloadOscalPlanStatus" class="text-gray-600 text-xs mt-2 hidden"></p>
+                    <p id="downloadOscalPlanStatus" class="text-brand-dim text-xs mt-2 hidden"></p>
                 </div>
             `;
             
@@ -1069,32 +1150,33 @@
         function displayAuditReport(report) {
             const humanReport = report.humanReadableReport;
             
+            const riskLow = humanReport.executiveSummary.riskLevel === 'Low';
             let html = `
-                <div class="mb-6 p-4 bg-purple-50 border-l-4 border-purple-400 rounded-r-lg">
-                    <h3 class="text-lg font-semibold text-purple-800 mb-2">📊 OSCAL-Compliant Audit Report</h3>
-                    <p class="text-purple-700">Generated using NIST OSCAL framework for standardized compliance reporting</p>
+                <div class="mb-6 p-4 bg-brand-surface border-l-4 border-brand-shield rounded-r-lg">
+                    <h3 class="text-lg font-semibold text-brand-doc mb-2">OSCAL-Compliant Audit Report</h3>
+                    <p class="text-brand-muted">Generated using NIST OSCAL framework for standardized compliance reporting</p>
                 </div>
                 
                 <div class="mb-6">
-                    <h3 class="text-xl font-bold text-gray-800 mb-4">Executive Summary</h3>
-                    <div class="bg-white border border-gray-200 rounded-lg p-4">
-                        <p class="text-gray-700 mb-4">${humanReport.executiveSummary.overview}</p>
+                    <h3 class="text-xl font-bold text-brand-text mb-4">Executive Summary</h3>
+                    <div class="bg-brand-surface border border-brand-border rounded-lg p-4">
+                        <p class="text-brand-muted mb-4">${humanReport.executiveSummary.overview}</p>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <h4 class="font-semibold text-gray-800 mb-2">Key Findings:</h4>
+                                <h4 class="font-semibold text-brand-text mb-2">Key Findings:</h4>
                                 <ul class="space-y-1">
             `;
             
             humanReport.executiveSummary.keyFindings.forEach(finding => {
-                html += `<li class="text-gray-700 text-sm">• ${finding}</li>`;
+                html += `<li class="text-brand-muted text-sm">• ${finding}</li>`;
             });
             
             html += `
                                 </ul>
                             </div>
                             <div>
-                                <h4 class="font-semibold text-gray-800 mb-2">Risk Level:</h4>
-                                <p class="text-lg font-bold text-${humanReport.executiveSummary.riskLevel === 'Low' ? 'green' : 'red'}-600">
+                                <h4 class="font-semibold text-brand-text mb-2">Risk Level:</h4>
+                                <p class="text-lg font-bold ${riskLow ? 'text-emerald-400' : 'text-red-400'}">
                                     ${humanReport.executiveSummary.riskLevel}
                                 </p>
                             </div>
@@ -1103,22 +1185,24 @@
                 </div>
                 
                 <div class="mb-6">
-                    <h3 class="text-xl font-bold text-gray-800 mb-4">Control Assessments</h3>
+                    <h3 class="text-xl font-bold text-brand-text mb-4">Control Assessments</h3>
                     <div class="space-y-4">
             `;
             
             humanReport.controlAssessments.forEach(assessment => {
-                const statusColor = assessment.assessmentStatus === 'completed' ? 'green' : 'red';
+                const statusBadge = assessment.assessmentStatus === 'completed'
+                    ? 'bg-emerald-950/50 text-emerald-300 border border-emerald-600'
+                    : 'bg-red-950/50 text-red-300 border border-red-600';
                 html += `
-                    <div class="border border-gray-200 rounded-lg p-4">
-                        <div class="flex items-center justify-between mb-2">
-                            <h4 class="text-lg font-semibold text-gray-800">${assessment.controlId}: ${assessment.title}</h4>
-                            <span class="px-3 py-1 rounded-full text-sm font-medium bg-${statusColor}-100 text-${statusColor}-800">
+                    <div class="border border-brand-border bg-brand-surface rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+                            <h4 class="text-lg font-semibold text-brand-text font-mono">${assessment.controlId}: ${assessment.title}</h4>
+                            <span class="px-3 py-1 rounded-full text-sm font-medium ${statusBadge}">
                                 ${assessment.assessmentStatus.toUpperCase()}
                             </span>
                         </div>
-                        <p class="text-gray-700 mb-2">${assessment.description}</p>
-                        <div class="flex items-center space-x-4 text-sm text-gray-600">
+                        <p class="text-brand-muted mb-2">${assessment.description}</p>
+                        <div class="flex items-center space-x-4 text-sm text-brand-dim">
                             <span>Priority: ${assessment.priority}</span>
                             <span>Next Assessment: ${new Date(assessment.nextAssessment).toLocaleDateString()}</span>
                         </div>
@@ -1130,15 +1214,15 @@
                     </div>
                 </div>
                 
-                <div class="mt-6 p-4 bg-gray-50 rounded-lg">
-                    <h4 class="font-semibold text-gray-800 mb-2">📄 Download Reports</h4>
-                    <div class="flex space-x-4">
+                <div class="mt-6 p-4 bg-brand-surface rounded-lg border border-brand-border">
+                    <h4 class="font-semibold text-brand-text mb-2">Download Reports</h4>
+                    <div class="flex flex-wrap gap-3">
                         <button id="downloadOscalReportBtn" type="button"
-                                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
+                                class="px-4 py-2 bg-brand-accent hover:bg-brand-accentHover text-brand-bg text-sm font-medium rounded-md transition duration-150 ease-in-out">
                             Download OSCAL Report
                         </button>
                         <button id="downloadHumanReportBtn" type="button"
-                                class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md transition duration-150 ease-in-out">
+                                class="px-4 py-2 border border-brand-k8s text-brand-k8s hover:bg-brand-k8s/10 text-sm font-medium rounded-md transition duration-150 ease-in-out">
                             Download Human-Readable Report
                         </button>
                     </div>
@@ -1167,8 +1251,8 @@
             const setStatus = (msg, isError = false) => {
                 if (!statusEl) return;
                 statusEl.textContent = msg;
-                statusEl.classList.remove('hidden', 'text-red-600', 'text-gray-600');
-                statusEl.classList.add(isError ? 'text-red-600' : 'text-gray-600');
+                statusEl.classList.remove('hidden', 'text-red-400', 'text-brand-dim');
+                statusEl.classList.add(isError ? 'text-red-400' : 'text-brand-dim');
             };
 
             if (!complianceReport) {
