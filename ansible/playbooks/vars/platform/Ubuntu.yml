@@ -1,0 +1,13 @@
+---
+# Ubuntu — same path map as Debian family
+grc_platform_id: ubuntu
+grc_pam_system: /etc/pam.d/common-auth
+grc_pam_auth: /etc/pam.d/sshd
+grc_pam_password:
+  - /etc/pam.d/common-password
+  - /etc/pam.d/sshd
+grc_auth_log: /var/log/auth.log
+grc_secure_log: /var/log/auth.log
+grc_system_log: /var/log/syslog
+grc_apache_conf: /etc/apache2/apache2.conf
+grc_iptables_rules: /etc/iptables/rules.v4

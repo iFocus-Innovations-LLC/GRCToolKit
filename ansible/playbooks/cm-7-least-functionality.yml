@@ -1,0 +1,74 @@
+---
+# Ansible Playbook: CM-7 Least Functionality (read-only audit profile)
+# HITL: detects high-risk services only — NEVER stops or disables them.
+# Based on NIST 800-53 Rev. 5 Control CM-7
+
+- name: "CM-7: Least Functionality Validation"
+  hosts: all
+  become: "{{ ansible_connection != 'local' and grc_audit_become | default(false) }}"
+  environment:
+    PATH: "{{ grc_bin_path | default('/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  vars:
+    control_id: "CM-7"
+    control_title: "Least Functionality"
+    compliance_framework: "NIST 800-53 Rev. 5"
+    grc_audit_mode: read_only
+
+  pre_tasks:
+    - name: Load OS / K8s platform path map
+      ansible.builtin.include_tasks: tasks/load_platform_vars.yml
+
+  tasks:
+    - name: "CM-7.1: Probe high-risk service units (systemd)"
+      when:
+        - grc_init_system == 'systemd'
+        - grc_high_risk_services | length > 0
+      block:
+        - name: "systemctl is-active for high-risk services"
+          ansible.builtin.command: "systemctl is-active {{ item }}"
+          loop: "{{ grc_high_risk_services }}"
+          register: risky_units
+          changed_when: false
+          failed_when: false
+
+    - name: "CM-7.1: NOTE - no systemd unit probe"
+      ansible.builtin.debug:
+        msg: "Skipping systemd high-risk unit checks (init={{ grc_init_system }}, platform={{ grc_platform_id }})."
+      when: grc_init_system != 'systemd' or grc_high_risk_services | length == 0
+
+    - name: "CM-7.2: Process name heuristics (read-only)"
+      block:
+        - name: "Search process list for telnet/ftp/rsh"
+          ansible.builtin.shell: "ps aux 2>/dev/null | grep -Eiw 'telnetd|vsftpd|ftpd|rshd' | grep -v grep | wc -l | tr -d ' '"
+          register: risky_procs
+          changed_when: false
+          failed_when: false
+
+        - name: "CM-7.2: WARN - high-risk process indicators"
+          ansible.builtin.debug:
+            msg: "Found {{ risky_procs.stdout }} process line(s) matching telnet/ftp/rsh heuristics — review only; playbook will not stop them."
+          when: (risky_procs.stdout | default('0') | int) > 0
+
+    - name: "Generate CM-7 compliance report"
+      block:
+        - name: "Ensure report directory exists"
+          ansible.builtin.file:
+            path: "{{ grc_compliance_report_dir }}"
+            state: directory
+            mode: "0755"
+
+        - name: "Write CM-7 compliance report JSON"
+          ansible.builtin.copy:
+            content: |
+              {
+                "control_id": "CM-7",
+                "hostname": "{{ inventory_hostname }}",
+                "platform_id": "{{ grc_platform_id }}",
+                "init_system": "{{ grc_init_system }}",
+                "validation_timestamp": "{{ ansible_date_time.iso8601 }}",
+                "grc_audit_mode": "{{ grc_audit_mode }}",
+                "risky_process_hits": "{{ risky_procs.stdout | default('unknown') }}",
+                "note": "Read-only detection only; no services were stopped or disabled."
+              }
+            dest: "{{ grc_compliance_report_dir }}/cm-7-compliance-{{ ansible_date_time.epoch }}.json"
+            mode: "0644"

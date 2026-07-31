@@ -51,10 +51,20 @@ class GRCComplianceEngine {
     async loadAnsiblePlaybooks() {
         // Standard GRC playbooks
         const playbooks = [
+            'ac-2-account-management',
             'ac-3-access-enforcement',
             'ac-6-least-privilege',
+            'ia-2-identification-authentication',
+            'ia-5-authenticator-management',
             'au-2-audit-events',
-            'sc-7-boundary-protection'
+            'au-3-audit-record-content',
+            'au-12-audit-generation',
+            'cm-6-configuration-settings',
+            'cm-7-least-functionality',
+            'sc-7-boundary-protection',
+            'sc-8-transmission-confidentiality',
+            'sc-28-data-protection',
+            'si-4-system-monitoring'
         ];
 
         for (const playbook of playbooks) {
@@ -91,30 +101,48 @@ class GRCComplianceEngine {
      */
     initializeScenarioMappings() {
         this.scenarioMappings.set('access_control', {
-            keywords: ['access', 'authentication', 'authorization', 'login', 'user', 'permission'],
-            controls: ['AC-3', 'AC-6', 'AC-7', 'AC-8'],
-            playbooks: ['ac-3-access-enforcement', 'ac-6-least-privilege']
+            keywords: ['access', 'authorization', 'permission', 'account', 'privilege', 'sudo'],
+            controls: ['AC-2', 'AC-3', 'AC-6', 'AC-7', 'AC-8'],
+            playbooks: ['ac-2-account-management', 'ac-3-access-enforcement', 'ac-6-least-privilege']
+        });
+
+        this.scenarioMappings.set('identity_auth', {
+            keywords: ['authentication', 'login', 'identity', 'mfa', 'password', 'authenticator', 'ssh key'],
+            controls: ['IA-2', 'IA-5'],
+            playbooks: ['ia-2-identification-authentication', 'ia-5-authenticator-management']
         });
 
         this.scenarioMappings.set('audit_logging', {
-            keywords: ['audit', 'log', 'monitoring', 'tracking', 'compliance'],
-            controls: ['AU-2', 'AU-3', 'AU-4', 'AU-5'],
-            playbooks: ['au-2-audit-events']
+            keywords: ['audit', 'log', 'tracking', 'compliance', 'auditd'],
+            controls: ['AU-2', 'AU-3', 'AU-4', 'AU-5', 'AU-12'],
+            playbooks: ['au-2-audit-events', 'au-3-audit-record-content', 'au-12-audit-generation']
+        });
+
+        this.scenarioMappings.set('hardening', {
+            keywords: ['hardening', 'baseline', 'configuration setting', 'least functionality', 'attack surface', 'unnecessary service'],
+            controls: ['CM-6', 'CM-7'],
+            playbooks: ['cm-6-configuration-settings', 'cm-7-least-functionality']
         });
 
         this.scenarioMappings.set('network_security', {
-            keywords: ['network', 'firewall', 'boundary', 'traffic', 'connection'],
+            keywords: ['network', 'firewall', 'boundary', 'traffic', 'connection', 'tls', 'transmission'],
             controls: ['SC-7', 'SC-8', 'SC-9', 'SC-10'],
-            playbooks: ['sc-7-boundary-protection']
+            playbooks: ['sc-7-boundary-protection', 'sc-8-transmission-confidentiality']
         });
 
         this.scenarioMappings.set('data_protection', {
-            keywords: ['data', 'encryption', 'privacy', 'sensitive', 'confidential'],
+            keywords: ['data', 'encryption', 'privacy', 'sensitive', 'confidential', 'at rest', 'filevault', 'luks'],
             controls: ['SC-28', 'SC-29', 'SC-30', 'SC-31'],
             playbooks: ['sc-28-data-protection']
         });
 
-        // PQC-specific scenario mappings
+        this.scenarioMappings.set('monitoring', {
+            keywords: ['monitoring', 'detection', 'siem', 'osquery', 'edr', 'observability'],
+            controls: ['SI-4'],
+            playbooks: ['si-4-system-monitoring']
+        });
+
+        // PQC-specific scenario mappings (deploy stems remain HITL-gated / separate)
         this.scenarioMappings.set('pqc_migration', {
             keywords: ['post-quantum', 'quantum', 'pqc', 'cryptography', 'cryptographic', 'migration', 'fips 203', 'fips 204', 'fips 205', 'ml-kem', 'ml-dsa', 'slh-dsa', 'rsa', 'ecc', 'elliptic curve', 'harvest now decrypt later'],
             controls: ['SC-12', 'SC-13', 'SC-17', 'SC-28'],
@@ -720,10 +748,20 @@ class GRCComplianceEngine {
 
     estimatePlaybookRuntime(playbookName) {
         const runtimeMap = {
+            'ac-2-account-management': 2,
             'ac-3-access-enforcement': 3,
             'ac-6-least-privilege': 5,
+            'ia-2-identification-authentication': 2,
+            'ia-5-authenticator-management': 2,
             'au-2-audit-events': 2,
+            'au-3-audit-record-content': 2,
+            'au-12-audit-generation': 2,
+            'cm-6-configuration-settings': 3,
+            'cm-7-least-functionality': 3,
             'sc-7-boundary-protection': 4,
+            'sc-8-transmission-confidentiality': 3,
+            'sc-28-data-protection': 3,
+            'si-4-system-monitoring': 2,
             // PQC playbook runtime estimates
             'pqc/inventory': 5,
             'pqc/assess': 3,

@@ -1,0 +1,42 @@
+---
+# macOS (ansible_os_family: Darwin)
+
+grc_platform_id: darwin
+grc_init_system: launchd
+grc_bin_path: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/homebrew/bin:/opt/homebrew/sbin"
+
+grc_shadow: /etc/master.passwd
+grc_pam_auth: /etc/pam.d/login
+grc_pam_system: /etc/pam.d/login
+grc_pam_password:
+  - /etc/pam.d/passwd
+  - /etc/pam.d/login
+grc_login_defs: ""
+grc_pwquality: ""
+
+grc_audit_rules: ""
+grc_auditd_conf: ""
+grc_audit_log_dir: /var/log
+grc_audit_log: /var/log/system.log
+grc_rsyslog_conf: ""
+grc_syslog_conf: ""
+grc_auth_log: /var/log/system.log
+grc_secure_log: /var/log/system.log
+grc_system_log: /var/log/system.log
+
+grc_sysctl_keys:
+  - net.inet.ip.forwarding
+  - net.inet.ip.redirect
+  - kern.securelevel
+
+grc_disk_encryption_probe: fdesetup
+
+grc_high_risk_services: []
+
+grc_monitor_bins:
+  - syslogd
+  - osqueryi
+  - osqueryd
+  - auditd
+
+grc_monitor_units: []

@@ -4,6 +4,8 @@ Maps NIST control validation tasks to **read-only** commands for the `grc-audit`
 
 **Profile:** `grc_audit_mode: read_only` ([`ansible/playbooks/group_vars/all.yml`](../playbooks/group_vars/all.yml))
 
+**OS / K8s paths:** Playbooks resolve config locations via [`tasks/load_platform_vars.yml`](../playbooks/tasks/load_platform_vars.yml) and [`vars/platform/`](../playbooks/vars/platform/) (not hardcoded `/etc/...` alone). Commands below show typical Linux paths; Darwin/Alpine/RedHat overlays may differ.
+
 **Wrapper scripts:** [`ansible/scripts/grc-audit-probes/`](../scripts/grc-audit-probes/) → deploy to `/usr/local/sbin/`
 
 ---
@@ -64,6 +66,95 @@ Maps NIST control validation tasks to **read-only** commands for the `grc-audit`
 | SC-7.4 config files | `/usr/bin/stat` on `/etc/iptables/rules.v4`, etc. | No | playbook |
 
 **Removed:** `systemd: state: started` on firewall units
+
+---
+
+## Purple-team validation pack (v1 — playbook probes; sudo wrappers TBD)
+
+These controls use **read-only** playbook tasks on lab localhost (`grc_audit_become: false`). Production `grc-audit-*` wrappers / sudoers entries for this pack are **deferred** pending sysadmin review.
+
+### AC-2 Account Management
+
+| Task | Read-only command | Sudo required | Wrapper |
+|------|-------------------|---------------|---------|
+| UID 0 count | `awk -F: '$3==0 {print $1}' /etc/passwd` | No | playbook |
+| passwd inventory | `wc -l /etc/passwd` | No | playbook |
+| nologin shells | `awk` on `/etc/passwd` | No | playbook |
+| shadow presence | `/usr/bin/stat /etc/shadow` | Often for content | TBD |
+
+### IA-2 Identification and Authentication
+
+| Task | Read-only command | Sudo required | Wrapper |
+|------|-------------------|---------------|---------|
+| sshd_config | `stat` / `grep` PasswordAuthentication, PubkeyAuthentication, PermitRootLogin | No | playbook |
+| PAM sshd/login | `stat /etc/pam.d/sshd` or `/etc/pam.d/login` | No | playbook |
+
+### IA-5 Authenticator Management
+
+| Task | Read-only command | Sudo required | Wrapper |
+|------|-------------------|---------------|---------|
+| login.defs | `grep PASS_MAX_DAYS\|PASS_MIN_LEN /etc/login.defs` | No | playbook |
+| pwquality | `stat /etc/security/pwquality.conf` | No | playbook |
+| Darwin | `which pwpolicy` (managed Mac policies separate) | No | playbook |
+
+### AU-3 Content of Audit Records
+
+| Task | Read-only command | Sudo required | Wrapper |
+|------|-------------------|---------------|---------|
+| audit rules | `grep -cE '^[^#]' /etc/audit/rules.d/audit.rules` | No | playbook |
+| content keywords | `grep -Ei 'identity\|auth\|logon' ...` | No | playbook |
+
+### AU-12 Audit Generation
+
+| Task | Read-only command | Sudo required | Wrapper |
+|------|-------------------|---------------|---------|
+| auditd | `/bin/systemctl is-active auditd` | Often yes | TBD |
+| rsyslog | `/bin/systemctl is-active rsyslog` | Often yes | TBD |
+| log paths | `stat /var/log/auth.log`, `/var/log/secure`, `/var/log` | No | playbook |
+
+### CM-6 Configuration Settings
+
+| Task | Read-only command | Sudo required | Wrapper |
+|------|-------------------|---------------|---------|
+| sysctl samples | `sysctl -n net.ipv4.ip_forward` (etc.) | No | playbook |
+| sshd MaxAuthTries / Protocol | `grep` on `/etc/ssh/sshd_config` | No | playbook |
+
+**Never applies** sysctl or sshd changes.
+
+### CM-7 Least Functionality
+
+| Task | Read-only command | Sudo required | Wrapper |
+|------|-------------------|---------------|---------|
+| risky units | `systemctl is-active telnet\|vsftpd\|...` | Often yes | TBD |
+| process heuristics | `ps aux \| grep -Eiw 'telnetd\|vsftpd\|...'` | No | playbook |
+
+**Removed / forbidden:** stopping or disabling services.
+
+### SC-8 Transmission Confidentiality
+
+| Task | Read-only command | Sudo required | Wrapper |
+|------|-------------------|---------------|---------|
+| sshd crypto | `grep Ciphers\|MACs\|KexAlgorithms /etc/ssh/sshd_config` | No | playbook |
+| OpenSSL | `openssl version` | No | playbook |
+| TLS server configs | `stat` nginx/apache/openssl.cnf | No | playbook |
+
+### SC-28 Protection of Information at Rest
+
+| Task | Read-only command | Sudo required | Wrapper |
+|------|-------------------|---------------|---------|
+| Darwin FileVault | `fdesetup status` | Often yes | TBD |
+| Linux LUKS | `which cryptsetup`; `lsblk` crypto/luks lines | No / often | TBD |
+| sensitive paths | `stat /etc/shadow`, `~/.ssh` | No | playbook |
+
+### SI-4 System Monitoring
+
+| Task | Read-only command | Sudo required | Wrapper |
+|------|-------------------|---------------|---------|
+| agent bins | `which rsyslogd\|osqueryd\|auditd\|...` | No | playbook |
+| units | `systemctl is-active rsyslog\|auditd\|osqueryd` | Often yes | TBD |
+| `/var/log` | `stat` / `find -maxdepth 1` | No | playbook |
+
+**Never installs or starts** monitoring agents.
 
 ---
 

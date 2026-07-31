@@ -8,9 +8,10 @@
 #   cd ansible/playbooks
 #   ansible-playbook -i inventory.yml ac-3-access-enforcement.yml
 #
-# Note: AC/AU/SC playbooks use Linux-oriented modules (systemd, auditd, etc.).
-# On macOS you will see real probe failures for those tasks — expected live output.
-# For a full Linux-style pass demo, run against a Linux VM or container.
+# Note: Playbooks load OS path maps via tasks/load_platform_vars.yml
+# (Darwin / Debian / Ubuntu / RedHat / Amazon / Alpine + optional K8s overlay).
+# On macOS, Linux-only probes are skipped or noted — expected for laptop demos.
+# K8s: see inventory.k8s.example.yml (GKE/EKS/AKS-agnostic hostPath /host pattern).
 
 all:
   hosts:

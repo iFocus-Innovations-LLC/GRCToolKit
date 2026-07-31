@@ -1,0 +1,99 @@
+---
+# Ansible Playbook: IA-5 Authenticator Management (read-only audit profile)
+# HITL: evidence collection only — no password policy mutations.
+# Based on NIST 800-53 Rev. 5 Control IA-5
+
+- name: "IA-5: Authenticator Management Validation"
+  hosts: all
+  become: "{{ ansible_connection != 'local' and grc_audit_become | default(false) }}"
+  environment:
+    PATH: "{{ grc_bin_path | default('/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  vars:
+    control_id: "IA-5"
+    control_title: "Authenticator Management"
+    compliance_framework: "NIST 800-53 Rev. 5"
+    grc_audit_mode: read_only
+
+  pre_tasks:
+    - name: Load OS / K8s platform path map
+      ansible.builtin.include_tasks: tasks/load_platform_vars.yml
+
+  tasks:
+    - name: "IA-5.1: Password aging / login.defs"
+      when: grc_login_defs | length > 0
+      block:
+        - name: "Stat login.defs"
+          ansible.builtin.stat:
+            path: "{{ grc_login_defs }}"
+          register: login_defs
+
+        - name: "Probe PASS_MAX_DAYS"
+          ansible.builtin.shell: "grep -E '^PASS_MAX_DAYS' {{ grc_login_defs }} | awk '{print $2}' | tail -1"
+          register: pass_max_days
+          changed_when: false
+          failed_when: false
+          when: login_defs.stat.exists
+
+        - name: "Probe PASS_MIN_LEN"
+          ansible.builtin.shell: "grep -E '^PASS_MIN_LEN' {{ grc_login_defs }} | awk '{print $2}' | tail -1"
+          register: pass_min_len
+          changed_when: false
+          failed_when: false
+          when: login_defs.stat.exists
+
+    - name: "IA-5.2: pwquality / PAM strength modules"
+      block:
+        - name: "Stat pwquality.conf"
+          ansible.builtin.stat:
+            path: "{{ grc_pwquality }}"
+          register: pwquality
+          when: grc_pwquality | length > 0
+
+        - name: "Stat PAM password paths"
+          ansible.builtin.stat:
+            path: "{{ item }}"
+          loop: "{{ grc_pam_password }}"
+          register: pam_pw_paths
+          failed_when: false
+
+    - name: "IA-5.3: Darwin pwpolicy"
+      when: ansible_facts.get('os_family') == 'Darwin'
+      block:
+        - name: "IA-5.3: LAB NOTE - macOS authenticator policy"
+          ansible.builtin.debug:
+            msg: "Darwin: use pwpolicy on managed Macs for IA-5; login.defs/pwquality not used (platform={{ grc_platform_id }})."
+
+        - name: "Probe Darwin pwpolicy availability"
+          ansible.builtin.command: which pwpolicy
+          register: pwpolicy_bin
+          changed_when: false
+          failed_when: false
+
+    - name: "Generate IA-5 compliance report"
+      block:
+        - name: "Ensure report directory exists"
+          ansible.builtin.file:
+            path: "{{ grc_compliance_report_dir }}"
+            state: directory
+            mode: "0755"
+
+        - name: "Write IA-5 compliance report JSON"
+          ansible.builtin.copy:
+            content: |
+              {
+                "control_id": "IA-5",
+                "hostname": "{{ inventory_hostname }}",
+                "platform_id": "{{ grc_platform_id }}",
+                "os_family": "{{ ansible_facts.get('os_family', 'unknown') }}",
+                "validation_timestamp": "{{ ansible_date_time.iso8601 }}",
+                "grc_audit_mode": "{{ grc_audit_mode }}",
+                "login_defs": "{{ grc_login_defs }}",
+                "login_defs_exists": {{ login_defs.stat.exists | default(false) | to_json }},
+                "PASS_MAX_DAYS": "{{ pass_max_days.stdout | default('n/a') }}",
+                "PASS_MIN_LEN": "{{ pass_min_len.stdout | default('n/a') }}",
+                "pwquality": "{{ grc_pwquality }}",
+                "pwquality_exists": {{ pwquality.stat.exists | default(false) | to_json }},
+                "pwpolicy_available": "{{ pwpolicy_bin.rc | default('n/a') }}"
+              }
+            dest: "{{ grc_compliance_report_dir }}/ia-5-compliance-{{ ansible_date_time.epoch }}.json"
+            mode: "0644"

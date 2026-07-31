@@ -1,0 +1,92 @@
+---
+# Ansible Playbook: AC-2 Account Management (read-only audit profile)
+# HITL: evidence collection only — no account create/disable/delete.
+# Based on NIST 800-53 Rev. 5 Control AC-2
+
+- name: "AC-2: Account Management Validation"
+  hosts: all
+  become: "{{ ansible_connection != 'local' and grc_audit_become | default(false) }}"
+  environment:
+    PATH: "{{ grc_bin_path | default('/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  vars:
+    control_id: "AC-2"
+    control_title: "Account Management"
+    compliance_framework: "NIST 800-53 Rev. 5"
+    grc_audit_mode: read_only
+
+  pre_tasks:
+    - name: Load OS / K8s platform path map
+      ansible.builtin.include_tasks: tasks/load_platform_vars.yml
+
+  tasks:
+    - name: "AC-2.1: Inventory local accounts (read-only)"
+      block:
+        - name: "Count UID 0 accounts"
+          ansible.builtin.shell: "awk -F: '$3==0 {print $1}' {{ grc_passwd }} | wc -l | tr -d ' '"
+          register: uid0_count
+          changed_when: false
+          failed_when: false
+
+        - name: "Count local passwd entries"
+          ansible.builtin.shell: "wc -l < {{ grc_passwd }} | tr -d ' '"
+          register: passwd_lines
+          changed_when: false
+          failed_when: false
+
+        - name: "AC-2.1: WARN - multiple UID 0 accounts"
+          ansible.builtin.debug:
+            msg: "Found {{ uid0_count.stdout | default('?') }} UID 0 account(s); purple-team review recommended if > 1."
+          when: (uid0_count.stdout | default('0') | int) > 1
+
+    - name: "AC-2.2: Check shadow / password aging artifacts (read-only)"
+      block:
+        - name: "Stat shadow file"
+          ansible.builtin.stat:
+            path: "{{ grc_shadow }}"
+          register: shadow_stat
+          when: grc_shadow | length > 0
+
+        - name: "Stat passwd file"
+          ansible.builtin.stat:
+            path: "{{ grc_passwd }}"
+          register: passwd_stat
+
+        - name: "AC-2.2: LAB NOTE - shadow not present or not used"
+          ansible.builtin.debug:
+            msg: "Shadow path {{ grc_shadow }} exists={{ shadow_stat.stat.exists | default(false) }} (platform={{ grc_platform_id }})."
+          when: grc_shadow | length == 0 or not (shadow_stat.stat.exists | default(false))
+
+    - name: "AC-2.3: Check for locked / nologin shells (sample)"
+      block:
+        - name: "Sample nologin/false shells"
+          ansible.builtin.shell: "awk -F: '$7 ~ /(nologin|false)$/ {c++} END {print c+0}' {{ grc_passwd }}"
+          register: nologin_count
+          changed_when: false
+          failed_when: false
+
+    - name: "Generate AC-2 compliance report"
+      block:
+        - name: "Ensure report directory exists"
+          ansible.builtin.file:
+            path: "{{ grc_compliance_report_dir }}"
+            state: directory
+            mode: "0755"
+
+        - name: "Write AC-2 compliance report JSON"
+          ansible.builtin.copy:
+            content: |
+              {
+                "control_id": "AC-2",
+                "hostname": "{{ inventory_hostname }}",
+                "platform_id": "{{ grc_platform_id }}",
+                "validation_timestamp": "{{ ansible_date_time.iso8601 }}",
+                "grc_audit_mode": "{{ grc_audit_mode }}",
+                "passwd_path": "{{ grc_passwd }}",
+                "uid0_count": "{{ uid0_count.stdout | default('unknown') }}",
+                "passwd_lines": "{{ passwd_lines.stdout | default('unknown') }}",
+                "nologin_shell_count": "{{ nologin_count.stdout | default('unknown') }}",
+                "shadow_exists": {{ shadow_stat.stat.exists | default(false) | to_json }},
+                "passwd_exists": {{ passwd_stat.stat.exists | default(false) | to_json }}
+              }
+            dest: "{{ grc_compliance_report_dir }}/ac-2-compliance-{{ ansible_date_time.epoch }}.json"
+            mode: "0644"

@@ -6,124 +6,137 @@
 - name: "AC-3: Access Enforcement Validation"
   hosts: all
   become: "{{ ansible_connection != 'local' and grc_audit_become | default(false) }}"
+  environment:
+    PATH: "{{ grc_bin_path | default('/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
   vars:
     control_id: "AC-3"
     control_title: "Access Enforcement"
     compliance_framework: "NIST 800-53 Rev. 5"
     grc_audit_mode: read_only
 
+  pre_tasks:
+    - name: Load OS / K8s platform path map
+      ansible.builtin.include_tasks: tasks/load_platform_vars.yml
+
   tasks:
     - name: "AC-3.1: Verify authentication mechanisms (read-only)"
       block:
         - name: "Check sshd service is active"
-          command: systemctl is-active sshd
+          ansible.builtin.command: systemctl is-active sshd
           register: sshd_active
           changed_when: false
           failed_when: false
+          when: grc_init_system == 'systemd'
 
         - name: "Verify PAM configuration exists"
-          stat:
-            path: "{{ '/etc/pam.d/login' if ansible_os_family == 'Darwin' else '/etc/pam.d/system-auth' }}"
+          ansible.builtin.stat:
+            path: "{{ grc_pam_system }}"
           register: pam_config
 
         - name: "AC-3.1: FAIL - PAM configuration missing"
-          fail:
-            msg: "PAM configuration not found - AC-3.1 compliance failure"
+          ansible.builtin.fail:
+            msg: "PAM configuration not found at {{ grc_pam_system }} - AC-3.1 compliance failure"
           when:
-            - ansible_os_family != 'Darwin'
+            - ansible_facts.get('os_family') != 'Darwin'
             - not pam_config.stat.exists
 
-        - name: "AC-3.1: LAB NOTE - macOS uses /etc/pam.d/login (not system-auth)"
-          debug:
-            msg: "Lab host (Darwin): validated /etc/pam.d/login; production Linux targets use /etc/pam.d/system-auth."
-          when:
-            - ansible_os_family == 'Darwin'
-            - not pam_config.stat.exists
+        - name: "AC-3.1: LAB NOTE - PAM path for platform"
+          ansible.builtin.debug:
+            msg: "Platform {{ grc_platform_id }}: PAM path {{ grc_pam_system }} exists={{ pam_config.stat.exists | default(false) }}."
+          when: ansible_facts.get('os_family') == 'Darwin'
 
         - name: "AC-3.1: WARN - sshd not active"
-          debug:
+          ansible.builtin.debug:
             msg: "sshd is not active (status={{ sshd_active.stdout | default('unknown') }})"
-          when: sshd_active.rc != 0
+          when:
+            - grc_init_system == 'systemd'
+            - sshd_active.rc is defined
+            - sshd_active.rc != 0
 
     - name: "AC-3.2: Verify critical file permissions (read-only)"
       block:
         - name: "Stat critical auth files"
-          stat:
+          ansible.builtin.stat:
             path: "{{ item }}"
-          loop:
-            - "/etc/passwd"
-            - "/etc/shadow"
-            - "/etc/group"
+          loop: "{{ [grc_passwd, grc_shadow, grc_group] | select('string') | reject('equalto', '') | list }}"
           register: auth_file_stats
 
     - name: "AC-3.3: Verify sudoers configuration (read-only)"
       block:
         - name: "Check sudoers file exists"
-          stat:
-            path: "/etc/sudoers"
+          ansible.builtin.stat:
+            path: "{{ grc_sudoers }}"
           register: sudoers_config
 
         - name: "Verify sudoers file mode is 0440"
-          fail:
+          ansible.builtin.fail:
             msg: "Sudoers mode is not 0440 (found {{ sudoers_config.stat.mode }}) - AC-3.3 compliance failure"
           when:
             - sudoers_config.stat.exists
-            - ansible_os_family != 'Darwin'
+            - ansible_facts.get('os_family') != 'Darwin'
             - sudoers_config.stat.mode | default('') != '0440'
 
         - name: "AC-3.3: FAIL - Sudoers missing"
-          fail:
-            msg: "Sudoers configuration not found - AC-3.3 compliance failure"
+          ansible.builtin.fail:
+            msg: "Sudoers configuration not found at {{ grc_sudoers }} - AC-3.3 compliance failure"
           when: not sudoers_config.stat.exists
 
     - name: "AC-3.4: Verify access logging (read-only)"
       block:
         - name: "Check auditd service is active"
-          command: systemctl is-active auditd
+          ansible.builtin.command: systemctl is-active auditd
           register: auditd_active
           changed_when: false
           failed_when: false
+          when: grc_init_system == 'systemd'
 
         - name: "Verify audit rules file exists"
-          stat:
-            path: "/etc/audit/rules.d/audit.rules"
+          ansible.builtin.stat:
+            path: "{{ grc_audit_rules }}"
           register: audit_rules
+          when: grc_audit_rules | length > 0
 
         - name: "AC-3.4: FAIL - Audit rules missing"
-          fail:
-            msg: "Audit rules not configured - AC-3.4 compliance failure"
+          ansible.builtin.fail:
+            msg: "Audit rules not configured at {{ grc_audit_rules }} - AC-3.4 compliance failure"
           when:
-            - ansible_os_family != 'Darwin'
-            - not audit_rules.stat.exists
+            - ansible_facts.get('os_family') != 'Darwin'
+            - grc_audit_rules | length > 0
+            - not (audit_rules.stat.exists | default(false))
 
-        - name: "AC-3.4: LAB NOTE - auditd not applicable on macOS"
-          debug:
-            msg: "Lab host (Darwin): Linux auditd paths skipped; run against production Linux for AC-3.4 evidence."
-          when: ansible_os_family == 'Darwin'
+        - name: "AC-3.4: LAB NOTE - auditd not applicable on this platform"
+          ansible.builtin.debug:
+            msg: "Platform {{ grc_platform_id }}: auditd rules path empty or non-Linux; run against production Linux for AC-3.4 evidence."
+          when: grc_audit_rules | length == 0 or ansible_facts.get('os_family') == 'Darwin'
 
         - name: "AC-3.4: WARN - auditd not active"
-          debug:
+          ansible.builtin.debug:
             msg: "auditd is not active (status={{ auditd_active.stdout | default('unknown') }})"
-          when: auditd_active.rc != 0
+          when:
+            - grc_init_system == 'systemd'
+            - auditd_active.rc is defined
+            - auditd_active.rc != 0
 
     - name: "Generate AC-3 compliance report"
       block:
         - name: "Ensure report directory exists"
-          file:
+          ansible.builtin.file:
             path: "{{ grc_compliance_report_dir }}"
             state: directory
             mode: "0755"
 
         - name: "Write AC-3 compliance report JSON"
-          copy:
+          ansible.builtin.copy:
             content: |
               {
                 "control_id": "AC-3",
                 "hostname": "{{ inventory_hostname }}",
+                "platform_id": "{{ grc_platform_id }}",
                 "validation_timestamp": "{{ ansible_date_time.iso8601 }}",
                 "grc_audit_mode": "{{ grc_audit_mode }}",
                 "sshd_active": "{{ sshd_active.stdout | default('unknown') }}",
                 "auditd_active": "{{ auditd_active.stdout | default('unknown') }}",
+                "pam_config": "{{ grc_pam_system }}",
                 "pam_config_exists": {{ pam_config.stat.exists | default(false) | to_json }},
                 "sudoers_exists": {{ sudoers_config.stat.exists | default(false) | to_json }},
                 "audit_rules_exists": {{ audit_rules.stat.exists | default(false) | to_json }}

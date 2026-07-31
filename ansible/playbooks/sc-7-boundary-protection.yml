@@ -6,11 +6,17 @@
 - name: "SC-7: Boundary Protection Validation"
   hosts: all
   become: "{{ ansible_connection != 'local' and grc_audit_become | default(false) }}"
+  environment:
+    PATH: "{{ grc_bin_path | default('/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
   vars:
     control_id: "SC-7"
     control_title: "Boundary Protection"
     compliance_framework: "NIST 800-53 Rev. 5"
     grc_audit_mode: read_only
+
+  pre_tasks:
+    - name: Load OS / K8s platform path map
+      ansible.builtin.include_tasks: tasks/load_platform_vars.yml
 
   tasks:
     - name: "SC-7.1: Verify firewall services (read-only)"
@@ -62,13 +68,11 @@
     - name: "SC-7.4: Verify network security config files (read-only)"
       block:
         - name: "Stat network configuration files"
-          stat:
+          ansible.builtin.stat:
             path: "{{ item }}"
-          loop:
-            - "/etc/iptables/rules.v4"
-            - "/etc/ufw/ufw.conf"
-            - "/etc/sysctl.conf"
+          loop: "{{ [grc_iptables_rules, grc_ufw_conf, '/etc/sysctl.conf'] | select('string') | reject('equalto', '') | list }}"
           register: network_config_files
+          failed_when: false
 
     - name: "SC-7.5: Verify network monitoring tools (read-only)"
       block:

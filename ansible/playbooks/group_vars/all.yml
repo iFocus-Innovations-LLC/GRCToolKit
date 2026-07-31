@@ -2,6 +2,9 @@
 # Shared GRC audit probe settings (read-only validation profile).
 # Production: set grc_audit_become: true and ansible_user: grc-audit in private inventory.
 # See docs/ANSIBLE-AUDIT-OPERATIONS.md and docs/ANSIBLE-AUDIT-COMMAND-MATRIX.md
+#
+# OS / K8s config PATH maps are loaded per-play via tasks/load_platform_vars.yml
+# from vars/platform/{defaults,Darwin,Debian,Ubuntu,RedHat,Amazon,Alpine,k8s_overlay}.yml
 
 grc_audit_mode: read_only
 grc_audit_become: false

@@ -22,9 +22,28 @@ This guide defines how organizations run validation **without outages**, align w
 | **Human-in-the-loop** | Production runs require human approval — see [HITL Framework](HITL-FRAMEWORK.md) Tier 2/3 |
 | **Change window** | Schedule playbook execution in an approved maintenance or after-hours window (ITIL Standard Change) |
 | **Lab vs production** | UI **Validate Controls** is for localhost QA only; production uses **manual CLI** from a jump host |
-| **No silent mutation** | AC-3, AC-6, AU-2, SC-7 playbooks use `grc_audit_mode: read_only` — probes only; no `systemd` state changes |
+| **No silent mutation** | Validation playbooks use `grc_audit_mode: read_only` — probes only; no `systemd` state changes |
 
 **Reference posture (target state):** [`ansible/playbooks/llm/owasp-llm-top-10-validate.yml`](../ansible/playbooks/llm/owasp-llm-top-10-validate.yml) — read-only intent, conditional privilege escalation, HITL/no auto-remediation.
+
+---
+
+## OS path maps and Kubernetes (production)
+
+Validation playbooks call [`tasks/load_platform_vars.yml`](../ansible/playbooks/tasks/load_platform_vars.yml) before probes. That loader:
+
+1. Detects **in-cluster Kubernetes** via `KUBERNETES_SERVICE_HOST` (GKE / EKS / AKS / self-managed).
+2. Loads [`vars/platform/defaults.yml`](../ansible/playbooks/vars/platform/defaults.yml), then overlays by `ansible_distribution` / `ansible_os_family` (`Darwin`, `Debian`, `Ubuntu`, `RedHat`, `Amazon`, `Alpine`).
+3. Sets **`PATH`** from `grc_bin_path` (includes Homebrew on Darwin).
+4. If `/host/etc` exists in-cluster, remaps config paths for **node-level** Jobs (hostPath convention).
+
+| Target | Inventory | Notes |
+|--------|-----------|--------|
+| Laptop lab | [`inventory.yml`](../ansible/playbooks/inventory.yml) | Darwin or Linux localhost |
+| Linux fleet | private inventory + `grc-audit` | See production example |
+| Native K8s (any cloud) | [`inventory.k8s.example.yml`](../ansible/playbooks/inventory.k8s.example.yml) | Job/DaemonSet with optional `hostPath: /host` |
+
+**Honest scope:** Path maps cover common Unix families used in production IT and cloud node images. Windows remains a separate roadmap track. Cluster **API-plane** checks (RBAC, NetworkPolicy) stay in the K8s skill / future controllers — Ansible here validates **node/OS userspace** (and mounted host paths).
 
 ---
 

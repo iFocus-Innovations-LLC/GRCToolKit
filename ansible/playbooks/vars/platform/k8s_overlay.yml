@@ -1,0 +1,7 @@
+---
+# Flags for in-cluster Jobs (GKE / EKS / AKS / self-managed).
+# Host path remapping is applied in tasks/load_platform_vars.yml only when /host is mounted.
+
+grc_k8s_in_cluster: true
+grc_k8s_service_account: /var/run/secrets/kubernetes.io/serviceaccount
+grc_k8s_host_root: /host

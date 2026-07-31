@@ -6,96 +6,114 @@
 - name: "AU-2: Audit Events Validation"
   hosts: all
   become: "{{ ansible_connection != 'local' and grc_audit_become | default(false) }}"
+  environment:
+    PATH: "{{ grc_bin_path | default('/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
   vars:
     control_id: "AU-2"
     control_title: "Audit Events"
     compliance_framework: "NIST 800-53 Rev. 5"
     grc_audit_mode: read_only
 
+  pre_tasks:
+    - name: Load OS / K8s platform path map
+      ansible.builtin.include_tasks: tasks/load_platform_vars.yml
+
   tasks:
     - name: "AU-2.1: Verify auditd service (read-only)"
       block:
         - name: "Check auditd service is active"
-          command: systemctl is-active auditd
+          ansible.builtin.command: systemctl is-active auditd
           register: auditd_active
           changed_when: false
           failed_when: false
+          when: grc_init_system == 'systemd'
 
         - name: "AU-2.1: FAIL - Audit service not active"
-          fail:
+          ansible.builtin.fail:
             msg: "Audit service not active - AU-2.1 compliance failure"
           when:
-            - ansible_os_family != 'Darwin'
+            - ansible_facts.get('os_family') != 'Darwin'
+            - grc_init_system == 'systemd'
+            - auditd_active.rc is defined
             - auditd_active.rc != 0
 
-        - name: "AU-2.1: LAB NOTE - auditd not available on macOS"
-          debug:
-            msg: "Lab host (Darwin): auditd/systemctl checks skipped; run against production Linux for AU-2 evidence."
-          when: ansible_os_family == 'Darwin'
+        - name: "AU-2.1: LAB NOTE - auditd not available on this platform"
+          ansible.builtin.debug:
+            msg: "Platform {{ grc_platform_id }}: auditd/systemctl checks skipped; run against production Linux for AU-2 evidence."
+          when: grc_init_system != 'systemd' or ansible_facts.get('os_family') == 'Darwin'
 
     - name: "AU-2.2: Verify audit rules (read-only)"
       block:
         - name: "Check audit rules file"
-          stat:
-            path: "/etc/audit/rules.d/audit.rules"
+          ansible.builtin.stat:
+            path: "{{ grc_audit_rules }}"
           register: audit_rules_file
+          when: grc_audit_rules | length > 0
 
         - name: "Count non-comment audit rules"
-          command: grep -c '^[^#]' /etc/audit/rules.d/audit.rules
+          ansible.builtin.command: "grep -c '^[^#]' {{ grc_audit_rules }}"
           register: audit_rules_count
           changed_when: false
           failed_when: false
-          when: audit_rules_file.stat.exists
+          when:
+            - grc_audit_rules | length > 0
+            - audit_rules_file.stat.exists | default(false)
 
         - name: "AU-2.2: FAIL - No audit rules configured"
-          fail:
+          ansible.builtin.fail:
             msg: "No audit rules found - AU-2.2 compliance failure"
           when:
-            - audit_rules_file.stat.exists
+            - audit_rules_file.stat.exists | default(false)
             - (audit_rules_count.stdout | default('0')) == '0'
 
         - name: "AU-2.2: WARN - Audit rules file missing"
-          debug:
-            msg: "Audit rules file not found - consider configuring audit rules"
-          when: not audit_rules_file.stat.exists
+          ansible.builtin.debug:
+            msg: "Audit rules file not found at {{ grc_audit_rules }} - consider configuring audit rules"
+          when:
+            - grc_audit_rules | length > 0
+            - not (audit_rules_file.stat.exists | default(false))
 
     - name: "AU-2.3: Verify audit log files (read-only)"
       block:
         - name: "Check audit log directory"
-          stat:
-            path: "/var/log/audit"
+          ansible.builtin.stat:
+            path: "{{ grc_audit_log_dir }}"
           register: audit_log_dir
+          when: grc_audit_log_dir | length > 0
 
         - name: "Count audit log files"
-          command: find /var/log/audit -maxdepth 1 -name 'audit.log*' -type f | wc -l
+          ansible.builtin.command: "find {{ grc_audit_log_dir }} -maxdepth 1 -name 'audit.log*' -type f | wc -l"
           register: audit_log_files
           changed_when: false
           failed_when: false
-          when: ansible_os_family != 'Darwin'
+          when:
+            - ansible_facts.get('os_family') != 'Darwin'
+            - grc_audit_log_dir | length > 0
 
-        - name: "Set lab audit log placeholder (macOS)"
-          set_fact:
+        - name: "Set lab audit log placeholder (non-Linux auditd)"
+          ansible.builtin.set_fact:
             audit_log_files:
               stdout: "n/a"
-          when: ansible_os_family == 'Darwin'
+          when: ansible_facts.get('os_family') == 'Darwin' or grc_audit_log_dir | length == 0
 
         - name: "AU-2.3: WARN - No audit log files found"
-          debug:
+          ansible.builtin.debug:
             msg: "No audit log files found - audit logging may not be active"
           when:
-            - ansible_os_family != 'Darwin'
+            - ansible_facts.get('os_family') != 'Darwin'
             - (audit_log_files.stdout | default('0') | trim) == '0'
 
     - name: "AU-2.4: Verify audit log permissions (read-only)"
       block:
         - name: "Stat audit log file"
-          stat:
-            path: "/var/log/audit/audit.log"
+          ansible.builtin.stat:
+            path: "{{ grc_audit_log }}"
           register: audit_log_perms
           failed_when: false
+          when: grc_audit_log | length > 0
 
         - name: "Read audit log ownership"
-          command: ls -la /var/log/audit/audit.log
+          ansible.builtin.command: "ls -la {{ grc_audit_log }}"
           register: audit_log_ownership
           changed_when: false
           failed_when: false
@@ -104,34 +122,37 @@
     - name: "AU-2.5: Verify auditd configuration (read-only)"
       block:
         - name: "Check auditd.conf"
-          stat:
-            path: "/etc/audit/auditd.conf"
+          ansible.builtin.stat:
+            path: "{{ grc_auditd_conf }}"
           register: auditd_config
+          when: grc_auditd_conf | length > 0
 
         - name: "Count active auditd.conf settings"
-          command: grep -cE '^[^#].*=' /etc/audit/auditd.conf
+          ansible.builtin.command: "grep -cE '^[^#].*=' {{ grc_auditd_conf }}"
           register: auditd_config_lines
           changed_when: false
           failed_when: false
-          when: auditd_config.stat.exists
+          when: auditd_config.stat.exists | default(false)
 
     - name: "Generate AU-2 compliance report"
       block:
         - name: "Ensure report directory exists"
-          file:
+          ansible.builtin.file:
             path: "{{ grc_compliance_report_dir }}"
             state: directory
             mode: "0755"
 
         - name: "Write AU-2 compliance report JSON"
-          copy:
+          ansible.builtin.copy:
             content: |
               {
                 "control_id": "AU-2",
                 "hostname": "{{ inventory_hostname }}",
+                "platform_id": "{{ grc_platform_id }}",
                 "validation_timestamp": "{{ ansible_date_time.iso8601 }}",
                 "grc_audit_mode": "{{ grc_audit_mode }}",
                 "auditd_active": "{{ auditd_active.stdout | default('unknown') }}",
+                "audit_rules_path": "{{ grc_audit_rules }}",
                 "audit_rules_count": "{{ audit_rules_count.stdout | default('0') }}",
                 "audit_log_files": "{{ audit_log_files.stdout | default('0') | trim }}"
               }

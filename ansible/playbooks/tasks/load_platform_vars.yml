@@ -1,0 +1,95 @@
+---
+# Resolve OS- and environment-specific config PATH maps for GRC validation.
+# Usage (in each playbook):
+#   pre_tasks:
+#     - ansible.builtin.include_tasks: tasks/load_platform_vars.yml
+
+- name: Detect in-cluster Kubernetes (cloud-agnostic)
+  ansible.builtin.set_fact:
+    grc_k8s_in_cluster: "{{ (lookup('env', 'KUBERNETES_SERVICE_HOST') | default('', true) | length) > 0 }}"
+
+- name: Detect container runtime markers
+  ansible.builtin.stat:
+    path: /.dockerenv
+  register: grc_dockerenv
+  changed_when: false
+  failed_when: false
+
+- name: Set container fact
+  ansible.builtin.set_fact:
+    grc_is_container: >-
+      {{
+        (grc_dockerenv.stat.exists | default(false))
+        or (ansible_facts.get('virtualization_type', '') | string) in ['docker', 'container', 'podman', 'lxc', 'containerd']
+      }}
+
+- name: Load default platform path map
+  ansible.builtin.include_vars:
+    file: vars/platform/defaults.yml
+
+- name: Overlay distribution / OS-family path map
+  ansible.builtin.include_vars:
+    file: "{{ item }}"
+  with_first_found:
+    - files:
+        - "vars/platform/{{ ansible_facts['distribution'] | default('Unknown') }}.yml"
+        - "vars/platform/{{ ansible_facts['os_family'] | default('Unknown') }}.yml"
+      skip: true
+
+- name: Overlay Kubernetes in-cluster flags
+  ansible.builtin.include_vars:
+    file: vars/platform/k8s_overlay.yml
+  when: grc_k8s_in_cluster | bool
+
+- name: Check for Kubernetes hostPath root (/host)
+  ansible.builtin.stat:
+    path: "{{ grc_k8s_host_root | default('/host') }}/etc"
+  register: grc_k8s_host_etc
+  changed_when: false
+  failed_when: false
+  when: grc_k8s_in_cluster | bool
+
+- name: Remap config paths to host mounts (node validation Job)
+  ansible.builtin.set_fact:
+    grc_platform_id: "{{ grc_platform_id }}-k8s-host"
+    grc_sshd_config: "{{ grc_k8s_host_root }}/etc/ssh/sshd_config"
+    grc_passwd: "{{ grc_k8s_host_root }}/etc/passwd"
+    grc_shadow: "{{ grc_k8s_host_root }}/etc/shadow"
+    grc_group: "{{ grc_k8s_host_root }}/etc/group"
+    grc_sudoers: "{{ grc_k8s_host_root }}/etc/sudoers"
+    grc_pam_auth: "{{ grc_k8s_host_root }}/etc/pam.d/sshd"
+    grc_pam_system: "{{ grc_k8s_host_root }}/etc/pam.d/system-auth"
+    grc_login_defs: "{{ grc_k8s_host_root }}/etc/login.defs"
+    grc_pwquality: "{{ grc_k8s_host_root }}/etc/security/pwquality.conf"
+    grc_audit_rules: "{{ grc_k8s_host_root }}/etc/audit/rules.d/audit.rules"
+    grc_auditd_conf: "{{ grc_k8s_host_root }}/etc/audit/auditd.conf"
+    grc_var_log: "{{ grc_k8s_host_root }}/var/log"
+    grc_auth_log: "{{ grc_k8s_host_root }}/var/log/auth.log"
+    grc_secure_log: "{{ grc_k8s_host_root }}/var/log/secure"
+    grc_system_log: "{{ grc_k8s_host_root }}/var/log/messages"
+    grc_audit_log_dir: "{{ grc_k8s_host_root }}/var/log/audit"
+    grc_nginx_conf: "{{ grc_k8s_host_root }}/etc/nginx/nginx.conf"
+    grc_apache_conf: "{{ grc_k8s_host_root }}/etc/apache2/apache2.conf"
+    grc_httpd_conf: "{{ grc_k8s_host_root }}/etc/httpd/conf/httpd.conf"
+    grc_openssl_cnf: "{{ grc_k8s_host_root }}/etc/ssl/openssl.cnf"
+  when:
+    - grc_k8s_in_cluster | bool
+    - grc_k8s_host_etc.stat.exists | default(false)
+
+- name: Tag in-cluster pod validation (no host mount)
+  ansible.builtin.set_fact:
+    grc_platform_id: "{{ grc_platform_id }}-k8s-pod"
+  when:
+    - grc_k8s_in_cluster | bool
+    - not (grc_k8s_host_etc.stat.exists | default(false))
+
+- name: Publish resolved platform summary
+  ansible.builtin.debug:
+    msg: >-
+      GRC platform map: id={{ grc_platform_id }}
+      os_family={{ ansible_facts.get('os_family', 'unknown') }}
+      distribution={{ ansible_facts.get('distribution', 'unknown') }}
+      k8s={{ grc_k8s_in_cluster }}
+      container={{ grc_is_container }}
+      sshd={{ grc_sshd_config }}
+      PATH={{ grc_bin_path }}
