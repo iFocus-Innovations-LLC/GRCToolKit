@@ -19,11 +19,15 @@ Follow the process in [docs/SECURITY.md](docs/SECURITY.md). Security reports are
 
 ## Branch workflow
 
+Full model: [docs/RELEASE-BRANCHING.md](docs/RELEASE-BRANCHING.md) (feature → `dev` → `main` + tags; QA/Demo freeze tags).
+
 | Branch | Purpose |
 |--------|---------|
-| `main` | Production-ready releases. Protected — merge via PR only. |
-| `dev` | Integration branch for ongoing development (see also [docs/BRANCH-PROTECTION.md](docs/BRANCH-PROTECTION.md), which references `develop` — use `dev` as the live integration branch in this repo). |
-| `feature/*`, `fix/*`, `chore/*` | Short-lived topic branches off `dev` |
+| `main` | Stable / releasable. Protected — merge via PR only. |
+| `dev` | Integration branch for ongoing development. |
+| `feature/*`, `fix/*`, `chore/*`, `docs/*` | Short-lived topic branches (prefer off `dev`). |
+| `hotfix/*` | Urgent fixes from `main`; back-merge to `dev`. |
+| `vX.Y.Z-qa-demo` | Frozen QA/Demo pins — use for conferences and GCP QA. |
 
 Typical flow:
 
@@ -33,8 +37,10 @@ git pull origin dev
 git checkout -b feature/your-change
 # ... make changes, test locally ...
 git push -u origin feature/your-change
-# Open a PR targeting dev (or main for release-critical hotfixes, with maintainer approval)
+# Open a PR targeting dev (or main for release-critical hotfixes / docs, with maintainer approval)
 ```
+
+**Demos:** checkout the current freeze tag (e.g. `v2.1.0-qa-demo`) — see [docs/RELEASE-BRANCHING.md](docs/RELEASE-BRANCHING.md).
 
 ## Local development
 
@@ -82,9 +88,10 @@ See [docs/QA-TESTING-GUIDE.md](docs/QA-TESTING-GUIDE.md) for full QA procedures.
 
 | Check | Source | Notes |
 |-------|--------|-------|
-| AI peer review | `.github/workflows/ai-pr-review.yml` | Automated GRC/security review comment; blocks on CRITICAL findings |
 | PR tests | `.github/workflows/pr-test.yml` | Syntax checks, hardening, MVP demo script validation |
 | CI/CD | `.github/workflows/ci-cd.yml` | Build, scan, deploy (varies by branch and repo secrets) |
+
+**MVP note:** There is **no** Anthropic/Claude AI peer-review job in CI (avoids second-LLM token spend). Human CODEOWNERS review + Trivy/hardening checks are the merge gate. Optional multi-model CI review is a future research item ([docs/PM-TODO.md](docs/PM-TODO.md) P6).
 
 All required checks must pass before merge. A **human maintainer approval** is also required for `main` and `dev`. See [docs/BRANCH-PROTECTION.md](docs/BRANCH-PROTECTION.md).
 

@@ -2,7 +2,7 @@
 
 **Audience:** CISO, VP Risk, GRC leads, technical evaluators  
 **Duration:** 12–18 minutes (live) + 5 minutes Q&A  
-**Last updated:** 2026-07-07
+**Last updated:** 2026-07-30
 
 ---
 
@@ -21,6 +21,17 @@
 ---
 
 ## Pre-demo setup (5 minutes before)
+
+**Prefer the QA/Demo freeze tag** (not a floating branch tip):
+
+```bash
+git fetch --tags
+git checkout v2.1.0-qa-demo   # create this tag after MVP CI cleanup merges to main — see RELEASE-BRANCHING.md
+export GEMINI_API_KEY="your-key-from-google-ai-studio"
+./scripts/run-local.sh
+```
+
+If the freeze tag is not yet published, use the maintainer-approved commit on `main` and note it in the demo log.
 
 ```bash
 export GEMINI_API_KEY="your-key-from-google-ai-studio"

@@ -66,6 +66,8 @@ For roadmap detail, see [ROADMAP.md](ROADMAP.md#market-positioning-grctoolkit-vs
 - Ansible playbooks for control validation and evidence collection
 - **Production handoff:** [Ansible Audit Operations](ANSIBLE-AUDIT-OPERATIONS.md) (ITIL window, manual CLI, SysAdmin RACI)
 - Auditor-ready report generation (`compliance-docs/`)
+- **Roadmap:** Windows targets via [Chocolatey](https://chocolatey.org/) bootstrap + WinRM inventory; mobile companion (Android/iOS) via PWA → Capacitor  
+  → [Windows OS Ansible validation](ROADMAP.md#windows-os-ansible-validation-chocolatey) · [Mobile groundwork](ROADMAP.md#44-mobile-app-level-groundwork-android-and-ios)
 
 ### Human-in-the-Loop (HITL)
 - Three-tier model: **Automated → Human Review → Human-Guided**
@@ -91,7 +93,7 @@ For roadmap detail, see [ROADMAP.md](ROADMAP.md#market-positioning-grctoolkit-vs
 
 ### Open source governance
 - MIT license, contributing guide, code of conduct, CODEOWNERS
-- CI: container hardening, image pin checks, MVP demo tests, AI peer review on PRs
+- CI: container hardening, image pin checks, MVP demo tests, Trivy/Scout scanning (human CODEOWNERS review — no LLM peer-review job in MVP)
 - Security policy and private vulnerability reporting path  
   → [SECURITY.md](SECURITY.md) · [CONTRIBUTING.md](../CONTRIBUTING.md)
 
@@ -245,4 +247,4 @@ We are transparent about maturity so evaluators — including government innovat
 
 ---
 
-*Last updated: 2026-07-16 · GRCToolKit.ai v2.1.0-dev*
+*Last updated: 2026-07-30 · GRCToolKit.ai v2.1.0-dev*

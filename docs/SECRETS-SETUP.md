@@ -12,8 +12,9 @@ Zero-trust secrets management for GRC Toolkit. **Never commit API keys, tokens, 
 | **WORKLOAD_IDENTITY_PROVIDER** | GitHub Actions | WIF provider resource name for OIDC federation |
 | **GCP_SA_EMAIL** | GitHub Actions | GCP service account that GitHub impersonates via WIF |
 | **GKE_CLUSTER_NAME** | GitHub Actions | GKE cluster name for deploy |
-| **ANTHROPIC_API_KEY** | nist-validator skill | Anthropic API (optional) |
 | **Firebase config** | grctoolkit.html | Firebase (optional, for future features) |
+
+**MVP AI:** In-product AI is **Gemini BYOK only**. Anthropic/Claude is **not** used in MVP CI (peer-review workflow removed). Optional `ANTHROPIC_API_KEY` for experimental skills is **deferred** — see PM-TODO P6 GenAI research.
 
 Prefer **Workload Identity Federation (OIDC)** for Actions so you do **not** store long‑lived `GCP_SA_KEY` JSON keys in GitHub. Legacy setups may still reference `GCP_SA_KEY`; migrate to WIF when possible (see [`.github/workflows/ci-cd.yml`](../.github/workflows/ci-cd.yml)).
 
@@ -103,22 +104,15 @@ If `k8s/secret.yaml` was previously committed with a real key:
 
 ---
 
-## 5. Skills (nist-validator)
+## 5. Skills (nist-validator) — deferred
 
-The `nist-control-validator` skill expects these in GCP Secret Manager:
+The experimental `nist-control-validator` skill may reference Anthropic + Gemini secrets in GCP Secret Manager. **MVP does not require Anthropic.** Treat skill wiring as post-MVP / GenAI research (PM-TODO P6).
 
-| Secret Ref | Env Var | Purpose |
-|------------|---------|---------|
-| `anthropic-api-key` | ANTHROPIC_API_KEY | Anthropic API |
-| `grc-api-key` | CLOUD_API_KEY | Cloud/Gemini API |
-| `firebase-service-account` | GCP_SERVICE_ACCOUNT_KEY | Firebase SA JSON |
-
-Create in GCP:
-
-```bash
-echo -n "YOUR_ANTHROPIC_KEY" | gcloud secrets create anthropic-api-key --data-file=-
-echo -n "YOUR_GEMINI_KEY" | gcloud secrets create grc-api-key --data-file=-
-```
+| Secret Ref | Env Var | Purpose | MVP |
+|------------|---------|---------|-----|
+| `grc-api-key` | CLOUD_API_KEY / GEMINI | Cloud/Gemini API | App uses `GEMINI_API_KEY` |
+| `anthropic-api-key` | ANTHROPIC_API_KEY | Anthropic API | Deferred |
+| `firebase-service-account` | GCP_SERVICE_ACCOUNT_KEY | Firebase SA JSON | Optional |
 
 ---
 

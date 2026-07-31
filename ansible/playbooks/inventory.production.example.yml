@@ -11,6 +11,17 @@
 #   - grc-audit UNIX account with SSH key from jump host only
 #   - /usr/local/sbin/grc-audit-* scripts installed (see ansible/scripts/grc-audit-probes/)
 #   - /etc/sudoers.d/grc-audit deployed and validated (visudo -c)
+#
+# Windows (roadmap — separate track; Linux grc-audit does not apply):
+#   See docs/ROADMAP.md#windows-os-ansible-validation-chocolatey
+#   Bootstrap lab hosts with Chocolatey (https://chocolatey.org/); HITL before installs.
+#   Example group (private inventory only):
+#     windows_targets:
+#       hosts:
+#         win-lab-01:
+#           ansible_host: 10.0.2.50
+#           ansible_user: grc-audit
+#           ansible_connection: winrm
 
 all:
   vars:
@@ -35,3 +46,9 @@ all:
         # prod-app-02:
         #   ansible_host: 10.0.1.51
         #   ansible_user: grc-audit
+    # windows_targets:  # roadmap — uncomment in private inventory when WinRM lab is ready
+    #   hosts:
+    #     win-lab-01:
+    #       ansible_host: 10.0.2.50
+    #       ansible_user: grc-audit
+    #       ansible_connection: winrm
