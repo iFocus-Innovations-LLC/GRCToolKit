@@ -1,0 +1,32 @@
+---
+# OWASP GenAI LLM Top 10 2026 — LLM09:2026 Vector and Embedding Weaknesses (read-only)
+# https://genai.owasp.org/llm-top-10/
+# HITL: no auto-remediation. Part of GRCToolKit Shields Up.
+#
+# Usage:
+#   cd ansible/playbooks/llm
+#   ansible-playbook -i inventory.yml llm09-vector-embedding-weaknesses.yml
+
+- name: "OWASP LLM09:2026 — Vector and Embedding Weaknesses — read-only validation"
+  hosts: all
+  gather_facts: yes
+  vars_files:
+    - vars/defaults.yml
+  vars:
+    llm_findings: []
+    llm_report_basename: "llm09-vector-embedding-weaknesses"
+  tasks:
+    - name: "Include common setup"
+      include_tasks: tasks/setup.yml
+      tags: always
+
+    - name: "Include LLM09:2026 probes"
+      include_tasks:
+        file: tasks/llm09-vector-embedding-weaknesses.yml
+        apply:
+          tags: [LLM09, vector_embedding]
+      tags: [LLM09, vector_embedding]
+
+    - name: "Include report"
+      include_tasks: tasks/report.yml
+      tags: always

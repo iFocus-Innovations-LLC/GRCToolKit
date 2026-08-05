@@ -24,7 +24,7 @@ This guide defines how organizations run validation **without outages**, align w
 | **Lab vs production** | UI **Validate Controls** is for localhost QA only; production uses **manual CLI** from a jump host |
 | **No silent mutation** | Validation playbooks use `grc_audit_mode: read_only` — probes only; no `systemd` state changes |
 
-**Reference posture (target state):** [`ansible/playbooks/llm/owasp-llm-top-10-validate.yml`](../ansible/playbooks/llm/owasp-llm-top-10-validate.yml) — read-only intent, conditional privilege escalation, HITL/no auto-remediation.
+**Reference posture (LLM / Shields Up):** [`ansible/playbooks/llm/`](../ansible/playbooks/llm/) — OWASP GenAI LLM Top 10 **2026** suite (`owasp-llm-top-10-validate.yml`) plus per-risk stems (`llm01-prompt-injection.yml` … `llm10-improper-output-handling.yml`). Evidence under `/tmp/grc-llm-compliance-reports/`. Read-only; HITL/no auto-remediation. Cite: [OWASP GenAI LLM Top 10](https://genai.owasp.org/llm-top-10/).
 
 ---
 
@@ -97,9 +97,15 @@ ansible-playbook -i inventory.production.yml ac-3-access-enforcement.yml \
 # 5. Direct wrapper probe (optional; same sudoers entrypoints)
 sudo -u grc-audit /usr/local/sbin/grc-audit-au-2
 
-# 6. OWASP LLM read-only probe (app/HTTP checks; preferred low-risk profile)
+# 6. OWASP GenAI LLM Top 10 2026 — full suite (app/HTTP + host probes)
 cd llm
 ansible-playbook -i inventory.yml owasp-llm-top-10-validate.yml
+
+# Or a single 2026 risk (e.g. Excessive Agency):
+ansible-playbook -i inventory.yml llm03-excessive-agency.yml
+
+# Selective tags on the suite:
+ansible-playbook -i inventory.yml owasp-llm-top-10-validate.yml --tags LLM06
 ```
 
 **Production inventory template:** [`ansible/playbooks/inventory.production.example.yml`](../ansible/playbooks/inventory.production.example.yml) — copy to a **private** repo; customize hosts and SSH.

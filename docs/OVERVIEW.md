@@ -14,7 +14,7 @@
 
 The project is designed for organizations modernizing compliance workflows in cloud and Kubernetes environments, including teams planning **post-quantum cryptography (PQC)** migration aligned with **NIST FIPS 203 / 204 / 205**.
 
-> **Try it in five minutes:** clone the repo, set `GEMINI_API_KEY`, run `./scripts/run-local.sh`, open `http://127.0.0.1:8080/local-index.html`, and analyze a GRC scenario.
+> **Try it in five minutes:** clone the repo, set `GEMINI_API_KEY` (default BYOK; optional OpenAI/Anthropic/Groq/Vertex via `.env.local`), run `./scripts/run-local.sh`, open `http://127.0.0.1:8080/local-index.html`, and analyze a GRC scenario.
 
 ---
 
@@ -31,7 +31,7 @@ GRCToolKit.ai targets that gap:
 | AI in compliance | Generic chat over policies | Scenario → controls with **HITL** and confidence tiers |
 | Post-quantum readiness | Rarely addressed | FIPS 203/204/205 playbooks and migration roadmap |
 | Inspectability | Closed SaaS | **MIT open source** — run, fork, audit the code |
-| Physical AI / robotics | Not in scope | **Shields Up** roadmap: OWASP LLM, RSF, robotic stacks |
+| Physical AI / robotics | Not in scope | **Shields Up**: OWASP GenAI LLM Top 10 **2026** arsenal + RSF / robotic stacks |
 | Deployment | Vendor cloud only | Docker, Kubernetes, Helm, GCP bootstrap |
 
 **Fair positioning:** GRCToolKit is not a replacement for full enterprise GRC operations (multi-tenant RBAC, vendor risk suites, FedRAMP-authorized SaaS). It is open source **infrastructure for automated NIST validation, OSCAL evidence, and HITL-guarded AI** — built for security engineers, auditors, and innovation programs that need controls **validated in the stack**, not only tracked in a dashboard.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Serve the app from the repo root so paths like /ai-agent/ resolve. Injects GEMINI_API_KEY
-# into local-index.html (gitignored) the same way as scripts/docker-entrypoint.sh.
-# Also starts scripts/ansible-runner-api.py for live Validate Controls (port 8081).
+# Serve the app from the repo root so paths like /ai-agent/ resolve. Injects multi-LLM BYOK
+# placeholders into local-index.html (gitignored) the same way as scripts/docker-entrypoint.sh.
+# Also starts scripts/ansible-runner-api.py for Validate Controls + /api/llm/analyze proxy (8081).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -44,26 +44,55 @@ if [[ -f "$ROOT/.env.local" ]]; then
   set +a
 fi
 
-# Pick up GEMINI_API_KEY from repo-root .env when the shell did not export it (file is gitignored).
-if [[ -z "${GEMINI_API_KEY:-}" && -f "$ROOT/.env" ]]; then
+# Pick up keys from repo-root .env when the shell did not export them (file is gitignored).
+if [[ -f "$ROOT/.env" ]]; then
   set -a
   # shellcheck disable=SC1090
   source "$ROOT/.env" || true
   set +a
 fi
 
-k="${GEMINI_API_KEY:-}"
-k="${k//$'\r'/}"
-k="${k#"${k%%[![:space:]]*}"}"
-k="${k%"${k##*[![:space:]]}"}"
-if [[ -z "$k" ]]; then
+trim() {
+  local v="${1:-}"
+  v="${v//$'\r'/}"
+  v="${v#"${v%%[![:space:]]*}"}"
+  v="${v%"${v##*[![:space:]]}"}"
+  printf '%s' "$v"
+}
+
+esc_sed() {
+  printf '%s' "$(trim "$1")" | sed -e 's/[\\|&]/\\&/g'
+}
+
+PROVIDER="$(trim "${LLM_PROVIDER:-gemini}")"
+case "${PROVIDER}" in
+  gemini|openai|anthropic|groq|vertex) ;;
+  *) PROVIDER=gemini ;;
+esac
+
+GEMINI_K="$(trim "${GEMINI_API_KEY:-}")"
+OPENAI_K="$(trim "${OPENAI_API_KEY:-}")"
+ANTHROPIC_K="$(trim "${ANTHROPIC_API_KEY:-}")"
+GROQ_K="$(trim "${GROQ_API_KEY:-}")"
+VERTEX_K="$(trim "${VERTEX_API_KEY:-}")"
+
+if [[ -z "$GEMINI_K" && "$PROVIDER" == "gemini" ]]; then
   echo "warning: GEMINI_API_KEY is unset. Get a key from https://aistudio.google.com/ then either:" >&2
   echo "  .env.local (see .env.local.example), repo-root .env, or export GEMINI_API_KEY for this session" >&2
-  echo "  export GEMINI_API_KEY=\"...\"   # same terminal, then re-run this script" >&2
   echo "Or in the browser console: window.GEMINI_API_KEY = \"...\"; then Analyze (no reload needed)." >&2
 fi
-k_esc=$(printf '%s' "$k" | sed -e 's/[\\|&]/\\&/g')
-sed -e "s|__GEMINI_API_KEY__|${k_esc}|g" grctoolkit.html > "$OUT"
+if [[ "$PROVIDER" != "gemini" ]]; then
+  echo "info: LLM_PROVIDER=${PROVIDER} — browser calls go through local proxy http://127.0.0.1:${RUNNER_PORT}/api/llm/analyze (CORS)." >&2
+fi
+
+sed \
+  -e "s|__LLM_PROVIDER__|$(esc_sed "$PROVIDER")|g" \
+  -e "s|__GEMINI_API_KEY__|$(esc_sed "$GEMINI_K")|g" \
+  -e "s|__OPENAI_API_KEY__|$(esc_sed "$OPENAI_K")|g" \
+  -e "s|__ANTHROPIC_API_KEY__|$(esc_sed "$ANTHROPIC_K")|g" \
+  -e "s|__GROQ_API_KEY__|$(esc_sed "$GROQ_K")|g" \
+  -e "s|__VERTEX_API_KEY__|$(esc_sed "$VERTEX_K")|g" \
+  grctoolkit.html > "$OUT"
 
 LOCAL_VENV="$ROOT/.venv-local-demo"
 PYTHON="python3"
@@ -100,9 +129,12 @@ python3 -m http.server "$PORT" &
 HTTP_PID=$!
 
 echo "Repository: $ROOT"
-echo "Open (injected key lives only in local-index.html — not in grctoolkit.html):"
+echo "Open (injected keys live only in local-index.html — not in grctoolkit.html):"
 echo "  http://127.0.0.1:${PORT}/${OUT}"
-echo "Ansible API: http://127.0.0.1:${RUNNER_PORT}/health"
+echo "LLM provider: ${PROVIDER} (picker in UI; Gemini default)"
+echo "Ansible/LLM API: http://127.0.0.1:${RUNNER_PORT}/health"
+echo "  LLM proxy:     POST /api/llm/analyze (OpenAI/Anthropic/Groq/Vertex BYOK)"
 echo "Reports:    /tmp/grc-oscal-reports/ (PDF + JSON)"
+echo "LLM reports:/tmp/grc-llm-compliance-reports/"
 echo "Stop:       Ctrl+C (stops UI and Ansible runner)"
 wait "${HTTP_PID}"

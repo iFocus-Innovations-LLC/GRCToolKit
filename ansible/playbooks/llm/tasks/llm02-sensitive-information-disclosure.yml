@@ -1,0 +1,56 @@
+---
+# LLM02:2026 — Sensitive Information Disclosure
+- name: "LLM02:2026 — Sensitive Information Disclosure — API key leakage in HTML"
+  set_fact:
+    llm_findings: "{{ llm_findings + [llm02_finding] }}"
+  vars:
+    body: "{{ llm_app_response.content | default('') }}"
+    has_placeholder: "{{ '__GEMINI_API_KEY__' in body or '__OPENAI_API_KEY__' in body or '__ANTHROPIC_API_KEY__' in body or '__GROQ_API_KEY__' in body }}"
+    has_empty_key: "{{ 'window.GEMINI_API_KEY = \"\"' in body or 'window.OPENAI_API_KEY = \"\"' in body }}"
+    has_likely_key: "{{ body | regex_search('window\\.(GEMINI|OPENAI|ANTHROPIC|GROQ)_API_KEY = \"[A-Za-z0-9_-]{20,}\"') is not none }}"
+    llm02_finding:
+      id: "LLM02:2026"
+      title: "Sensitive Information Disclosure"
+      status: >-
+        {{ 'FAIL' if has_likely_key
+           else ('WARN' if has_empty_key else ('PASS' if not has_placeholder else 'WARN')) }}
+      detail: >-
+        Client-side API key detected={{ has_likely_key }}.
+        Prefer server-side proxy for production; restrict keys; never commit secrets.
+  when: llm_app_response.content is defined
+  tags: [LLM02, sensitive_disclosure]
+
+- name: "LLM02:2026 — probe sensitive HTTP paths"
+  uri:
+    url: "{{ llm_app_base_url }}{{ item }}"
+    method: GET
+    status_code: [200, 301, 302, 403, 404, 500]
+    timeout: 5
+  loop:
+    - "/.env"
+    - "/api/keys"
+    - "/models/"
+  register: llm02_exposed_paths
+  failed_when: false
+  tags: [LLM02, sensitive_disclosure]
+
+- name: "LLM02:2026 — record path exposure finding"
+  set_fact:
+    llm_findings: "{{ llm_findings + [llm02_path_finding] }}"
+  vars:
+    exposed: "{{ llm02_exposed_paths.results | default([]) | selectattr('status', 'equalto', 200) | list | length }}"
+    llm02_path_finding:
+      id: "LLM02:2026"
+      title: "Sensitive Information Disclosure"
+      status: "{{ 'FAIL' if exposed | int > 0 else 'PASS' }}"
+      detail: >-
+        {{ exposed | string + ' sensitive path(s) returned HTTP 200 — block secrets and model artifacts from web root.'
+           if exposed | int > 0
+           else 'No .env, /api/keys, or /models/ path returned HTTP 200.' }}
+  tags: [LLM02, sensitive_disclosure]
+
+- name: "LLM02:2026 — SKIP HTML probe when page unreachable"
+  set_fact:
+    llm_findings: "{{ llm_findings + [{'id': 'LLM02:2026', 'title': 'Sensitive Information Disclosure', 'status': 'SKIP', 'detail': 'Could not fetch app HTML for key-leakage scan.'}] }}"
+  when: llm_app_response.content is not defined
+  tags: [LLM02, sensitive_disclosure]

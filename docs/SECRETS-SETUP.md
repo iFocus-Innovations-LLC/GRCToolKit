@@ -6,7 +6,12 @@ Zero-trust secrets management for GRC Toolkit. **Never commit API keys, tokens, 
 
 | Secret / variable | Used By | Purpose |
 |--------|---------|---------|
-| **GEMINI_API_KEY** | App (Docker, K8s) | Gemini AI API for GRC recommendations |
+| **GEMINI_API_KEY** | App (Docker, K8s, run-local) | Default Gemini BYOK for Analyze Scenario |
+| **OPENAI_API_KEY** | run-local LLM proxy (optional) | OpenAI BYOK via `POST /api/llm/analyze` |
+| **ANTHROPIC_API_KEY** | run-local LLM proxy (optional) | Anthropic BYOK via local proxy |
+| **GROQ_API_KEY** | run-local LLM proxy (optional) | Groq BYOK via local proxy |
+| **VERTEX_API_KEY** | run-local LLM proxy (optional) | Vertex / Gemini-compatible BYOK |
+| **LLM_PROVIDER** | run-local / Docker inject | Default picker value (`gemini`\|`openai`\|`anthropic`\|`groq`\|`vertex`) |
 | **DOCKER_SCOUT_TOKEN** | GitHub Actions | Docker image vulnerability scanning (optional) |
 | **GCP_PROJECT_ID** | GitHub Actions, scripts | GCP project identifier |
 | **WORKLOAD_IDENTITY_PROVIDER** | GitHub Actions | WIF provider resource name for OIDC federation |
@@ -14,7 +19,7 @@ Zero-trust secrets management for GRC Toolkit. **Never commit API keys, tokens, 
 | **GKE_CLUSTER_NAME** | GitHub Actions | GKE cluster name for deploy |
 | **Firebase config** | grctoolkit.html | Firebase (optional, for future features) |
 
-**MVP AI:** In-product AI is **Gemini BYOK only**. Anthropic/Claude is **not** used in MVP CI (peer-review workflow removed). Optional `ANTHROPIC_API_KEY` for experimental skills is **deferred** — see PM-TODO P6 GenAI research.
+**Community AI:** Runtime multi-LLM **BYOK** (Gemini default; OpenAI / Anthropic / Groq / Vertex optional). Non-Gemini providers use the **localhost runner proxy** (`scripts/ansible-runner-api.py` → `/api/llm/analyze`) because browsers often block CORS. **CI does not require a second paid LLM** — Anthropic peer-review remains out of MVP pipelines (PM-TODO P6).
 
 Prefer **Workload Identity Federation (OIDC)** for Actions so you do **not** store long‑lived `GCP_SA_KEY` JSON keys in GitHub. Legacy setups may still reference `GCP_SA_KEY`; migrate to WIF when possible (see [`.github/workflows/ci-cd.yml`](../.github/workflows/ci-cd.yml)).
 
@@ -48,12 +53,20 @@ The impersonated GCP service account needs:
 
 ## 2. Local Development
 
-### Option A: Environment Variable
+### Option A: Environment Variable / `.env.local`
 
 ```bash
+cp .env.local.example .env.local
+# edit GEMINI_API_KEY=... (and optional OPENAI_/ANTHROPIC_/GROQ_/VERTEX_ keys)
+./scripts/run-local.sh
+# Open http://127.0.0.1:8080/local-index.html — keys are injected only into local-index.html
+
+# Docker (Gemini still primary):
 export GEMINI_API_KEY="your-gemini-api-key"
-docker run -p 8080:8080 -e GEMINI_API_KEY=$GEMINI_API_KEY grc-toolkit
+docker run -p 8080:8080 -e GEMINI_API_KEY=$GEMINI_API_KEY -e LLM_PROVIDER=gemini grc-toolkit
 ```
+
+**CORS / proxy:** OpenAI, Anthropic, Groq, and Vertex calls from the browser go through `http://127.0.0.1:8081/api/llm/analyze` (started by `run-local.sh`). The proxy never logs API keys; it binds **localhost only**.
 
 **If the app shows `API error: 400 - API key expired`:** Google uses that wording for several failures—not only clock expiry. Typical causes: key deleted or rotated in [Google AI Studio](https://aistudio.google.com/); API key **restrictions** in GCP (Credentials) blocking **Generative Language API** or the wrong **HTTP referrer** (browser vs `file://`); or the page still has an **old embedded key** (restart `./scripts/run-local.sh` or the container, then hard-refresh). Verify the value the browser uses: DevTools → Console → `window.GEMINI_API_KEY` (check length/prefix only; do not paste the full key into chat).
 
@@ -106,12 +119,12 @@ If `k8s/secret.yaml` was previously committed with a real key:
 
 ## 5. Skills (nist-validator) — deferred
 
-The experimental `nist-control-validator` skill may reference Anthropic + Gemini secrets in GCP Secret Manager. **MVP does not require Anthropic.** Treat skill wiring as post-MVP / GenAI research (PM-TODO P6).
+The experimental `nist-control-validator` skill may reference Anthropic + Gemini secrets in GCP Secret Manager. **CI does not require Anthropic.** Community runtime BYOK for Anthropic/OpenAI/Groq/Vertex is optional via `.env.local` + local proxy (PM-TODO P6).
 
 | Secret Ref | Env Var | Purpose | MVP |
 |------------|---------|---------|-----|
 | `grc-api-key` | CLOUD_API_KEY / GEMINI | Cloud/Gemini API | App uses `GEMINI_API_KEY` |
-| `anthropic-api-key` | ANTHROPIC_API_KEY | Anthropic API | Deferred |
+| `anthropic-api-key` | ANTHROPIC_API_KEY | Anthropic API | Optional Community BYOK (not required for CI) |
 | `firebase-service-account` | GCP_SERVICE_ACCOUNT_KEY | Firebase SA JSON | Optional |
 
 ---

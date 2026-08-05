@@ -1,0 +1,39 @@
+---
+# LLM05:2026 — Data and Model Poisoning
+- name: "LLM05:2026 — Data/Model Poisoning — world-writable model/training paths"
+  find:
+    paths:
+      - /var/lib
+      - /opt
+    patterns: "*(train|model|finetune|weights)*"
+    file_type: directory
+    recurse: no
+  register: llm05_train_dirs
+  failed_when: false
+  become: "{{ ansible_connection != 'local' }}"
+  tags: [LLM05, data_model_poisoning]
+
+- name: "LLM05:2026 — check permissions on discovered training dirs"
+  stat:
+    path: "{{ item.path }}"
+  loop: "{{ llm05_train_dirs.files | default([]) }}"
+  register: llm05_dir_stats
+  failed_when: false
+  become: "{{ ansible_connection != 'local' }}"
+  when: llm05_train_dirs.matched | default(0) > 0
+  tags: [LLM05, data_model_poisoning]
+
+- name: "LLM05:2026 — record finding"
+  set_fact:
+    llm_findings: "{{ llm_findings + [llm05_finding] }}"
+  vars:
+    world_writable: "{{ llm05_dir_stats.results | default([]) | selectattr('stat.mode', 'defined') | selectattr('stat.mode', 'match', '.*7$') | list | length }}"
+    llm05_finding:
+      id: "LLM05:2026"
+      title: "Data and Model Poisoning"
+      status: "{{ 'FAIL' if world_writable | int > 0 else 'PASS' }}"
+      detail: >-
+        {{ 'Found ' + (world_writable | string) + ' world-writable training/model path(s).'
+           if world_writable | int > 0
+           else 'No world-writable training paths detected (inference-only deployments: N/A).' }}
+  tags: [LLM05, data_model_poisoning]

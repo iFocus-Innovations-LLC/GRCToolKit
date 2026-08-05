@@ -161,7 +161,7 @@ GRCToolKit aims to **align toward** [CISA Open Source Software: Security Princip
 | Vulnerability management | Private reporting via SECURITY.md; scanner workflows on PRs | Formal response SLAs as project grows |
 | SBOM | Aspirational (noted in Shields Up / robotics docs) | Generate/publish SBOM for release images (see [2026 Minimum Elements for an SBOM](https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom)) — PM-TODO |
 | Trust assessment (C4-oriented) | Transparent repo, CODEOWNERS, HITL before remediation | Document consumer trust checklist as needed |
-| Open source AI | Gemini BYOK; HITL; no silent auto-remediation; secrets via env/Secret Manager | Multi-model evaluation deferred (PM-TODO P6) |
+| Open source AI | Multi-LLM Community BYOK (Gemini default); HITL; no silent auto-remediation; secrets via env/Secret Manager | Multi-model **CI** peer review still deferred (PM-TODO P6) |
 
 Branching and release hygiene supporting secure OSS practice: [RELEASE-BRANCHING.md](RELEASE-BRANCHING.md).
 

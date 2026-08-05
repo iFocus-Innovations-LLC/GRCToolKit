@@ -1,0 +1,28 @@
+---
+# Common setup for OWASP LLM Top 10 2026 probes (read-only).
+- name: "Setup — create report directory"
+  file:
+    path: "{{ llm_report_dir }}"
+    state: directory
+    mode: "0755"
+  tags: always
+
+- name: "Setup — fetch LLM application page"
+  uri:
+    url: "{{ llm_app_base_url }}{{ llm_app_path }}"
+    method: GET
+    return_content: yes
+    status_code: [200, 301, 302, 403, 404]
+    timeout: 10
+  register: llm_app_response
+  failed_when: false
+  tags: always
+
+- name: "Setup — fetch response headers"
+  uri:
+    url: "{{ llm_app_base_url }}{{ llm_app_path }}"
+    method: HEAD
+    timeout: 10
+  register: llm_app_headers
+  failed_when: false
+  tags: always

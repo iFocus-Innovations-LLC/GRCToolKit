@@ -1,7 +1,8 @@
 ---
-# Sample inventory for OWASP LLM Top 10 validation
+# Sample inventory for OWASP GenAI LLM Top 10 2026 validation
 # Usage:
 #   ansible-playbook -i inventory.yml owasp-llm-top-10-validate.yml
+#   ansible-playbook -i inventory.yml llm03-excessive-agency.yml
 #
 # Override the app URL for Docker / K8s / remote hosts:
 #   ansible-playbook -i inventory.yml owasp-llm-top-10-validate.yml \
@@ -11,8 +12,9 @@ all:
   hosts:
     localhost:
       ansible_connection: local
+      ansible_python_interpreter: auto_silent
       llm_app_base_url: "http://127.0.0.1:8080"
       llm_app_path: "/"
       llm_health_path: "/health"
       llm_report_dir: "/tmp/grc-llm-compliance-reports"
-      # grctoolkit_app_root: defaults to repo root via playbook
+      # grctoolkit_app_root: defaults via vars/defaults.yml (repo root)

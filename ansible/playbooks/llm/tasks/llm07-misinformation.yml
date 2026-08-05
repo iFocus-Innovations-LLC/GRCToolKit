@@ -1,0 +1,23 @@
+---
+# LLM07:2026 — Misinformation
+- name: "LLM07:2026 — Misinformation — human review / disclaimer in UI"
+  set_fact:
+    llm_findings: "{{ llm_findings + [llm07_finding] }}"
+  vars:
+    body: "{{ llm_app_response.content | default('') }}"
+    has_disclaimer: "{{ body | regex_search('(?i)(human.{0,20}review|not.{0,20}legal advice|verify|confidence|HITL|human-in-the-loop)') is not none }}"
+    llm07_finding:
+      id: "LLM07:2026"
+      title: "Misinformation"
+      status: "{{ 'PASS' if has_disclaimer else 'WARN' }}"
+      detail: >-
+        UI contains human-review, HITL, or verification messaging={{ has_disclaimer }}.
+        Document LLM limitations and require analyst sign-off for compliance decisions.
+  when: llm_app_response.content is defined
+  tags: [LLM07, misinformation]
+
+- name: "LLM07:2026 — SKIP when app unreachable"
+  set_fact:
+    llm_findings: "{{ llm_findings + [{'id': 'LLM07:2026', 'title': 'Misinformation', 'status': 'SKIP', 'detail': 'App unreachable — start GRCToolKit or set llm_app_base_url.'}] }}"
+  when: llm_app_response.content is not defined
+  tags: [LLM07, misinformation]

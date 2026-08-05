@@ -1,0 +1,38 @@
+---
+# LLM06:2026 — Unbounded Consumption
+- name: "LLM06:2026 — Unbounded Consumption — nginx body/rate limits"
+  shell: |
+    set -e
+    for f in /etc/nginx/nginx.conf /etc/nginx/conf.d/*.conf; do
+      [ -f "$f" ] || continue
+      grep -E 'client_max_body_size|limit_req' "$f" && exit 0
+    done
+    exit 1
+  register: llm06_nginx_limits
+  failed_when: false
+  changed_when: false
+  become: "{{ ansible_connection != 'local' }}"
+  tags: [LLM06, unbounded_consumption]
+
+- name: "LLM06:2026 — health endpoint responds within timeout"
+  uri:
+    url: "{{ llm_app_base_url }}{{ llm_health_path }}"
+    method: GET
+    timeout: 5
+  register: llm06_health
+  failed_when: false
+  tags: [LLM06, unbounded_consumption]
+
+- name: "LLM06:2026 — record finding"
+  set_fact:
+    llm_findings: "{{ llm_findings + [llm06_finding] }}"
+  vars:
+    llm06_finding:
+      id: "LLM06:2026"
+      title: "Unbounded Consumption"
+      status: "{{ 'WARN' if llm06_nginx_limits.rc != 0 else 'PASS' }}"
+      detail: >-
+        Rate/size limits in nginx={{ llm06_nginx_limits.rc == 0 }},
+        health reachable={{ llm06_health.status | default('n/a') }}.
+        Configure rate limiting, quotas, and request size caps on LLM endpoints.
+  tags: [LLM06, unbounded_consumption]
