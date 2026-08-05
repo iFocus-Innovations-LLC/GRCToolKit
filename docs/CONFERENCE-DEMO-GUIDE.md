@@ -2,7 +2,7 @@
 
 **Audience:** CISO, VP Risk, GRC leads, technical evaluators  
 **Duration:** 12–18 minutes (live) + 5 minutes Q&A  
-**Last updated:** 2026-07-30
+**Last updated:** 2026-08-05
 
 ---
 
@@ -40,7 +40,9 @@ export GEMINI_API_KEY="your-key-from-google-ai-studio"
 
 Open **http://127.0.0.1:8080/local-index.html** (not the raw `grctoolkit.html` — the script injects your key into `local-index.html` only).
 
-**Optional:** `brew install ansible` so **Validate Controls** runs real playbooks (runner API on `127.0.0.1:8081`).
+**Optional:** `brew install ansible` so **Validate Controls** runs real playbooks (runner API on `127.0.0.1:8081`, also hosts the multi-LLM BYOK proxy at `/api/llm/analyze`).
+
+**LLM picker:** UI defaults to **Gemini**. OpenAI / Anthropic / Groq / Vertex need the matching `*_API_KEY` in `.env.local` and the local proxy (keep `run-local.sh` running).
 
 **Docker alternative:**
 
@@ -83,12 +85,12 @@ docker run -p 8080:8080 -e GEMINI_API_KEY=$GEMINI_API_KEY grc-toolkit
 ### 3. Validate controls (4 min)
 
 1. Click **Validate Controls**.
-2. Show **Live Ansible on localhost** — playbooks execute read-only probes.
-3. Walk through **Validation Summary** (pass/fail, findings).
+2. Show **Live Ansible on localhost** — playbooks execute read-only probes (NIST pack and/or **OWASP GenAI LLM Top 10 2026** stems under `ansible/playbooks/llm/`).
+3. Walk through **Validation Summary** (pass/fail, findings). Optional CLI: `ansible-playbook -i inventory.yml llm03-excessive-agency.yml` from `ansible/playbooks/llm/`.
 
 **Say:**
 
-> *"This is evidence collection, not remediation. Playbooks are read-only in our current profile — they don’t start services or change configs. On macOS lab hosts you’ll see honest gaps for Linux-only checks; production targets Linux with a dedicated `grc-audit` account and least-privilege sudo."*
+> *"This is evidence collection, not remediation. Playbooks are read-only in our current profile — they don’t start services or change configs. On macOS lab hosts you’ll see honest gaps for Linux-only checks; production targets Linux with a dedicated `grc-audit` account and least-privilege sudo. For GenAI surfaces we also ship the OWASP LLM Top 10 2026 arsenal — same HITL rule."*
 
 **Production handoff (one sentence):** See [ANSIBLE-AUDIT-OPERATIONS.md](ANSIBLE-AUDIT-OPERATIONS.md) — ITIL change window, jump host, SysAdmin RACI.
 

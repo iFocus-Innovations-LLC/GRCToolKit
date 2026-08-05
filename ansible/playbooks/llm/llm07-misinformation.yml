@@ -1,0 +1,32 @@
+---
+# OWASP GenAI LLM Top 10 2026 — LLM07:2026 Misinformation (read-only)
+# https://genai.owasp.org/llm-top-10/
+# HITL: no auto-remediation. Part of GRCToolKit Shields Up.
+#
+# Usage:
+#   cd ansible/playbooks/llm
+#   ansible-playbook -i inventory.yml llm07-misinformation.yml
+
+- name: "OWASP LLM07:2026 — Misinformation — read-only validation"
+  hosts: all
+  gather_facts: yes
+  vars_files:
+    - vars/defaults.yml
+  vars:
+    llm_findings: []
+    llm_report_basename: "llm07-misinformation"
+  tasks:
+    - name: "Include common setup"
+      include_tasks: tasks/setup.yml
+      tags: always
+
+    - name: "Include LLM07:2026 probes"
+      include_tasks:
+        file: tasks/llm07-misinformation.yml
+        apply:
+          tags: [LLM07, misinformation]
+      tags: [LLM07, misinformation]
+
+    - name: "Include report"
+      include_tasks: tasks/report.yml
+      tags: always

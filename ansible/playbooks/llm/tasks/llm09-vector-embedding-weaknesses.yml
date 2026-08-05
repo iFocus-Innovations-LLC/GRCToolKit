@@ -1,0 +1,50 @@
+---
+# LLM09:2026 — Vector and Embedding Weaknesses
+- name: "LLM09:2026 — Vector/Embedding — probe common RAG/vector API paths"
+  uri:
+    url: "{{ llm_app_base_url }}{{ item }}"
+    method: GET
+    status_code: [200, 301, 302, 401, 403, 404, 405, 500]
+    timeout: 5
+  loop:
+    - "/v1/embeddings"
+    - "/api/embeddings"
+    - "/api/vector"
+    - "/rag/query"
+  register: llm09_vector_paths
+  failed_when: false
+  tags: [LLM09, vector_embedding]
+
+- name: "LLM09:2026 — check repo for RAG/vector config hints"
+  shell: |
+    root="{{ grctoolkit_app_root }}"
+    [ -d "$root" ] || exit 0
+    grep -RIlE 'embeddings?|vector.?store|chroma|pinecone|rag' \
+      --include='*.yml' --include='*.yaml' --include='*.js' --include='*.md' \
+      "$root/ai-agent" "$root/ansible" "$root/docs" 2>/dev/null | head -10 || true
+  register: llm09_rag_refs
+  changed_when: false
+  failed_when: false
+  tags: [LLM09, vector_embedding]
+
+- name: "LLM09:2026 — record finding"
+  set_fact:
+    llm_findings: "{{ llm_findings + [llm09_finding] }}"
+  vars:
+    open_paths: "{{ llm09_vector_paths.results | default([]) | selectattr('status', 'equalto', 200) | list | length }}"
+    refs: "{{ llm09_rag_refs.stdout_lines | default([]) | length }}"
+    llm09_finding:
+      id: "LLM09:2026"
+      title: "Vector and Embedding Weaknesses"
+      status: >-
+        {{ 'FAIL' if open_paths | int > 0
+           else ('SKIP' if refs | int == 0
+           else 'WARN') }}
+      detail: >-
+        {{ 'Unauthenticated vector/embedding endpoint(s) returned 200 — harden auth and tenancy.'
+           if open_paths | int > 0
+           else ('No RAG/vector surface detected in this deployment — SKIP (N/A).'
+                 if refs | int == 0
+                 else 'RAG/vector references found in repo (' + (refs | string)
+                      + ') but no open HTTP embedding path returned 200 — review access control and poisoning defenses.') }}
+  tags: [LLM09, vector_embedding]

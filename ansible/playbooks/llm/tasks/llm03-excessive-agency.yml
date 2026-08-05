@@ -1,0 +1,52 @@
+---
+# LLM03:2026 — Excessive Agency
+- name: "LLM03:2026 — Excessive Agency — HITL framework doc present"
+  stat:
+    path: "{{ grctoolkit_app_root }}/docs/HITL-FRAMEWORK.md"
+  register: llm03_hitl_doc
+  failed_when: false
+  tags: [LLM03, excessive_agency]
+
+- name: "LLM03:2026 — scan ai-agent for auto-remediation without approval keywords"
+  shell: |
+    root="{{ grctoolkit_app_root }}/ai-agent"
+    [ -d "$root" ] || exit 0
+    grep -RInE 'auto.?remediat|executeRemediation|applyFix' "$root" \
+      | grep -viE 'human|approval|HITL|hitl' | head -5 || true
+  register: llm03_auto_remediate
+  changed_when: false
+  failed_when: false
+  tags: [LLM03, excessive_agency]
+
+- name: "LLM03:2026 — probe open tool/agent surfaces (rosbridge-style ports)"
+  wait_for:
+    host: "{{ ansible_host | default('127.0.0.1') }}"
+    port: "{{ item }}"
+    timeout: 2
+    state: started
+  loop:
+    - 9090
+    - 9091
+  register: llm03_open_ports
+  failed_when: false
+  tags: [LLM03, excessive_agency]
+
+- name: "LLM03:2026 — record finding"
+  set_fact:
+    llm_findings: "{{ llm_findings + [llm03_finding] }}"
+  vars:
+    risky_lines: "{{ llm03_auto_remediate.stdout_lines | default([]) | length }}"
+    open_ws: "{{ llm03_open_ports.results | default([]) | selectattr('state', 'defined') | selectattr('state', 'equalto', 'started') | list | length }}"
+    llm03_finding:
+      id: "LLM03:2026"
+      title: "Excessive Agency"
+      status: >-
+        {{ 'FAIL' if (open_ws | int > 0)
+           else ('WARN' if (risky_lines | int > 0)
+           else ('PASS' if llm03_hitl_doc.stat.exists else 'WARN')) }}
+      detail: >-
+        HITL doc present={{ llm03_hitl_doc.stat.exists | default(false) }}.
+        Unreviewed auto-remediation patterns={{ risky_lines | int }}.
+        Open rosbridge/WebSocket ports={{ open_ws | int }}.
+        Require human approval before any robot or infrastructure change.
+  tags: [LLM03, excessive_agency]

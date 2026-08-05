@@ -125,7 +125,23 @@
                 placeholder="e.g., 'What controls are needed for securing patient health information in a cloud database?' or 'How do I manage access to critical systems?'"
             ></textarea>
 
-            <div class="flex gap-3">
+            <div class="flex flex-col sm:flex-row gap-3 sm:items-end">
+                <div class="sm:w-56">
+                    <label for="llmProviderSelect" class="block text-xs font-medium text-brand-dim mb-1">
+                        LLM provider (BYOK)
+                    </label>
+                    <select
+                        id="llmProviderSelect"
+                        class="w-full p-3 border border-brand-border rounded-lg bg-brand-surface2 text-brand-text text-sm focus:ring-1 focus:ring-brand-accent focus:border-brand-accent"
+                        title="Community BYOK — Gemini is default; other providers use the local runner proxy"
+                    >
+                        <option value="gemini">Google Gemini (default)</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="anthropic">Anthropic Claude</option>
+                        <option value="groq">Groq</option>
+                        <option value="vertex">Google Vertex AI</option>
+                    </select>
+                </div>
                 <button
                     id="analyzeButton"
                     class="flex-1 bg-brand-accent hover:bg-brand-accentHover text-brand-bg font-semibold py-3 px-6 rounded-lg transition duration-300 ease-in-out flex items-center justify-center space-x-2 focus-visible:ring-2 focus-visible:ring-brand-accent"
@@ -232,17 +248,29 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
-    <!-- Load GRC Compliance Engine and Report Generator -->
+    <!-- Load GRC Compliance Engine, multi-LLM BYOK adapter, and Report Generator -->
     <script src="/ai-agent/grc-compliance-engine.js?v=2.1.0-dev-ansible2"></script>
+    <script src="/ai-agent/llm-providers.js?v=2.2.0-dev-multillm"></script>
     <script src="/compliance-docs/auditor-report-generator.js?v=2.1.0-dev"></script>
     
     <script type="module">
-        // Configuration - Set your Gemini API key here
-        // Get your API key from: https://aistudio.google.com/
-        window.GEMINI_API_KEY = "__GEMINI_API_KEY__"; // Injected: docker-entrypoint.sh or scripts/run-local.sh
-        // Use a model that supports structured JSON (response_mime_type), e.g. gemini-2.5-flash, gemini-2.0-flash, gemini-1.5-flash — not gemini-pro / gemini-1.0-pro.
+        // Multi-LLM BYOK — placeholders injected by docker-entrypoint.sh / scripts/run-local.sh
+        // Never commit real keys. Gemini remains the Community default.
+        window.LLM_PROVIDER = "__LLM_PROVIDER__";
+        window.GEMINI_API_KEY = "__GEMINI_API_KEY__";
+        window.OPENAI_API_KEY = "__OPENAI_API_KEY__";
+        window.ANTHROPIC_API_KEY = "__ANTHROPIC_API_KEY__";
+        window.GROQ_API_KEY = "__GROQ_API_KEY__";
+        window.VERTEX_API_KEY = "__VERTEX_API_KEY__";
         window.GEMINI_MODEL = window.GEMINI_MODEL || "gemini-2.5-flash";
+        window.OPENAI_MODEL = window.OPENAI_MODEL || "gpt-4o-mini";
+        window.ANTHROPIC_MODEL = window.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
+        window.GROQ_MODEL = window.GROQ_MODEL || "llama-3.3-70b-versatile";
+        window.VERTEX_MODEL = window.VERTEX_MODEL || "gemini-2.5-flash";
         window.ANSIBLE_API_BASE = window.ANSIBLE_API_BASE || "http://127.0.0.1:8081";
+        if (window.LLM_PROVIDER === "__LLM_PROVIDER__" || !window.LLM_PROVIDER) {
+            window.LLM_PROVIDER = "gemini";
+        }
 
         // Firebase Configuration
         const firebaseConfig = {
@@ -302,6 +330,24 @@
 
         clearScenarioBtn.addEventListener('click', clearScenario);
 
+        const llmProviderSelect = document.getElementById('llmProviderSelect');
+        if (llmProviderSelect && window.GRCLLM) {
+            const injected = (window.LLM_PROVIDER || 'gemini').trim();
+            const initial = (injected && injected !== '__LLM_PROVIDER__')
+                ? injected.toLowerCase()
+                : window.GRCLLM.getProviderId();
+            try {
+                window.GRCLLM.setProviderId(initial);
+            } catch {
+                window.GRCLLM.setProviderId('gemini');
+            }
+            llmProviderSelect.value = window.GRCLLM.getProviderId();
+            llmProviderSelect.addEventListener('change', () => {
+                window.GRCLLM.setProviderId(llmProviderSelect.value);
+                console.info('[GRC LLM] provider selected', window.GRCLLM.getProviderId());
+            });
+        }
+
         analyzeButton.addEventListener('click', async () => {
             const prompt = scenarioInput.value.trim();
             if (!prompt) {
@@ -319,8 +365,10 @@
             analyzeButton.disabled = true;
 
             try {
-                let chatHistory = [];
-                // Construct the prompt to guide the AI to act as a GRC expert with structured JSON output
+                if (!window.GRCLLM || typeof window.GRCLLM.analyzeScenario !== 'function') {
+                    throw new Error('LLM adapter not loaded (ai-agent/llm-providers.js).');
+                }
+
                 const fullPrompt = `As an AI GRC expert, given the following scenario, identify and list the most relevant NIST 800-53 R.5 Security and Privacy Controls. 
 
                 Scenario: "${prompt}"
@@ -354,161 +402,46 @@
 
                 Ensure the JSON is valid and properly formatted.`;
 
-                chatHistory.push({ role: "user", parts: [{ text: fullPrompt }] });
-
-                // v1beta + protobuf-style JSON (camelCase generationConfig). Do not use stable v1 URL — it rejects responseMimeType.
-                // If you still see 400s, hard-refresh or redeploy: an old bundle may be sending stale field names.
-                const apiKey = (window.GEMINI_API_KEY || "").trim();
-                const modelId = window.GEMINI_MODEL || "gemini-2.5-flash";
-                if (!apiKey) {
-                    throw new Error(
-                        "No Gemini API key in this page. Export GEMINI_API_KEY, restart ./scripts/run-local.sh (or redeploy the container), hard-refresh the browser, or set window.GEMINI_API_KEY in the console.",
-                    );
-                }
-                const apiUrl =
-                    "https://generativelanguage.googleapis.com/v1beta/models/" +
-                    encodeURIComponent(modelId) +
-                    ":generateContent?key=" +
-                    encodeURIComponent(apiKey);
-
-                const genBase = {
-                    temperature: 0.3,
-                    topK: 40,
-                    topP: 0.95,
-                    maxOutputTokens: 8192,
+                const result = await window.GRCLLM.analyzeScenario(fullPrompt);
+                // AU-2 style metadata for HITL / audit trail (no secrets).
+                window.lastLlmMeta = {
+                    provider: result.provider,
+                    modelId: result.modelId,
+                    via: result.via,
+                    at: new Date().toISOString(),
                 };
 
-                async function geminiGenerate(withStructuredJsonMime, maxTokens, disableThinking) {
-                    const generationConfig = withStructuredJsonMime
-                        ? { ...genBase, maxOutputTokens: maxTokens, responseMimeType: "application/json" }
-                        : { ...genBase, maxOutputTokens: maxTokens };
-                    // thinkingConfig must be nested under generationConfig (not top-level).
-                    if (!disableThinking && /^gemini-2\.5/i.test(modelId)) {
-                        generationConfig.thinkingConfig = { thinkingBudget: 0 };
-                    }
-                    const bodyObj = {
-                        contents: chatHistory,
-                        generationConfig,
-                    };
-                    const body = JSON.stringify(bodyObj);
-                    const res = await fetch(apiUrl, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body,
-                    });
-                    const raw = await res.text();
-                    return { res, raw };
-                }
-
-                let usedStructuredJson = true;
-                let maxTokensUsed = genBase.maxOutputTokens;
-                let disableThinking = false;
-                let { res: gemRes, raw: gemRaw } = await geminiGenerate(true, maxTokensUsed, disableThinking);
-                if (!gemRes.ok) {
-                    let msg = gemRaw;
-                    try {
-                        msg = JSON.parse(gemRaw).error?.message || gemRaw;
-                    } catch {
-                        /* use raw */
-                    }
-                    if (
-                        gemRes.status === 400 &&
-                        /thinkingConfig|thinkingBudget|Unknown name.*thinking/i.test(
-                            String(msg),
-                        )
-                    ) {
-                        console.warn(
-                            "Gemini: thinkingConfig rejected; retrying without thinking budget.",
-                        );
-                        disableThinking = true;
-                        ({ res: gemRes, raw: gemRaw } = await geminiGenerate(usedStructuredJson, maxTokensUsed, disableThinking));
-                    } else if (
-                        gemRes.status === 400 &&
-                        /responseMimeType|response_mime_type|Unknown name|generation_config|generationConfig/i.test(
-                            String(msg),
-                        )
-                    ) {
-                        console.warn(
-                            "Gemini: structured JSON mode rejected; retrying without responseMimeType.",
-                        );
-                        usedStructuredJson = false;
-                        ({ res: gemRes, raw: gemRaw } = await geminiGenerate(false, maxTokensUsed, disableThinking));
-                    }
-                }
-                if (!gemRes.ok) {
-                    let errorDetail = {};
-                    try {
-                        errorDetail = JSON.parse(gemRaw);
-                    } catch {
-                        /* */
-                    }
-                    const errObj = errorDetail && errorDetail.error;
-                    let apiMsg = "";
-                    if (errObj) {
-                        const m = errObj.message ?? errObj.errors?.[0]?.message;
-                        apiMsg = typeof m === "string" ? m : m != null ? JSON.stringify(m) : "";
-                    }
-                    if (!String(apiMsg).trim()) {
-                        apiMsg = typeof gemRaw === "string" ? gemRaw : "Unknown error";
-                    }
-                    let detail = apiMsg;
-                    const s = String(apiMsg);
-                    const raw = String(gemRaw || "");
-                    const keyPat =
-                        /API key expired|Please renew|renew the API key|API key not valid|API key invalid|invalid API key|API key|api key|invalid.*key|PERMISSION_DENIED|API_KEY_INVALID|UNAUTHENTICATED|API_KEY_SERVICE_BLOCKED/i;
-                    const keyish = keyPat.test(s) || keyPat.test(raw);
-                    // Google often labels many key/restriction failures as “expired”; 401/403 appear too.
-                    if ((gemRes.status === 400 || gemRes.status === 401 || gemRes.status === 403) && keyish) {
-                        detail =
-                            s.trim() +
-                            "\n\n— Google’s “expired” message is often misleading. Check: (1) new key https://aistudio.google.com/app/apikey (2) GCP Credentials → that key → API restrictions include Generative Language API (3) Application restrictions allow http://127.0.0.1:8080/* for run-local or “None” for testing (4) set GEMINI_API_KEY or .env, restart ./scripts/run-local.sh, open /local-index.html, hard-refresh (Cmd+Shift+R).";
-                    }
-                    throw new Error(`API error: ${gemRes.status} - ${detail}`);
-                }
-
-                const result = JSON.parse(gemRaw);
-                if (result.candidates && result.candidates.length > 0 &&
-                    result.candidates[0].content && result.candidates[0].content.parts &&
-                    result.candidates[0].content.parts.length > 0) {
-                    let candidate = result.candidates[0];
-                    let text = candidate.content.parts[0].text;
-                    let finishReason = candidate.finishReason || null;
-
-                    // Retry once with higher token budget if output was truncated.
-                    if (finishReason === "MAX_TOKENS" && maxTokensUsed < 16384) {
-                        maxTokensUsed = 16384;
-                        ({ res: gemRes, raw: gemRaw } = await geminiGenerate(usedStructuredJson, maxTokensUsed, disableThinking));
-                        if (gemRes.ok) {
-                            const retryResult = JSON.parse(gemRaw);
-                            if (retryResult.candidates?.[0]?.content?.parts?.[0]?.text) {
-                                candidate = retryResult.candidates[0];
-                                text = candidate.content.parts[0].text;
-                                finishReason = candidate.finishReason || null;
-                            }
-                        }
-                    }
-
-                    try {
-                        // Try to parse the JSON response
-                        const jsonResponse = JSON.parse(text);
-                        displayStructuredResponse(jsonResponse);
-                    } catch (parseError) {
-                        // If JSON parsing fails, fall back to plain text display
-                        console.warn('Failed to parse JSON response, falling back to plain text:', parseError);
-                        initialMessage.classList.add('hidden');
-                        errorMessage.classList.add('hidden');
-                        aiResponse.classList.remove('hidden');
-                        aiResponse.innerHTML = `<div class="bg-brand-surface border-l-4 border-brand-lock p-4 rounded-r-lg mb-4">
-                            <p class="text-brand-lock text-sm"><strong>Note:</strong> Response received in plain text format. For better formatting, the AI should return structured JSON.</p>
-                        </div>
-                        <pre class="whitespace-pre-wrap font-mono text-sm leading-relaxed bg-brand-bg p-4 rounded border border-brand-border text-brand-muted">${text}</pre>`;
-                    }
+                const jsonResponse = result.parsedJson;
+                if (jsonResponse && typeof jsonResponse === 'object') {
+                    displayStructuredResponse(jsonResponse);
+                } else if (result.text) {
+                    console.warn('Failed to parse JSON response, falling back to plain text');
+                    initialMessage.classList.add('hidden');
+                    errorMessage.classList.add('hidden');
+                    aiResponse.classList.remove('hidden');
+                    const safe = result.text
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;');
+                    aiResponse.innerHTML = `<div class="bg-brand-surface border-l-4 border-brand-lock p-4 rounded-r-lg mb-4">
+                        <p class="text-brand-lock text-sm"><strong>Note:</strong> Response received in plain text format (${result.provider}/${result.modelId}). For better formatting, the AI should return structured JSON.</p>
+                    </div>
+                    <pre class="whitespace-pre-wrap font-mono text-sm leading-relaxed bg-brand-bg p-4 rounded border border-brand-border text-brand-muted">${safe}</pre>`;
                 } else {
                     displayMessage('No relevant controls found or an unexpected response structure. Please try a different query.', 'error');
                 }
             } catch (error) {
                 console.error('Error fetching AI response:', error);
-                displayMessage(`Failed to get AI response: ${error.message}. Please try again.`, 'error');
+                let msg = error.message || String(error);
+                if (/API key|GEMINI|expired|PERMISSION_DENIED|API_KEY/i.test(msg) && /gemini/i.test(msg + (window.GRCLLM?.getProviderId?.() || ''))) {
+                    msg +=
+                        "\n\n— For Gemini: (1) new key https://aistudio.google.com/app/apikey (2) API restrictions include Generative Language API (3) Application restrictions allow http://127.0.0.1:8080/* (4) restart ./scripts/run-local.sh and open /local-index.html.";
+                }
+                if (/proxy|CORS|Failed to fetch/i.test(msg)) {
+                    msg +=
+                        "\n\n— Non-Gemini providers need the local LLM proxy: keep ./scripts/run-local.sh running (port 8081) and set the matching *_API_KEY in .env.local.";
+                }
+                displayMessage(`Failed to get AI response: ${msg}. Please try again.`, 'error');
             } finally {
                 buttonText.textContent = 'Analyze Scenario';
                 loadingSpinner.style.display = 'none';

@@ -1,0 +1,41 @@
+---
+# LLM08:2026 — Hidden Context Exposure
+- name: "LLM08:2026 — Hidden Context Exposure — probe system-prompt / debug endpoints"
+  uri:
+    url: "{{ llm_app_base_url }}{{ item }}"
+    method: GET
+    return_content: yes
+    status_code: [200, 301, 302, 401, 403, 404, 405, 500]
+    timeout: 5
+  loop:
+    - "/debug/system-prompt"
+    - "/api/system-prompt"
+    - "/v1/system"
+    - "/.well-known/prompt"
+  register: llm08_prompt_paths
+  failed_when: false
+  tags: [LLM08, hidden_context]
+
+- name: "LLM08:2026 — scan app HTML for leaked system-prompt markers"
+  set_fact:
+    llm08_html_leak: "{{ body | regex_search('(?i)(system[_ ]?prompt|you are a helpful|hidden instruction)') is not none }}"
+  vars:
+    body: "{{ llm_app_response.content | default('') }}"
+  when: llm_app_response.content is defined
+  tags: [LLM08, hidden_context]
+
+- name: "LLM08:2026 — record finding"
+  set_fact:
+    llm_findings: "{{ llm_findings + [llm08_finding] }}"
+  vars:
+    exposed: "{{ llm08_prompt_paths.results | default([]) | selectattr('status', 'equalto', 200) | list | length }}"
+    html_leak: "{{ llm08_html_leak | default(false) }}"
+    llm08_finding:
+      id: "LLM08:2026"
+      title: "Hidden Context Exposure"
+      status: "{{ 'FAIL' if (exposed | int > 0 or html_leak) else 'PASS' }}"
+      detail: >-
+        System-prompt/debug paths returning 200={{ exposed | int }}.
+        HTML system-prompt markers={{ html_leak }}.
+        Do not expose hidden instructions, tool schemas, or privileged context to clients.
+  tags: [LLM08, hidden_context]

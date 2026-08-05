@@ -1,0 +1,40 @@
+---
+# LLM04:2026 — Supply Chain
+- name: "LLM04:2026 — Supply Chain — Dockerfile present"
+  stat:
+    path: "{{ grctoolkit_app_root }}/Dockerfile"
+  register: llm04_dockerfile
+  failed_when: false
+  tags: [LLM04, supply_chain]
+
+- name: "LLM04:2026 — check Dockerfile for floating tags"
+  shell: |
+    grep -E '^FROM ' "{{ grctoolkit_app_root }}/Dockerfile" | grep -v '@sha256:' || true
+  register: llm04_unpinned
+  changed_when: false
+  failed_when: false
+  when: llm04_dockerfile.stat.exists | default(false)
+  tags: [LLM04, supply_chain]
+
+- name: "LLM04:2026 — note SBOM documentation posture"
+  stat:
+    path: "{{ grctoolkit_app_root }}/docs/SECURITY.md"
+  register: llm04_security_doc
+  failed_when: false
+  tags: [LLM04, supply_chain]
+
+- name: "LLM04:2026 — record finding"
+  set_fact:
+    llm_findings: "{{ llm_findings + [llm04_finding] }}"
+  vars:
+    unpinned_lines: "{{ llm04_unpinned.stdout_lines | default([]) | length }}"
+    llm04_finding:
+      id: "LLM04:2026"
+      title: "Supply Chain"
+      status: "{{ 'WARN' if unpinned_lines | int > 0 else 'PASS' }}"
+      detail: >-
+        {{ unpinned_lines | string + ' Dockerfile FROM line(s) without digest pin.'
+           if unpinned_lines | int > 0
+           else 'Dockerfile base images appear digest-pinned or Dockerfile not found at grctoolkit_app_root.' }}
+        SECURITY.md present={{ llm04_security_doc.stat.exists | default(false) }} (SBOM aspirational — see PM-TODO).
+  tags: [LLM04, supply_chain]

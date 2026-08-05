@@ -1,0 +1,11 @@
+---
+# Shared defaults for OWASP GenAI LLM Top 10 2026 read-only probes.
+# Reference: https://genai.owasp.org/llm-top-10/
+owasp_framework: "OWASP GenAI LLM Top 10 2026"
+owasp_reference: "https://genai.owasp.org/llm-top-10/"
+llm_app_base_url: "http://127.0.0.1:8080"
+llm_app_path: "/"
+llm_health_path: "/health"
+llm_report_dir: "/tmp/grc-llm-compliance-reports"
+grctoolkit_app_root: "{{ playbook_dir }}/../../.."
+grc_audit_mode: read_only

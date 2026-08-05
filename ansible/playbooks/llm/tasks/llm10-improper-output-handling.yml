@@ -1,0 +1,24 @@
+---
+# LLM10:2026 — Improper Output Handling
+- name: "LLM10:2026 — Improper Output Handling — security headers on app response"
+  set_fact:
+    llm_findings: "{{ llm_findings + [llm10_finding] }}"
+  vars:
+    hdrs: "{{ llm_app_headers.headers | default({}) }}"
+    has_csp: "{{ 'content-security-policy' in hdrs or 'Content-Security-Policy' in hdrs }}"
+    has_xcto: "{{ 'x-content-type-options' in hdrs or 'X-Content-Type-Options' in hdrs }}"
+    llm10_finding:
+      id: "LLM10:2026"
+      title: "Improper Output Handling"
+      status: "{{ 'PASS' if (has_csp and has_xcto) else 'WARN' }}"
+      detail: >-
+        CSP present={{ has_csp }}, X-Content-Type-Options present={{ has_xcto }}.
+        Validate LLM output is sanitized before DOM/script execution or tool invocation.
+  when: llm_app_headers.status is defined
+  tags: [LLM10, output_handling]
+
+- name: "LLM10:2026 — WARN when app unreachable"
+  set_fact:
+    llm_findings: "{{ llm_findings + [{'id': 'LLM10:2026', 'title': 'Improper Output Handling', 'status': 'SKIP', 'detail': 'App unreachable — start GRCToolKit or set llm_app_base_url.'}] }}"
+  when: llm_app_headers.status is not defined
+  tags: [LLM10, output_handling]

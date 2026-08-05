@@ -7,10 +7,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, unquote
@@ -28,9 +31,13 @@ MAX_JSON_BODY_BYTES = 10_000_000
 
 def _build_playbook_allowlist() -> dict[str, Path]:
     """Build stem -> resolved path map at startup (CodeQL-safe allowlist)."""
+    skip_dirs = {"tasks", "vars", "group_vars", "host_vars", "files", "templates"}
     allowed: dict[str, Path] = {}
     for path in sorted(PLAYBOOKS_DIR.rglob("*.yml")):
         if path.name == "inventory.yml":
+            continue
+        rel_parts = path.relative_to(PLAYBOOKS_DIR).parts
+        if any(part in skip_dirs for part in rel_parts[:-1]):
             continue
         stem = path.relative_to(PLAYBOOKS_DIR).with_suffix("").as_posix()
         resolved = path.resolve()
@@ -105,7 +112,14 @@ def _find_report_pdf(raw: str) -> tuple[str, Path] | None:
 
 
 def control_id_from_playbook(stem: str) -> str:
-    parts = stem.split("-")
+    base = stem.split("/")[-1]
+    # OWASP GenAI LLM Top 10 2026: llm01-prompt-injection -> LLM01:2026
+    llm_match = re.match(r"^llm(\d{2})-", base, re.IGNORECASE)
+    if llm_match:
+        return f"LLM{llm_match.group(1)}:2026"
+    if base.startswith("owasp-llm"):
+        return "LLM-TOP10:2026"
+    parts = base.split("-")
     if len(parts) >= 2 and parts[0].isalpha() and parts[1].isdigit():
         return f"{parts[0].upper()}-{parts[1]}"
     return stem.upper()
@@ -185,6 +199,224 @@ def validate_localhost_inventory(inventory_path: Path) -> None:
             "SSH/smart connection inventories are not allowed via the local runner API in v1. "
             "See docs/ANSIBLE-AUDIT-OPERATIONS.md"
         )
+
+
+def _extract_json_object(text: str) -> dict | None:
+    if not text:
+        return None
+    trimmed = text.strip()
+    try:
+        parsed = json.loads(trimmed)
+        return parsed if isinstance(parsed, dict) else None
+    except json.JSONDecodeError:
+        pass
+    fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", trimmed, re.I)
+    if fence:
+        try:
+            parsed = json.loads(fence.group(1).strip())
+            return parsed if isinstance(parsed, dict) else None
+        except json.JSONDecodeError:
+            pass
+    start = trimmed.find("{")
+    end = trimmed.rfind("}")
+    if start >= 0 and end > start:
+        try:
+            parsed = json.loads(trimmed[start : end + 1])
+            return parsed if isinstance(parsed, dict) else None
+        except json.JSONDecodeError:
+            return None
+    return None
+
+
+def _http_json(
+    url: str,
+    payload: dict,
+    headers: dict[str, str] | None = None,
+    timeout: int = 90,
+) -> dict:
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={"Content-Type": "application/json", **(headers or {})},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8")
+            return json.loads(body or "{}")
+    except urllib.error.HTTPError as exc:
+        err_body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Upstream HTTP {exc.code}: {err_body[:800]}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Upstream unreachable: {exc.reason}") from exc
+
+
+def analyze_llm(provider: str, prompt: str, model: str | None, api_key: str | None) -> dict:
+    """Server-side LLM forwarder for local BYOK demos (CORS-safe). Binds localhost only."""
+    provider = (provider or "gemini").strip().lower()
+    prompt = (prompt or "").strip()
+    if not prompt:
+        raise ValueError("Missing prompt")
+
+    def env_key(*names: str) -> str:
+        for name in names:
+            val = (os.environ.get(name) or "").strip()
+            if val:
+                return val
+        return ""
+
+    key = (api_key or "").strip()
+    text = ""
+    model_id = (model or "").strip()
+
+    if provider == "gemini":
+        key = key or env_key("GEMINI_API_KEY")
+        model_id = model_id or os.environ.get("GEMINI_MODEL", "gemini-2.5-flash").strip()
+        if not key:
+            raise ValueError("Missing Gemini API key (body.apiKey or GEMINI_API_KEY)")
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{model_id}:generateContent?key={key}"
+        )
+        payload = {
+            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0.3,
+                "maxOutputTokens": 8192,
+                "responseMimeType": "application/json",
+            },
+        }
+        result = _http_json(url, payload)
+        text = (
+            (((result.get("candidates") or [{}])[0].get("content") or {}).get("parts") or [{}])[0].get(
+                "text"
+            )
+            or ""
+        )
+
+    elif provider == "openai":
+        key = key or env_key("OPENAI_API_KEY")
+        model_id = model_id or os.environ.get("OPENAI_MODEL", "gpt-4o-mini").strip()
+        if not key:
+            raise ValueError("Missing OpenAI API key (body.apiKey or OPENAI_API_KEY)")
+        result = _http_json(
+            "https://api.openai.com/v1/chat/completions",
+            {
+                "model": model_id,
+                "temperature": 0.3,
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You are a GRC expert. Respond with valid JSON only.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+            },
+            headers={"Authorization": f"Bearer {key}"},
+        )
+        text = (((result.get("choices") or [{}])[0].get("message") or {}).get("content")) or ""
+
+    elif provider == "anthropic":
+        key = key or env_key("ANTHROPIC_API_KEY")
+        model_id = model_id or os.environ.get(
+            "ANTHROPIC_MODEL", "claude-sonnet-4-20250514"
+        ).strip()
+        if not key:
+            raise ValueError("Missing Anthropic API key (body.apiKey or ANTHROPIC_API_KEY)")
+        result = _http_json(
+            "https://api.anthropic.com/v1/messages",
+            {
+                "model": model_id,
+                "max_tokens": 8192,
+                "temperature": 0.3,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+            headers={
+                "x-api-key": key,
+                "anthropic-version": "2023-06-01",
+            },
+        )
+        blocks = result.get("content") or []
+        text = "".join(
+            block.get("text", "") for block in blocks if isinstance(block, dict) and block.get("type") == "text"
+        )
+
+    elif provider == "groq":
+        key = key or env_key("GROQ_API_KEY")
+        model_id = model_id or os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
+        if not key:
+            raise ValueError("Missing Groq API key (body.apiKey or GROQ_API_KEY)")
+        result = _http_json(
+            "https://api.groq.com/openai/v1/chat/completions",
+            {
+                "model": model_id,
+                "temperature": 0.3,
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You are a GRC expert. Respond with valid JSON only.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+            },
+            headers={"Authorization": f"Bearer {key}"},
+        )
+        text = (((result.get("choices") or [{}])[0].get("message") or {}).get("content")) or ""
+
+    elif provider == "vertex":
+        # Vertex Express / API-key style endpoint for local demos (not full ADC).
+        key = key or env_key("VERTEX_API_KEY", "GEMINI_API_KEY")
+        project = os.environ.get("VERTEX_PROJECT", "").strip()
+        location = os.environ.get("VERTEX_LOCATION", "us-central1").strip()
+        model_id = model_id or os.environ.get("VERTEX_MODEL", "gemini-2.5-flash").strip()
+        if not key:
+            raise ValueError(
+                "Missing Vertex API key (body.apiKey, VERTEX_API_KEY, or GEMINI_API_KEY). "
+                "Full ADC/Workload Identity is Enterprise/GCP path — see docs/SECRETS-SETUP.md."
+            )
+        if project:
+            url = (
+                f"https://{location}-aiplatform.googleapis.com/v1/projects/{project}"
+                f"/locations/{location}/publishers/google/models/{model_id}:generateContent"
+            )
+            headers = {"Authorization": f"Bearer {key}"}
+        else:
+            # Fall back to Generative Language API with the same key (Gemini-compatible).
+            url = (
+                "https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{model_id}:generateContent?key={key}"
+            )
+            headers = {}
+        payload = {
+            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0.3,
+                "maxOutputTokens": 8192,
+                "responseMimeType": "application/json",
+            },
+        }
+        result = _http_json(url, payload, headers=headers or None)
+        text = (
+            (((result.get("candidates") or [{}])[0].get("content") or {}).get("parts") or [{}])[0].get(
+                "text"
+            )
+            or ""
+        )
+    else:
+        raise ValueError(
+            f"Unsupported provider '{provider}'. Use gemini|openai|anthropic|groq|vertex."
+        )
+
+    return {
+        "provider": provider,
+        "modelId": model_id,
+        "text": text,
+        "parsedJson": _extract_json_object(text),
+        "via": "proxy",
+    }
 
 
 def run_playbook(playbook_name: str) -> dict:
@@ -333,6 +565,7 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
                     "ok": True,
                     "ansible": shutil.which("ansible-playbook") is not None,
                     "pdf": PDF_SUPPORT,
+                    "llmProxy": True,
                     "reportDir": str(REPORT_DIR),
                     "inventory": str(DEFAULT_INVENTORY),
                     "playbooksDir": str(PLAYBOOKS_DIR),
@@ -348,6 +581,28 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == "/api/reports/oscal-pdf":
             self._handle_oscal_pdf()
+            return
+        if path == "/api/llm/analyze":
+            try:
+                data = self._read_json_body()
+            except ValueError as exc:
+                self._send_json(400, {"error": str(exc)})
+                return
+            try:
+                result = analyze_llm(
+                    data.get("provider") or "gemini",
+                    data.get("prompt") or "",
+                    data.get("model"),
+                    data.get("apiKey"),
+                )
+                # Never echo apiKey; provider/model are AU-2 metadata for the UI.
+                self._send_json(200, result)
+            except ValueError as exc:
+                self._send_json(400, {"error": str(exc)})
+            except RuntimeError as exc:
+                self._send_json(502, {"error": str(exc)})
+            except Exception as exc:  # noqa: BLE001
+                self._send_json(500, {"error": str(exc)})
             return
         if path != "/api/ansible/playbook":
             self._send_json(404, {"error": "Not found"})

@@ -73,7 +73,7 @@ See [HITL-FRAMEWORK.md](HITL-FRAMEWORK.md) for guardrail tiers.
 | **OWASP Web Top 10** | Robot web dashboards, rosbridge HTTP surfaces |
 | **OWASP API Top 10** | Fleet REST/gRPC APIs |
 | **OWASP IoT Top 10** | Edge devices, default credentials, update mechanisms |
-| **OWASP LLM Top 10** | AI planning layers, prompt injection, excessive agency | `ansible/playbooks/llm/owasp-llm-top-10-validate.yml` |
+| **OWASP GenAI LLM Top 10 2026** | Prompt injection, sensitive disclosure, excessive agency, supply chain, poisoning, unbounded consumption, misinformation, hidden context, vector/embedding, improper output | Suite: `ansible/playbooks/llm/owasp-llm-top-10-validate.yml`; per-risk stems `llm01-…`–`llm10-…` ([genai.owasp.org/llm-top-10](https://genai.owasp.org/llm-top-10/)) |
 | **NIST SP 800-53 Rev. 5** | SC, AC, AU control mapping for evidence packages |
 | **OSCAL** | Assessment results format (reuse GRCToolKit compliance-docs) |
 
@@ -109,7 +109,7 @@ See [HITL-FRAMEWORK.md](HITL-FRAMEWORK.md) for guardrail tiers.
 | [HITL-FRAMEWORK.md](HITL-FRAMEWORK.md) | Mandatory human approval path |
 | [SECRETS-SETUP.md](SECRETS-SETUP.md) | No keys in repo; GCP Secret Manager |
 
-Planned probe locations: `ansible/playbooks/robot/` (robotics, later phase) and `ansible/playbooks/llm/` (OWASP LLM Top 10 read-only checks).
+Probe locations: `ansible/playbooks/llm/` (**OWASP GenAI LLM Top 10 2026** read-only arsenal — umbrella + per-risk stems); `ansible/playbooks/robot/` (robotics, later phase). Follow-on: Agentic Applications Top 10 2026 (not in this slice).
 
 ---
 

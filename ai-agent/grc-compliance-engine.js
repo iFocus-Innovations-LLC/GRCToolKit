@@ -94,6 +94,30 @@ class GRCComplianceEngine {
                 controls: this.extractPQCControlsFromPlaybook(playbookName)
             });
         }
+
+        // OWASP GenAI LLM Top 10 2026 (Shields Up — read-only)
+        const llmPlaybooks = [
+            'llm/owasp-llm-top-10-validate',
+            'llm/llm01-prompt-injection',
+            'llm/llm02-sensitive-information-disclosure',
+            'llm/llm03-excessive-agency',
+            'llm/llm04-supply-chain',
+            'llm/llm05-data-model-poisoning',
+            'llm/llm06-unbounded-consumption',
+            'llm/llm07-misinformation',
+            'llm/llm08-hidden-context-exposure',
+            'llm/llm09-vector-embedding-weaknesses',
+            'llm/llm10-improper-output-handling'
+        ];
+
+        for (const playbook of llmPlaybooks) {
+            const playbookName = playbook.replace('llm/', '');
+            this.ansiblePlaybooks.set(playbook, {
+                name: playbook,
+                path: `/ansible/playbooks/${playbook}.yml`,
+                controls: this.extractLLMControlsFromPlaybook(playbookName)
+            });
+        }
     }
 
     /**
@@ -153,6 +177,32 @@ class GRCComplianceEngine {
             keywords: ['quantum risk', 'quantum threat', 'quantum computing', 'quantum vulnerability', 'quantum resistant', 'quantum safe'],
             controls: ['SC-12', 'SC-13', 'SC-17'],
             playbooks: ['pqc/assess', 'pqc/validate']
+        });
+
+        // OWASP GenAI LLM Top 10 2026
+        this.scenarioMappings.set('llm_security', {
+            keywords: [
+                'llm', 'owasp llm', 'genai', 'generative ai', 'prompt injection',
+                'excessive agency', 'model poisoning', 'embedding', 'vector store',
+                'rag', 'llm top 10', 'shields up', 'misinformation', 'hidden context'
+            ],
+            controls: [
+                'LLM01:2026', 'LLM02:2026', 'LLM03:2026', 'LLM04:2026', 'LLM05:2026',
+                'LLM06:2026', 'LLM07:2026', 'LLM08:2026', 'LLM09:2026', 'LLM10:2026'
+            ],
+            playbooks: [
+                'llm/owasp-llm-top-10-validate',
+                'llm/llm01-prompt-injection',
+                'llm/llm02-sensitive-information-disclosure',
+                'llm/llm03-excessive-agency',
+                'llm/llm04-supply-chain',
+                'llm/llm05-data-model-poisoning',
+                'llm/llm06-unbounded-consumption',
+                'llm/llm07-misinformation',
+                'llm/llm08-hidden-context-exposure',
+                'llm/llm09-vector-embedding-weaknesses',
+                'llm/llm10-improper-output-handling'
+            ]
         });
     }
 
@@ -818,6 +868,29 @@ class GRCComplianceEngine {
         };
         
         return pqcControlMap[playbookName] || [];
+    }
+
+    /**
+     * Extract OWASP GenAI LLM Top 10 2026 IDs from playbook stem
+     */
+    extractLLMControlsFromPlaybook(playbookName) {
+        const llmControlMap = {
+            'owasp-llm-top-10-validate': [
+                'LLM01:2026', 'LLM02:2026', 'LLM03:2026', 'LLM04:2026', 'LLM05:2026',
+                'LLM06:2026', 'LLM07:2026', 'LLM08:2026', 'LLM09:2026', 'LLM10:2026'
+            ],
+            'llm01-prompt-injection': ['LLM01:2026'],
+            'llm02-sensitive-information-disclosure': ['LLM02:2026'],
+            'llm03-excessive-agency': ['LLM03:2026'],
+            'llm04-supply-chain': ['LLM04:2026'],
+            'llm05-data-model-poisoning': ['LLM05:2026'],
+            'llm06-unbounded-consumption': ['LLM06:2026'],
+            'llm07-misinformation': ['LLM07:2026'],
+            'llm08-hidden-context-exposure': ['LLM08:2026'],
+            'llm09-vector-embedding-weaknesses': ['LLM09:2026'],
+            'llm10-improper-output-handling': ['LLM10:2026']
+        };
+        return llmControlMap[playbookName] || [];
     }
 }
 

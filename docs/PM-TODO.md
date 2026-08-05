@@ -33,8 +33,9 @@ For technical roadmap detail, see [ROADMAP.md](ROADMAP.md).
 - [x] Create branch `feature/shields-up-robotics` from `main`
 - [x] Add [SHIELDS-UP-ROBOTICS.md](SHIELDS-UP-ROBOTICS.md) vision + MVP spec
 - [x] Define `ansible/playbooks/llm/` OWASP LLM Top 10 read-only probe playbook
+- [x] Align LLM arsenal to **OWASP GenAI LLM Top 10 2026** (umbrella + `llm01`–`llm10` stems; engine `llm_security` scenario)
 - [ ] Define `ansible/playbooks/robot/` probe catalog (read-only)
-- [ ] Map probes → OWASP categories + NIST SC/AC/AU controls + RSF layers
+- [ ] Map probes → OWASP 2026 categories + NIST SC/AC/AU controls + RSF layers (+ Agentic Top 10 follow-on)
 - [ ] AI report template (reuse `compliance-docs/` patterns)
 - [ ] HITL gate: no remediation without human approval
 - [ ] Lab environment: Dockerized ROS 2 + rosbridge test target
@@ -147,16 +148,17 @@ Companion app for executives/analysts (status, HITL, reports) — not a jump-hos
 
 ### P6 — GenAI model / agent market research
 
-**Goal:** Track progress of commercial and open LLMs/agents for possible future use — **without** adding a second paid LLM to MVP CI or product.
+**Goal:** Track commercial and open LLMs/agents for CI / Enterprise economics — **without** requiring a second paid LLM for green CI.
 
+- [x] Community **runtime multi-BYOK** (Gemini default; OpenAI / Anthropic / Groq / Vertex via local proxy) — see [SECRETS-SETUP.md](SECRETS-SETUP.md), `ai-agent/llm-providers.js`
 - [ ] Quarterly scan: cost/token efficiency, HITL/tool-confirmation fitness, gov-friendly hosting
 - [ ] Revisit optional multi-model **CI** peer review only after P0 + budget policy
-- [ ] Revisit optional alternate **runtime** models (beyond Gemini BYOK) only with Enterprise token economics
-- [ ] Keep MVP: Gemini BYOK in-app; human + Trivy/hardening CI only
+- [ ] Enterprise pooled tokens / metering (still P3) vs Community BYOK
+- [ ] Keep CI: human + Trivy/hardening only — **no** second LLM secret required for green builds
 
 **Explicit out of scope until research approved**
 
-- Anthropic/Claude (or other) API keys required for green CI
+- Anthropic/Claude (or other) API keys **required** for green CI
 - Unbounded multi-vendor agent loops in shared GCP QA
 
 ### P7 — CISA OSS alignment follow-through
