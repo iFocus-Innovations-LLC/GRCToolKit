@@ -28,6 +28,30 @@ GRCToolKit adds **Puppet** as a second read-only audit engine alongside Ansible 
 
 ## Architecture
 
+### Ansible-Driven Execution (Experimental)
+
+**Status: EXPERIMENTAL - POC Stage**
+
+Puppet runs as an optional check driven by the existing Ansible runner:
+- **No sidecar, DaemonSet, or new container**
+- **No changes to k8s/Helm**
+- Small read-only Ansible playbook (`ansible/playbooks/puppet-audit.yml`):
+  1. Checks if Puppet/OpenVox installed on target (reports SKIP if not, **never installs**)
+  2. Copies `puppet/modules/grc_audit` to target temp directory
+  3. Runs `puppet apply --noop` with per-run temp `--vardir`
+  4. Fetches `last_run_report.yaml` back to controller
+  5. Feeds report to `scripts/parse-puppet-summary.py` locally
+  6. Exports to OSCAL via `scripts/puppet-to-oscal.py`
+
+**Usage:**
+```bash
+ansible-playbook ansible/playbooks/puppet-audit.yml \
+  -i inventory.ini \
+  -e "puppet_module=grc_audit::ssh_hardening" \
+  -e "control_id=IA-2" \
+  -e "oscal_output=/tmp/grc-oscal-reports"
+```
+
 ### Read-Only Model
 
 ```mermaid
