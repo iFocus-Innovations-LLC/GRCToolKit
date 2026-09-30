@@ -3,7 +3,7 @@
 # Never applies changes; enforces noop mode for read-only validation.
 #
 # Usage:
-#   ./scripts/puppet-audit-wrapper.sh grc_audit::ssh_hardening [control_id] [--oscal]
+#   ./scripts/puppet-audit-wrapper.sh grc_audit::ssh_hardening [control_id] [config_path] [--oscal]
 #
 # Output: JSON finding to stdout
 #   {"control": "IA-2", "status": "PASS|WARN|FAIL", "message": "...", "evidence": "..."}
@@ -16,14 +16,24 @@ cd "$ROOT"
 
 MODULE="${1:-}"
 CONTROL="${2:-PUPPET}"
-OSCAL_FLAG="${3:-}"
+CONFIG_PATH="${3:-}"
+OSCAL_FLAG="${4:-}"
+
+# Handle optional config_path parameter
+if [[ "$CONFIG_PATH" == "--oscal" ]]; then
+  OSCAL_FLAG="--oscal"
+  CONFIG_PATH=""
+elif [[ "$OSCAL_FLAG" != "--oscal" ]]; then
+  OSCAL_FLAG=""
+fi
+
 REPORT_DIR="${ROOT}/puppet/reports"
 OSCAL_DIR="/tmp/grc-oscal-reports"
 TIMESTAMP="$(date +%s)"
 REPORT_FILE="${REPORT_DIR}/puppet-noop-${TIMESTAMP}.yaml"
 
 if [[ -z "$MODULE" ]]; then
-  echo '{"control": "PUPPET", "status": "FAIL", "message": "Usage: puppet-audit-wrapper.sh <module> [control_id] [--oscal]", "evidence": ""}' >&2
+  echo '{"control": "PUPPET", "status": "FAIL", "message": "Usage: puppet-audit-wrapper.sh <module> [control_id] [config_path] [--oscal]", "evidence": ""}' >&2
   exit 1
 fi
 

@@ -27,7 +27,7 @@
 #   Whether PubkeyAuthentication should be enabled. Default: yes (NIST baseline).
 class grc_audit::ssh_hardening (
   Boolean $ensure_compliance = $grc_audit::ensure_compliance,
-  Stdlib::Absolutepath $sshd_config_path = $facts['os']['family'] ? {
+  String $sshd_config_path = $facts['os']['family'] ? {
     'windows' => 'C:/ProgramData/ssh/sshd_config',
     default   => '/etc/ssh/sshd_config',
   },
