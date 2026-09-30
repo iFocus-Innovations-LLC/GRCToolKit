@@ -55,14 +55,9 @@ run_puppet_noop() {
   local output
   local exit_code=0
   local vardir="/tmp/puppet-run-${TIMESTAMP}"
-  local vardir_file="/tmp/puppet-vardir-${TIMESTAMP}-$$.txt"
-  local exitcode_file="/tmp/puppet-exitcode-${TIMESTAMP}-$$.txt"
   
   # Create temp vardir for this run's structured output
   mkdir -p "$vardir"
-  
-  # Store vardir path for main() to use (before running puppet)
-  echo "$vardir" > "$vardir_file"
   
   # Build puppet apply command
   local puppet_cmd="include ${MODULE}"
@@ -83,8 +78,9 @@ run_puppet_noop() {
     -e "$puppet_cmd" \
     2>&1) || exit_code=$?
   
-  # Store exit code for main() to use (after running puppet)
-  echo "$exit_code" > "$exitcode_file"
+  # Write metadata to files AFTER puppet completes
+  printf "%s" "$vardir" > "/tmp/puppet-vardir-${TIMESTAMP}.txt"
+  printf "%s" "$exit_code" > "/tmp/puppet-exitcode-${TIMESTAMP}.txt"
   
   # Output goes to stdout
   echo "$output"
@@ -165,31 +161,21 @@ main() {
   local output
   output=$(run_puppet_noop 2>&1)
   
-  # Read exit code and vardir from temp files (with PID for uniqueness)
-  local exit_code
-  local vardir
-  local vardir_file="/tmp/puppet-vardir-${TIMESTAMP}-$$.txt"
-  local exitcode_file="/tmp/puppet-exitcode-${TIMESTAMP}-$$.txt"
+  # Read exit code and vardir from temp files
+  local exit_code=0
+  local vardir=""
   
-  echo "# DEBUG: Looking for temp files: vardir=$vardir_file, exitcode=$exitcode_file" >&2
-  
-  if [[ -f "$exitcode_file" ]]; then
-    exit_code=$(cat "$exitcode_file")
-    echo "# DEBUG: Exit code: '${exit_code}'" >&2
-    rm -f "$exitcode_file"
-  else
-    echo "# DEBUG: Exit code file not found" >&2
-    exit_code=0
+  if [[ -f "/tmp/puppet-exitcode-${TIMESTAMP}.txt" ]]; then
+    exit_code=$(cat "/tmp/puppet-exitcode-${TIMESTAMP}.txt")
+    rm -f "/tmp/puppet-exitcode-${TIMESTAMP}.txt"
   fi
   
-  if [[ -f "$vardir_file" ]]; then
-    vardir=$(cat "$vardir_file")
-    echo "# DEBUG: Vardir: '${vardir}' (length ${#vardir})" >&2
-    rm -f "$vardir_file"
-  else
-    echo "# DEBUG: Vardir file not found" >&2
-    vardir=""
+  if [[ -f "/tmp/puppet-vardir-${TIMESTAMP}.txt" ]]; then
+    vardir=$(cat "/tmp/puppet-vardir-${TIMESTAMP}.txt")
+    rm -f "/tmp/puppet-vardir-${TIMESTAMP}.txt"
   fi
+  
+  echo "# DEBUG: exit_code='${exit_code}', vardir='${vardir}'" >&2
   
   # Parse and emit JSON finding (uses structured YAML if available)
   local finding_json
