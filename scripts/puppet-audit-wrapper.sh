@@ -96,17 +96,6 @@ parse_puppet_output() {
   
   # If Python available, use structured YAML parsing
   if command -v python3 &>/dev/null && [[ -n "$vardir" ]]; then
-    # Debug: Check if YAML files exist
-    if [[ -f "${vardir}/state/last_run_report.yaml" ]]; then
-      echo "# DEBUG: Found report at ${vardir}/state/last_run_report.yaml" >&2
-      echo "# DEBUG: First 100 lines of report:" >&2
-      head -100 "${vardir}/state/last_run_report.yaml" >&2
-    else
-      echo "# DEBUG: Report file missing: ${vardir}/state/last_run_report.yaml" >&2
-      echo "# DEBUG: state directory contents:" >&2
-      ls -la "$vardir/state" >&2 || true
-    fi
-    
     # Parse Puppet's structured output (last_run_report.yaml)
     python3 "${ROOT}/scripts/parse-puppet-summary.py" "$vardir" "$CONTROL" "$MODULE"
     return 0
