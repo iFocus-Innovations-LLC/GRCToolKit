@@ -78,12 +78,8 @@ run_puppet_noop() {
     -e "$puppet_cmd" \
     2>&1) || exit_code=$?
   
-  echo "$output"
-  
-  # Export vardir for parse function
-  export PUPPET_VARDIR="$vardir"
-  
-  return $exit_code
+  # Return: "exit_code|vardir|output"
+  echo "${exit_code}|${vardir}|${output}"
 }
 
 parse_puppet_output() {
