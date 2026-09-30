@@ -85,7 +85,7 @@ run_puppet_noop() {
 parse_puppet_output() {
   local output="$1"
   local exit_code="$2"
-  local vardir="${PUPPET_VARDIR:-}"
+  local vardir="$3"
   
   # Save raw output to report file for debugging
   echo "$output" > "$REPORT_FILE"
@@ -153,14 +153,22 @@ EOF
 main() {
   check_puppet_available
   
-  # Run Puppet in noop mode
+  # Run Puppet in noop mode (returns "exit_code|vardir|output")
+  local puppet_result
+  puppet_result=$(run_puppet_noop 2>&1)
+  
+  # Parse the result
+  local exit_code
+  local vardir
   local output
-  local exit_code=0
-  output=$(run_puppet_noop 2>&1) || exit_code=$?
+  
+  exit_code=$(echo "$puppet_result" | cut -d'|' -f1)
+  vardir=$(echo "$puppet_result" | cut -d'|' -f2)
+  output=$(echo "$puppet_result" | cut -d'|' -f3-)
   
   # Parse and emit JSON finding (uses structured YAML if available)
   local finding_json
-  finding_json=$(parse_puppet_output "$output" "$exit_code")
+  finding_json=$(parse_puppet_output "$output" "$exit_code" "$vardir")
   echo "$finding_json"
   
   # Optionally convert to OSCAL format
@@ -172,8 +180,8 @@ main() {
   fi
   
   # Cleanup temp vardir
-  if [[ -n "${PUPPET_VARDIR:-}" ]] && [[ -d "$PUPPET_VARDIR" ]]; then
-    rm -rf "$PUPPET_VARDIR"
+  if [[ -n "$vardir" ]] && [[ -d "$vardir" ]]; then
+    rm -rf "$vardir"
   fi
   
   # Success (JSON emitted to stdout)
