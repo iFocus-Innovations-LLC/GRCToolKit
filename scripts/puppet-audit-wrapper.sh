@@ -164,8 +164,6 @@ main() {
     rm -f "/tmp/puppet-vardir-${TIMESTAMP}.txt"
   fi
   
-  echo "# DEBUG: exit_code='${exit_code}', vardir='${vardir}'" >&2
-  
   # Parse and emit JSON finding (uses structured YAML if available)
   local finding_json
   finding_json=$(parse_puppet_output "$output" "$exit_code" "$vardir")
