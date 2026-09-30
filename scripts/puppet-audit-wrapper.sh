@@ -54,6 +54,10 @@ check_puppet_available() {
 run_puppet_noop() {
   local output
   local exit_code=0
+  local vardir="/tmp/puppet-run-${TIMESTAMP}"
+  
+  # Create temp vardir for this run's structured output
+  mkdir -p "$vardir"
   
   # Build puppet apply command
   local puppet_cmd="include ${MODULE}"
@@ -63,57 +67,52 @@ run_puppet_noop() {
     puppet_cmd="class { '${MODULE}': sshd_config_path => '${CONFIG_PATH}' }"
   fi
   
-  # Run puppet apply in noop mode with YAML report
-  # --modulepath: use our grc_audit module
+  # Run puppet apply in noop mode with structured output
+  # --vardir: isolated directory for this run's state/reports
   # --noop: never apply changes
-  # --detailed-exitcodes: 0=no changes, 2=changes would be made, 4+=errors
+  # --detailed-exitcodes: 0=no changes, 2=changes, 4+=errors
   output=$(puppet apply --noop \
+    --vardir="$vardir" \
     --modulepath="${ROOT}/puppet/modules" \
     --detailed-exitcodes \
     -e "$puppet_cmd" \
     2>&1) || exit_code=$?
   
   echo "$output"
+  
+  # Export vardir for parse function
+  export PUPPET_VARDIR="$vardir"
+  
   return $exit_code
 }
 
 parse_puppet_output() {
   local output="$1"
   local exit_code="$2"
+  local vardir="${PUPPET_VARDIR:-}"
+  
+  # Save raw output to report file for debugging
+  echo "$output" > "$REPORT_FILE"
+  
+  # If Python available, use structured YAML parsing
+  if command -v python3 &>/dev/null && [[ -n "$vardir" ]]; then
+    # Parse Puppet's structured output (last_run_summary.yaml)
+    python3 "${ROOT}/scripts/parse-puppet-summary.py" "$vardir" "$CONTROL" "$MODULE"
+    return 0
+  fi
+  
+  # Fallback: simple exit code mapping (less accurate)
   local status="SKIP"
-  local message="Unknown"
+  local message="Could not parse Puppet output"
   local evidence=""
   
-  # Puppet detailed exit codes:
-  # 0 = no changes (PASS)
-  # 1 = exec resource failed in noop (WARN/FAIL - command returned non-zero)
-  # 2 = changes would be made in real run (WARN/FAIL depending on severity)
-  # 4 = failures (FAIL)
-  # 6 = changes + failures (FAIL)
-  
+  # Exit codes: 0=no changes, 2=changes, 4+=errors
   if [[ $exit_code -eq 0 ]]; then
     status="PASS"
     message="All SSH hardening settings in desired state (no drift detected)"
-  elif [[ $exit_code -eq 1 ]]; then
-    # Exec resources failed (grep didn't find expected config)
-    drift_count=$(echo "$output" | grep -c "returned 1 instead of" || echo 0)
-    if [[ $drift_count -gt 0 ]]; then
-      status="WARN"
-      message="SSH configuration drift detected: ${drift_count} setting(s) out of compliance"
-    else
-      status="FAIL"
-      message="Puppet validation failed (exit code 1)"
-    fi
   elif [[ $exit_code -eq 2 ]]; then
-    # Parse drift details from output
-    drift_count=$(echo "$output" | grep -c "current_value.*should be" || echo 0)
-    if [[ $drift_count -gt 0 ]]; then
-      status="WARN"
-      message="SSH configuration drift detected: ${drift_count} setting(s) out of compliance"
-    else
-      status="WARN"
-      message="Puppet detected changes would be made (see evidence for details)"
-    fi
+    status="WARN"
+    message="SSH configuration drift detected (changes would be made)"
   elif [[ $exit_code -ge 4 ]]; then
     status="FAIL"
     message="Puppet validation failed (exit code ${exit_code})"
@@ -122,7 +121,6 @@ parse_puppet_output() {
     message="Unexpected Puppet exit code: ${exit_code}"
   fi
   
-  # Extract relevant evidence (last 1000 chars to keep JSON manageable)
   evidence=$(echo "$output" | tail -c 1000 | sed 's/"/\\"/g' | tr '\n' ' ')
   
   # Emit JSON finding
@@ -147,10 +145,7 @@ main() {
   local exit_code=0
   output=$(run_puppet_noop 2>&1) || exit_code=$?
   
-  # Save raw output to report file for debugging
-  echo "$output" > "$REPORT_FILE"
-  
-  # Parse and emit JSON finding
+  # Parse and emit JSON finding (uses structured YAML if available)
   local finding_json
   finding_json=$(parse_puppet_output "$output" "$exit_code")
   echo "$finding_json"
@@ -161,6 +156,11 @@ main() {
     if echo "$finding_json" | python3 "${ROOT}/scripts/puppet-to-oscal.py" > "$oscal_file" 2>/dev/null; then
       echo "# OSCAL result: ${oscal_file}" >&2
     fi
+  fi
+  
+  # Cleanup temp vardir
+  if [[ -n "${PUPPET_VARDIR:-}" ]] && [[ -d "$PUPPET_VARDIR" ]]; then
+    rm -rf "$PUPPET_VARDIR"
   fi
   
   # Success (JSON emitted to stdout)

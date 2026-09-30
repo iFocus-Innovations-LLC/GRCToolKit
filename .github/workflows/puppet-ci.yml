@@ -59,94 +59,84 @@ jobs:
     - name: Test compliant config (expect PASS)
       run: |
         echo "Testing compliant configuration..."
-        puppet apply --noop --detailed-exitcodes \
-          --modulepath=./puppet/modules \
-          -e "class { 'grc_audit::ssh_hardening': sshd_config_path => '/tmp/puppet-fixtures/sshd_config_compliant' }" \
-          2>&1 | tee /tmp/puppet-compliant-output.txt || EXIT_CODE=$?
-        
-        echo "Exit code: ${EXIT_CODE:-0}"
-        
-        # Exit code 0 = no changes needed (PASS)
-        if [ "${EXIT_CODE:-0}" -eq 0 ]; then
-          echo "✅ PASS: Compliant config detected correctly"
-        else
-          echo "❌ FAIL: Expected exit code 0 (PASS), got ${EXIT_CODE:-0}"
-          cat /tmp/puppet-compliant-output.txt
-          exit 1
-        fi
-
-    - name: Test non-compliant config (expect WARN/drift)
-      run: |
-        echo "Testing non-compliant configuration..."
-        puppet apply --noop --detailed-exitcodes \
-          --modulepath=./puppet/modules \
-          -e "class { 'grc_audit::ssh_hardening': sshd_config_path => '/tmp/puppet-fixtures/sshd_config_noncompliant' }" \
-          2>&1 | tee /tmp/puppet-noncompliant-output.txt || EXIT_CODE=$?
-        
-        echo "Exit code: ${EXIT_CODE:-0}"
-        
-        # Exit code 2 = changes would be made (WARN/drift)
-        if [ "${EXIT_CODE:-0}" -eq 2 ]; then
-          echo "✅ WARN: Drift detected correctly"
-        else
-          echo "❌ FAIL: Expected exit code 2 (WARN), got ${EXIT_CODE:-0}"
-          cat /tmp/puppet-noncompliant-output.txt
-          exit 1
-        fi
-
-    - name: Test wrapper with compliant config
-      run: |
-        echo "Testing wrapper with compliant configuration..."
         ./scripts/puppet-audit-wrapper.sh \
           grc_audit::ssh_hardening \
           IA-2 \
           /tmp/puppet-fixtures/sshd_config_compliant \
-          > /tmp/wrapper-compliant.json 2>&1 || true
+          > /tmp/wrapper-compliant.json 2>&1
         
         cat /tmp/wrapper-compliant.json
         
-        # Verify JSON structure
+        # Verify JSON structure and status
         if command -v jq &>/dev/null; then
           STATUS=$(jq -r '.status' /tmp/wrapper-compliant.json)
+          MESSAGE=$(jq -r '.message' /tmp/wrapper-compliant.json)
+          
           if [ "$STATUS" = "PASS" ]; then
-            echo "✅ Wrapper correctly reported PASS for compliant config"
+            echo "✅ PASS: Compliant config detected correctly"
+            echo "   Message: $MESSAGE"
           else
             echo "❌ FAIL: Expected status PASS, got $STATUS"
+            echo "   Message: $MESSAGE"
             exit 1
           fi
         fi
 
-    - name: Test wrapper with non-compliant config
+    - name: Test non-compliant config (expect WARN with details)
       run: |
-        echo "Testing wrapper with non-compliant configuration..."
+        echo "Testing non-compliant configuration..."
         ./scripts/puppet-audit-wrapper.sh \
           grc_audit::ssh_hardening \
           IA-2 \
           /tmp/puppet-fixtures/sshd_config_noncompliant \
-          > /tmp/wrapper-noncompliant.json 2>&1 || true
+          > /tmp/wrapper-noncompliant.json 2>&1
         
         cat /tmp/wrapper-noncompliant.json
         
-        # Verify JSON structure
+        # Verify JSON structure and status
         if command -v jq &>/dev/null; then
           STATUS=$(jq -r '.status' /tmp/wrapper-noncompliant.json)
+          MESSAGE=$(jq -r '.message' /tmp/wrapper-noncompliant.json)
+          EVIDENCE=$(jq -r '.evidence' /tmp/wrapper-noncompliant.json)
+          
           if [ "$STATUS" = "WARN" ]; then
-            echo "✅ Wrapper correctly reported WARN for non-compliant config"
+            echo "✅ WARN: Drift detected correctly"
+            echo "   Message: $MESSAGE"
+            
+            # Verify evidence mentions the failing settings
+            if echo "$EVIDENCE" | grep -qi "password"; then
+              echo "✅ Evidence mentions PasswordAuthentication"
+            else
+              echo "⚠️  Evidence should mention PasswordAuthentication"
+            fi
+            
+            if echo "$EVIDENCE" | grep -qi "root"; then
+              echo "✅ Evidence mentions PermitRootLogin"
+            else
+              echo "⚠️  Evidence should mention PermitRootLogin"
+            fi
+            
+            if echo "$EVIDENCE" | grep -qi "pubkey"; then
+              echo "✅ Evidence mentions PubkeyAuthentication"
+            else
+              echo "⚠️  Evidence should mention PubkeyAuthentication"
+            fi
           else
             echo "❌ FAIL: Expected status WARN, got $STATUS"
+            echo "   Message: $MESSAGE"
             exit 1
           fi
         fi
 
     - name: Test OSCAL export with compliant config
       run: |
-        echo "Testing OSCAL export..."
+        echo "Testing OSCAL export with compliant config..."
         ./scripts/puppet-audit-wrapper.sh \
           grc_audit::ssh_hardening \
           IA-2 \
           /tmp/puppet-fixtures/sshd_config_compliant \
           --oscal \
-          > /tmp/wrapper-oscal.json 2>&1 || true
+          > /tmp/wrapper-oscal-compliant.json 2>&1
         
         # Find and validate OSCAL file
         OSCAL_FILE=$(find /tmp/grc-oscal-reports -name "puppet-*.json" -type f 2>/dev/null | head -1)
@@ -156,11 +146,46 @@ jobs:
           if command -v jq &>/dev/null; then
             if jq -e '.["assessment-results"]' "$OSCAL_FILE" >/dev/null 2>&1; then
               echo "✅ OSCAL structure valid"
-              jq '.["assessment-results"].results[0].findings[0]' "$OSCAL_FILE"
+              
+              # Check that status is in the finding
+              OSCAL_STATUS=$(jq -r '.["assessment-results"].results[0].findings[0].title' "$OSCAL_FILE")
+              echo "   OSCAL finding: $OSCAL_STATUS"
             else
               echo "❌ FAIL: Invalid OSCAL structure"
               cat "$OSCAL_FILE"
               exit 1
+            fi
+          fi
+        else
+          echo "❌ FAIL: OSCAL file not created"
+          exit 1
+        fi
+
+    - name: Test OSCAL export with non-compliant config
+      run: |
+        echo "Testing OSCAL export with non-compliant config..."
+        rm -f /tmp/grc-oscal-reports/*.json  # Clean up previous
+        ./scripts/puppet-audit-wrapper.sh \
+          grc_audit::ssh_hardening \
+          IA-2 \
+          /tmp/puppet-fixtures/sshd_config_noncompliant \
+          --oscal \
+          > /tmp/wrapper-oscal-noncompliant.json 2>&1
+        
+        # Find and validate OSCAL file
+        OSCAL_FILE=$(find /tmp/grc-oscal-reports -name "puppet-*.json" -type f 2>/dev/null | head -1)
+        if [ -n "$OSCAL_FILE" ] && [ -f "$OSCAL_FILE" ]; then
+          echo "✅ OSCAL file created: $OSCAL_FILE"
+          
+          if command -v jq &>/dev/null; then
+            # Verify OSCAL captures drift
+            OSCAL_DESC=$(jq -r '.["assessment-results"].results[0].findings[0].description' "$OSCAL_FILE")
+            echo "   OSCAL description: $OSCAL_DESC"
+            
+            if echo "$OSCAL_DESC" | grep -qi "drift"; then
+              echo "✅ OSCAL correctly reports drift"
+            else
+              echo "⚠️  OSCAL should mention drift for non-compliant config"
             fi
           fi
         else
