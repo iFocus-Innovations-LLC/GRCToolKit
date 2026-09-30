@@ -55,12 +55,14 @@ run_puppet_noop() {
   local output
   local exit_code=0
   local vardir="/tmp/puppet-run-${TIMESTAMP}"
+  local vardir_file="/tmp/puppet-vardir-${TIMESTAMP}-$$.txt"
+  local exitcode_file="/tmp/puppet-exitcode-${TIMESTAMP}-$$.txt"
   
   # Create temp vardir for this run's structured output
   mkdir -p "$vardir"
   
-  # Store vardir path for main() to use
-  echo "$vardir" > /tmp/puppet-vardir-${TIMESTAMP}.txt
+  # Store vardir path for main() to use (before running puppet)
+  echo "$vardir" > "$vardir_file"
   
   # Build puppet apply command
   local puppet_cmd="include ${MODULE}"
@@ -81,8 +83,8 @@ run_puppet_noop() {
     -e "$puppet_cmd" \
     2>&1) || exit_code=$?
   
-  # Store exit code for main() to use
-  echo "$exit_code" > /tmp/puppet-exitcode-${TIMESTAMP}.txt
+  # Store exit code for main() to use (after running puppet)
+  echo "$exit_code" > "$exitcode_file"
   
   # Output goes to stdout
   echo "$output"
@@ -170,7 +172,7 @@ main() {
   echo "# DEBUG: Looking for temp files with timestamp ${TIMESTAMP}" >&2
   
   if [[ -f /tmp/puppet-exitcode-${TIMESTAMP}.txt ]]; then
-    exit_code=$(cat /tmp/puppet-vardir-${TIMESTAMP}.txt)
+    exit_code=$(cat /tmp/puppet-exitcode-${TIMESTAMP}.txt)
     echo "# DEBUG: Exit code file contents: '${exit_code}'" >&2
     rm -f /tmp/puppet-exitcode-${TIMESTAMP}.txt
   else
