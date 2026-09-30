@@ -40,7 +40,7 @@ def parse_puppet_summary(vardir: Path, control_id: str, module: str) -> dict:
     ruby_script = """
 require 'yaml'
 require 'json'
-report = YAML.load_file(ARGV[0])
+report = YAML.unsafe_load_file(ARGV[0])
 metrics = {}
 ['resources', 'events'].each do |category|
   if report.metrics && report.metrics[category]
