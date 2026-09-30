@@ -106,6 +106,10 @@ parse_puppet_output() {
   local message="Could not parse Puppet output"
   local evidence=""
   
+  # Strip ANSI color codes from output for JSON safety
+  local clean_output
+  clean_output=$(echo "$output" | sed 's/\x1b\[[0-9;]*m//g')
+  
   # Exit codes: 0=no changes, 2=changes, 4+=errors
   if [[ $exit_code -eq 0 ]]; then
     status="PASS"
@@ -121,7 +125,7 @@ parse_puppet_output() {
     message="Unexpected Puppet exit code: ${exit_code}"
   fi
   
-  evidence=$(echo "$output" | tail -c 1000 | sed 's/"/\\"/g' | tr '\n' ' ')
+  evidence=$(echo "$clean_output" | tail -c 1000 | sed 's/"/\\"/g' | tr '\n' ' ')
   
   # Emit JSON finding
   cat <<EOF
