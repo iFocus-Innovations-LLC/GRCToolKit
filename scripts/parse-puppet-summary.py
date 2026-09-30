@@ -17,8 +17,8 @@ import yaml
 def parse_puppet_summary(vardir: Path, control_id: str, module: str) -> dict:
     """Parse Puppet structured output and return GRCToolKit finding."""
     
-    summary_file = vardir / "state" / "last_run_summary.yaml"
-    report_file = vardir / "state" / "last_run_report.yaml"
+    summary_file = vardir / "last_run_summary.yaml"
+    report_file = vardir / "last_run_report.yaml"
     
     # Default finding
     finding = {
