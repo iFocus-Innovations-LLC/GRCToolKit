@@ -64,3 +64,7 @@ grc-deploy.env
 .grc-deploy.env
 
 SECRETS.md
+
+# Puppet reports (noop output)
+puppet/reports/*.yaml
+puppet/reports/*.json
