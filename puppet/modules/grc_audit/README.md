@@ -10,6 +10,8 @@
 
 This module provides Puppet manifests for validating system configuration against NIST 800-53 Rev. 5 controls using Puppet's `--noop` mode. All checks are read-only by default and never modify system state.
 
+**Note:** This POC uses only core Puppet resource types (`exec`, `notify`, `file`). No external dependencies required.
+
 ## Modules
 
 ### `grc_audit::ssh_hardening`

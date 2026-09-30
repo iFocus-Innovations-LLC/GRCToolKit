@@ -1,6 +1,6 @@
 # Puppet Audit Engine — Read-Only NIST Validation
 
-**Status:** Proof of Concept  
+**Status:** Proof of Concept (POC)  
 **Integration:** Parallel to Ansible grc-audit playbooks  
 **Mode:** `puppet apply --noop` (no state changes)  
 **License:** Open-source Puppet 7/8 or OpenVox community fork  
@@ -10,7 +10,7 @@
 
 ## Overview
 
-GRCToolKit adds **Puppet** as a second read-only audit engine alongside Ansible. Puppet's declarative model and `--noop` mode provide drift detection and compliance validation without changing system state.
+GRCToolKit adds **Puppet** as a second read-only audit engine alongside Ansible in a **proof-of-concept implementation**. Puppet's declarative model and `--noop` mode provide drift detection and compliance validation without changing system state.
 
 ### Why Puppet + Ansible?
 
@@ -22,7 +22,7 @@ GRCToolKit adds **Puppet** as a second read-only audit engine alongside Ansible.
 | **Strengths** | Procedural validation, orchestration | State drift, idempotent resources |
 | **GRCToolKit use** | Multi-control suites (AC/AU/SC/LLM) | Single-control drift checks (SSH, file perms, packages) |
 
-**Complementary, not redundant:** Ansible excels at multi-step validation workflows; Puppet excels at "is this file/service/package in the correct state?" checks.
+**Complementary, not redundant:** Ansible excels at multi-step validation workflows; Puppet excels at "is this file/service/package in the correct state?" checks. This POC validates the approach with a single module.
 
 ---
 
@@ -216,17 +216,18 @@ def run_puppet():
 
 ## Phased Implementation Plan
 
-### Phase 0: POC (Current)
+### Phase 0: POC (Current — Demonstrates Viability)
 
 - [x] Design doc (this file)
-- [ ] One module: `grc_audit::ssh_hardening` (IA-2)
-- [ ] Wrapper: `puppet-audit-wrapper.sh` (noop report → JSON)
-- [ ] Smoke test: local `puppet apply --noop`
-- [ ] CI: `puppet parser validate`, `puppet-lint` (optional)
+- [x] One module: `grc_audit::ssh_hardening` (IA-2)
+- [x] Wrapper: `puppet-audit-wrapper.sh` (noop report → JSON)
+- [x] OSCAL converter: `puppet-to-oscal.py` (JSON finding → OSCAL result)
+- [x] Smoke test: local `puppet apply --noop`
+- [ ] CI: optional `puppet parser validate` (if Puppet installed)
 
-**Success criteria:** Single control check (SSH PasswordAuthentication) runs in noop mode, produces PASS/WARN finding, doesn't change system.
+**Success criteria:** Single control check (SSH PasswordAuthentication) runs in noop mode, produces PASS/WARN finding, doesn't change system, and can export to OSCAL format. **Status:** ✅ POC demonstrates technical viability.
 
-### Phase 1: Core Modules (Post-POC)
+### Phase 1: Expand Validation Coverage (Post-POC Approval)
 
 - [ ] Add 3-5 modules: file_permissions (AC-6), package_baseline (CM-7), audit_daemon (AU-2)
 - [ ] Runner API `/run-puppet` endpoint

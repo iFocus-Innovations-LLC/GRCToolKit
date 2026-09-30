@@ -3,10 +3,12 @@
 # Never applies changes; enforces noop mode for read-only validation.
 #
 # Usage:
-#   ./scripts/puppet-audit-wrapper.sh grc_audit::ssh_hardening [control_id]
+#   ./scripts/puppet-audit-wrapper.sh grc_audit::ssh_hardening [control_id] [--oscal]
 #
 # Output: JSON finding to stdout
 #   {"control": "IA-2", "status": "PASS|WARN|FAIL", "message": "...", "evidence": "..."}
+#
+# With --oscal flag: Also writes OSCAL result to /tmp/grc-oscal-reports/
 
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -14,17 +16,22 @@ cd "$ROOT"
 
 MODULE="${1:-}"
 CONTROL="${2:-PUPPET}"
+OSCAL_FLAG="${3:-}"
 REPORT_DIR="${ROOT}/puppet/reports"
+OSCAL_DIR="/tmp/grc-oscal-reports"
 TIMESTAMP="$(date +%s)"
 REPORT_FILE="${REPORT_DIR}/puppet-noop-${TIMESTAMP}.yaml"
 
 if [[ -z "$MODULE" ]]; then
-  echo '{"control": "PUPPET", "status": "FAIL", "message": "Usage: puppet-audit-wrapper.sh <module> [control_id]", "evidence": ""}' >&2
+  echo '{"control": "PUPPET", "status": "FAIL", "message": "Usage: puppet-audit-wrapper.sh <module> [control_id] [--oscal]", "evidence": ""}' >&2
   exit 1
 fi
 
-# Ensure report directory exists
+# Ensure report directories exist
 mkdir -p "$REPORT_DIR"
+if [[ "$OSCAL_FLAG" == "--oscal" ]]; then
+  mkdir -p "$OSCAL_DIR"
+fi
 
 # Safety check: never run without explicit validation that we're in noop mode
 check_puppet_available() {
@@ -61,6 +68,7 @@ parse_puppet_output() {
   
   # Puppet detailed exit codes:
   # 0 = no changes (PASS)
+  # 1 = exec resource failed in noop (WARN/FAIL - command returned non-zero)
   # 2 = changes would be made in real run (WARN/FAIL depending on severity)
   # 4 = failures (FAIL)
   # 6 = changes + failures (FAIL)
@@ -68,6 +76,16 @@ parse_puppet_output() {
   if [[ $exit_code -eq 0 ]]; then
     status="PASS"
     message="All SSH hardening settings in desired state (no drift detected)"
+  elif [[ $exit_code -eq 1 ]]; then
+    # Exec resources failed (grep didn't find expected config)
+    drift_count=$(echo "$output" | grep -c "returned 1 instead of" || echo 0)
+    if [[ $drift_count -gt 0 ]]; then
+      status="WARN"
+      message="SSH configuration drift detected: ${drift_count} setting(s) out of compliance"
+    else
+      status="FAIL"
+      message="Puppet validation failed (exit code 1)"
+    fi
   elif [[ $exit_code -eq 2 ]]; then
     # Parse drift details from output
     drift_count=$(echo "$output" | grep -c "current_value.*should be" || echo 0)
@@ -115,7 +133,17 @@ main() {
   echo "$output" > "$REPORT_FILE"
   
   # Parse and emit JSON finding
-  parse_puppet_output "$output" "$exit_code"
+  local finding_json
+  finding_json=$(parse_puppet_output "$output" "$exit_code")
+  echo "$finding_json"
+  
+  # Optionally convert to OSCAL format
+  if [[ "$OSCAL_FLAG" == "--oscal" ]] && command -v python3 &>/dev/null; then
+    local oscal_file="${OSCAL_DIR}/puppet-${MODULE//::/-}-${CONTROL}-${TIMESTAMP}.json"
+    if echo "$finding_json" | python3 "${ROOT}/scripts/puppet-to-oscal.py" > "$oscal_file" 2>/dev/null; then
+      echo "# OSCAL result: ${oscal_file}" >&2
+    fi
+  fi
   
   # Success (JSON emitted to stdout)
   exit 0

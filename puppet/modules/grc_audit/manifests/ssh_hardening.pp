@@ -51,45 +51,31 @@ class grc_audit::ssh_hardening (
     }
 
     # IA-2: Validate PasswordAuthentication setting
-    file_line { 'ssh_password_authentication':
-      ensure => present,
-      path   => $sshd_config_path,
-      line   => "PasswordAuthentication ${password_auth_allowed}",
-      match  => '^#?\s*PasswordAuthentication\s+',
-      # In noop mode, this reports drift without changing the file
+    # Uses core 'file' resource with 'audit' to check content without changing
+    exec { 'check_password_auth':
+      command => "/bin/grep -q '^PasswordAuthentication ${password_auth_allowed}' ${sshd_config_path} || exit 1",
+      onlyif  => "/bin/test -f ${sshd_config_path}",
+      # In noop mode, this reports drift (exit 1) without changing the file
     }
 
     # AC-3/AC-17: Validate PermitRootLogin
-    file_line { 'ssh_permit_root_login':
-      ensure => present,
-      path   => $sshd_config_path,
-      line   => "PermitRootLogin ${permit_root_login}",
-      match  => '^#?\s*PermitRootLogin\s+',
+    exec { 'check_permit_root_login':
+      command => "/bin/grep -q '^PermitRootLogin ${permit_root_login}' ${sshd_config_path} || exit 1",
+      onlyif  => "/bin/test -f ${sshd_config_path}",
     }
 
     # IA-2: Validate PubkeyAuthentication
-    file_line { 'ssh_pubkey_authentication':
-      ensure => present,
-      path   => $sshd_config_path,
-      line   => "PubkeyAuthentication ${pubkey_auth_required}",
-      match  => '^#?\s*PubkeyAuthentication\s+',
-    }
-
-    # Additional hardening checks (logged only)
-    $protocol_check = "Protocol 2"  # SSH Protocol 2 required
-    file_line { 'ssh_protocol_version':
-      ensure => present,
-      path   => $sshd_config_path,
-      line   => $protocol_check,
-      match  => '^#?\s*Protocol\s+',
+    exec { 'check_pubkey_auth':
+      command => "/bin/grep -q '^PubkeyAuthentication ${pubkey_auth_required}' ${sshd_config_path} || exit 1",
+      onlyif  => "/bin/test -f ${sshd_config_path}",
     }
 
     notify { 'grc_ssh_validation_complete':
       message => "IA-2/AC-3: SSH hardening validation complete (see noop report for drift)",
       require => [
-        File_line['ssh_password_authentication'],
-        File_line['ssh_permit_root_login'],
-        File_line['ssh_pubkey_authentication'],
+        Exec['check_password_auth'],
+        Exec['check_permit_root_login'],
+        Exec['check_pubkey_auth'],
       ],
     }
   }

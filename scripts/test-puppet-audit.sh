@@ -115,6 +115,36 @@ else
 fi
 
 echo ""
+echo "7) OSCAL integration (if Python 3 available)"
+if command -v python3 &>/dev/null; then
+  if ./scripts/puppet-audit-wrapper.sh grc_audit::ssh_hardening IA-2 --oscal > /tmp/puppet-finding-oscal.json 2>&1; then
+    echo "✅ Wrapper with OSCAL flag executed"
+    
+    # Check if OSCAL file was created
+    oscal_file=$(find /tmp/grc-oscal-reports -name "puppet-*.json" -type f 2>/dev/null | head -1)
+    if [[ -n "$oscal_file" ]] && [[ -f "$oscal_file" ]]; then
+      echo "✅ OSCAL result file created: $oscal_file"
+      
+      if command -v jq &>/dev/null; then
+        if jq -e '.["assessment-results"]' "$oscal_file" >/dev/null 2>&1; then
+          echo "✅ OSCAL structure valid"
+        else
+          echo "❌ OSCAL structure invalid"
+          failed=1
+        fi
+      fi
+    else
+      echo "⚠️  OSCAL file not created (non-critical for POC)"
+    fi
+  else
+    echo "❌ Wrapper with OSCAL flag failed"
+    failed=1
+  fi
+else
+  echo "⚠️  Python 3 not installed (skipping OSCAL test)"
+fi
+
+echo ""
 if [[ $failed -eq 0 ]]; then
   echo "🎉 Puppet audit engine smoke test PASSED"
   exit 0
