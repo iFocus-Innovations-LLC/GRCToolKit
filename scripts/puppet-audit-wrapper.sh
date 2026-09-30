@@ -1,118 +1,116 @@
-#!/usr/bin/env bash
-# Puppet audit wrapper: runs puppet apply --noop and converts output to GRCToolKit JSON finding.
-# Never applies changes; enforces noop mode for read-only validation.
-#
-# Usage:
-#   ./scripts/puppet-audit-wrapper.sh grc_audit::ssh_hardening [control_id] [config_path] [--oscal]
-#
-# Output: JSON finding to stdout
-#   {"control": "IA-2", "status": "PASS|WARN|FAIL", "message": "...", "evidence": "..."}
-#
-# With --oscal flag: Also writes OSCAL result to /tmp/grc-oscal-reports/
-
+#!/bin/bash
+# Puppet noop audit wrapper with structured YAML parsing
+# Usage: puppet-audit-wrapper.sh <module> <control> [config_path] [--oscal]
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT"
 
-MODULE="${1:-}"
-CONTROL="${2:-PUPPET}"
+# Configuration
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+MODULE="${1:-grc_audit::ssh_hardening}"
+CONTROL="${2:-IA-2}"
 CONFIG_PATH="${3:-}"
 OSCAL_FLAG="${4:-}"
+OSCAL_DIR="${OSCAL_DIR:-/tmp/grc-oscal-reports}"
+GRC_DEBUG="${GRC_DEBUG:-0}"
 
-# Handle optional config_path parameter
-if [[ "$CONFIG_PATH" == "--oscal" ]]; then
-  OSCAL_FLAG="--oscal"
-  CONFIG_PATH=""
-elif [[ "$OSCAL_FLAG" != "--oscal" ]]; then
-  OSCAL_FLAG=""
-fi
+# Create output directory
+mkdir -p "$OSCAL_DIR"
 
-REPORT_DIR="${ROOT}/puppet/reports"
-OSCAL_DIR="/tmp/grc-oscal-reports"
-TIMESTAMP="$(date +%s)"
-REPORT_FILE="${REPORT_DIR}/puppet-noop-${TIMESTAMP}.yaml"
+# Debug logging helper (only if GRC_DEBUG=1)
+debug() {
+  if [[ "$GRC_DEBUG" == "1" ]]; then
+    echo "# DEBUG: $*" >&2
+  fi
+}
 
-if [[ -z "$MODULE" ]]; then
-  echo '{"control": "PUPPET", "status": "FAIL", "message": "Usage: puppet-audit-wrapper.sh <module> [control_id] [config_path] [--oscal]", "evidence": ""}' >&2
-  exit 1
-fi
-
-# Ensure report directories exist
-mkdir -p "$REPORT_DIR"
-if [[ "$OSCAL_FLAG" == "--oscal" ]]; then
-  mkdir -p "$OSCAL_DIR"
-fi
-
-# Safety check: never run without explicit validation that we're in noop mode
 check_puppet_available() {
   if ! command -v puppet &>/dev/null; then
-    echo '{"control": "'"${CONTROL}"'", "status": "SKIP", "message": "Puppet not installed (install puppet 7+ or run in container)", "evidence": "puppet command not found"}' >&2
+    cat <<EOF
+{
+  "control": "${CONTROL}",
+  "status": "SKIP",
+  "message": "Puppet not installed",
+  "evidence": "Puppet binary not found in PATH",
+  "puppet_module": "${MODULE}",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "grc_audit_mode": "read_only"
+}
+EOF
     exit 0
   fi
 }
 
 run_puppet_noop() {
-  local output
-  local exit_code=0
-  local vardir="/tmp/puppet-run-${TIMESTAMP}"
-  
-  # Create temp vardir for this run's structured output
-  mkdir -p "$vardir"
+  # Create per-run temp directory with mktemp
+  local run_dir
+  run_dir=$(mktemp -d -t puppet-grc-XXXXXX)
+  debug "Created run directory: $run_dir"
   
   # Build puppet apply command
   local puppet_cmd="include ${MODULE}"
-  
-  # If config_path provided, use it as a parameter
   if [[ -n "$CONFIG_PATH" ]]; then
     puppet_cmd="class { '${MODULE}': sshd_config_path => '${CONFIG_PATH}' }"
   fi
   
-  # Run puppet apply in noop mode with structured output
-  # --vardir: isolated directory for this run's state/reports
-  # --noop: never apply changes
-  # --detailed-exitcodes: 0=no changes, 2=changes, 4+=errors
+  # Run puppet apply in noop mode with explicit paths
+  local exit_code=0
+  local output
   output=$(puppet apply --noop \
-    --vardir="$vardir" \
+    --vardir="$run_dir/vardir" \
     --modulepath="${ROOT}/puppet/modules" \
     --detailed-exitcodes \
     -e "$puppet_cmd" \
     2>&1) || exit_code=$?
   
-  # Write metadata to files AFTER puppet completes
-  printf "%s" "$vardir" > "/tmp/puppet-vardir-${TIMESTAMP}.txt"
-  printf "%s" "$exit_code" > "/tmp/puppet-exitcode-${TIMESTAMP}.txt"
+  debug "Puppet exit code: $exit_code"
+  debug "Vardir: $run_dir/vardir"
   
-  # Output goes to stdout
-  echo "$output"
+  # Return: exit_code, run_dir, output (newline-separated)
+  printf "%d\n%s\n%s\n" "$exit_code" "$run_dir" "$output"
 }
 
 parse_puppet_output() {
-  local output="$1"
-  local exit_code="$2"
-  local vardir="$3"
+  local exit_code="$1"
+  local run_dir="$2"
+  local output="$3"
   
-  # Save raw output to report file for debugging
-  echo "$output" > "$REPORT_FILE"
+  local report_file="$run_dir/vardir/state/last_run_report.yaml"
   
-  # If Python available, use structured YAML parsing
-  if command -v python3 &>/dev/null && [[ -n "$vardir" ]]; then
-    # Parse Puppet's structured output (last_run_report.yaml)
-    python3 "${ROOT}/scripts/parse-puppet-summary.py" "$vardir" "$CONTROL" "$MODULE"
+  # Check if report exists
+  if [[ ! -f "$report_file" ]]; then
+    debug "Report file not found: $report_file"
+    cat <<EOF
+{
+  "control": "${CONTROL}",
+  "status": "ERROR",
+  "message": "Puppet report not generated",
+  "evidence": "Expected report at $report_file but file not found. Puppet may have failed to write report.",
+  "puppet_module": "${MODULE}",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "grc_audit_mode": "read_only"
+}
+EOF
+    return 1
+  fi
+  
+  debug "Found report file: $report_file"
+  
+  # Parse with Python if available
+  if command -v python3 &>/dev/null; then
+    python3 "${ROOT}/scripts/parse-puppet-summary.py" "$run_dir/vardir" "$CONTROL" "$MODULE"
     return 0
   fi
   
-  echo "# DEBUG: Falling back to exit code (python3=$(command -v python3), vardir=${vardir})" >&2
-  
   # Fallback: simple exit code mapping (less accurate)
+  debug "Python not available, using exit code fallback"
+  
   local status="SKIP"
   local message="Could not parse Puppet output"
-  local evidence=""
+  local evidence
   
-  # Strip ANSI color codes from output for JSON safety
+  # Strip ANSI codes
   local clean_output
   clean_output=$(echo "$output" | sed 's/\x1b\[[0-9;]*m//g')
   
-  # Exit codes: 0=no changes, 2=changes, 4+=errors
   if [[ $exit_code -eq 0 ]]; then
     status="PASS"
     message="All SSH hardening settings in desired state (no drift detected)"
@@ -129,7 +127,6 @@ parse_puppet_output() {
   
   evidence=$(echo "$clean_output" | tail -c 1000 | sed 's/"/\\"/g' | tr '\n' ' ')
   
-  # Emit JSON finding
   cat <<EOF
 {
   "control": "${CONTROL}",
@@ -147,42 +144,43 @@ main() {
   check_puppet_available
   
   # Run Puppet in noop mode
+  local puppet_result
+  puppet_result=$(run_puppet_noop)
+  
+  # Parse result (newline-separated)
+  local exit_code
+  local run_dir
   local output
-  output=$(run_puppet_noop 2>&1)
   
-  # Read exit code and vardir from temp files
-  local exit_code=0
-  local vardir=""
+  exit_code=$(echo "$puppet_result" | sed -n '1p')
+  run_dir=$(echo "$puppet_result" | sed -n '2p')
+  output=$(echo "$puppet_result" | sed -n '3,$p')
   
-  if [[ -f "/tmp/puppet-exitcode-${TIMESTAMP}.txt" ]]; then
-    exit_code=$(cat "/tmp/puppet-exitcode-${TIMESTAMP}.txt")
-    rm -f "/tmp/puppet-exitcode-${TIMESTAMP}.txt"
-  fi
-  
-  if [[ -f "/tmp/puppet-vardir-${TIMESTAMP}.txt" ]]; then
-    vardir=$(cat "/tmp/puppet-vardir-${TIMESTAMP}.txt")
-    rm -f "/tmp/puppet-vardir-${TIMESTAMP}.txt"
-  fi
+  debug "Parsed exit_code=$exit_code, run_dir=$run_dir"
   
   # Parse and emit JSON finding (uses structured YAML if available)
   local finding_json
-  finding_json=$(parse_puppet_output "$output" "$exit_code" "$vardir")
+  finding_json=$(parse_puppet_output "$exit_code" "$run_dir" "$output")
+  
+  # Only JSON to stdout
   echo "$finding_json"
   
   # Optionally convert to OSCAL format
   if [[ "$OSCAL_FLAG" == "--oscal" ]] && command -v python3 &>/dev/null; then
-    local oscal_file="${OSCAL_DIR}/puppet-${MODULE//::/-}-${CONTROL}-${TIMESTAMP}.json"
+    local timestamp
+    timestamp=$(date +%s)
+    local oscal_file="${OSCAL_DIR}/puppet-${MODULE//::/-}-${CONTROL}-${timestamp}.json"
     if echo "$finding_json" | python3 "${ROOT}/scripts/puppet-to-oscal.py" > "$oscal_file" 2>/dev/null; then
-      echo "# OSCAL result: ${oscal_file}" >&2
+      debug "OSCAL result: ${oscal_file}"
     fi
   fi
   
-  # Cleanup temp vardir
-  if [[ -n "$vardir" ]] && [[ -d "$vardir" ]]; then
-    rm -rf "$vardir"
+  # Cleanup temp directory
+  if [[ -n "$run_dir" ]] && [[ -d "$run_dir" ]]; then
+    rm -rf "$run_dir"
+    debug "Cleaned up: $run_dir"
   fi
   
-  # Success (JSON emitted to stdout)
   exit 0
 }
 
