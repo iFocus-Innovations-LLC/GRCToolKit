@@ -35,8 +35,8 @@ def parse_puppet_summary(vardir: Path, control_id: str, module: str) -> dict:
         return finding
     
     with report_file.open("r") as f:
-        # Puppet reports contain Ruby objects, need full_load
-        report = yaml.full_load(f)
+        # Puppet reports contain Ruby objects, need UnsafeLoader
+        report = yaml.load(f, Loader=yaml.UnsafeLoader)
     
     # Extract metrics from report
     metrics = report.get("metrics", {})
