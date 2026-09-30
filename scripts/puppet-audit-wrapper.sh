@@ -105,6 +105,8 @@ parse_puppet_output() {
       echo "# DEBUG: Summary file missing: ${vardir}/state/last_run_summary.yaml" >&2
       echo "# DEBUG: vardir contents:" >&2
       ls -la "$vardir" >&2 || true
+      echo "# DEBUG: state directory contents:" >&2
+      ls -la "$vardir/state" >&2 || true
     fi
     
     # Parse Puppet's structured output (last_run_summary.yaml)
