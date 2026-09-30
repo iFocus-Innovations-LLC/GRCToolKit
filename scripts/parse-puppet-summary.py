@@ -17,6 +17,8 @@ import yaml
 def parse_puppet_summary(vardir: Path, control_id: str, module: str) -> dict:
     """Parse Puppet structured output and return GRCToolKit finding."""
     
+    import subprocess
+    
     report_file = vardir / "state" / "last_run_report.yaml"
     
     # Default finding
@@ -30,31 +32,68 @@ def parse_puppet_summary(vardir: Path, control_id: str, module: str) -> dict:
         "grc_audit_mode": "read_only",
     }
     
-    # Parse report file
+    # Parse report file using Ruby (since Puppet YAML contains Ruby objects)
     if not report_file.exists():
         return finding
     
-    with report_file.open("r") as f:
-        # Puppet reports contain Ruby objects, need UnsafeLoader
-        report = yaml.load(f, Loader=yaml.UnsafeLoader)
+    # Use Ruby to parse Puppet YAML and extract metrics as JSON
+    ruby_script = """
+require 'yaml'
+require 'json'
+report = YAML.load_file(ARGV[0])
+metrics = {}
+['resources', 'events'].each do |category|
+  if report.metrics && report.metrics[category]
+    metrics[category] = report.metrics[category].values.to_h
+  end
+end
+# Extract resource statuses
+statuses = {}
+if report.resource_statuses
+  report.resource_statuses.each do |name, status|
+    if status.out_of_sync || status.change_count > 0
+      statuses[name] = {
+        'out_of_sync' => status.out_of_sync,
+        'change_count' => status.change_count,
+        'events' => status.events.map { |e| {'status' => e.status} }
+      }
+    end
+  end
+end
+puts JSON.generate({
+  'metrics' => metrics,
+  'resource_statuses' => statuses,
+  'time' => report.time.to_s
+})
+"""
     
-    # Extract metrics from report
-    metrics = report.get("metrics", {})
+    try:
+        result = subprocess.run(
+            ['ruby', '-e', ruby_script, str(report_file)],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode != 0:
+            return finding
+        
+        import json
+        data = json.loads(result.stdout)
+    except Exception as e:
+        finding["evidence"] = f"Failed to parse report: {e}"
+        return finding
     
-    # Resource metrics
+    # Extract metrics
+    metrics = data.get("metrics", {})
     resources_metrics = metrics.get("resources", {})
+    events_metrics = metrics.get("events", {})
+    
     total = resources_metrics.get("total", 0)
     out_of_sync = resources_metrics.get("out_of_sync", 0)
     failed = resources_metrics.get("failed", 0)
-    
-    # Event metrics
-    events_metrics = metrics.get("events", {})
     noop_events = events_metrics.get("noop", 0)
     
     # Determine status based on counts
-    # FAIL: any failures
-    # WARN: resources out of sync or noop events (drift detected)
-    # PASS: no failures, no drift
     if failed > 0:
         status = "FAIL"
         message = f"Puppet validation failed: {failed} resource(s) failed"
@@ -65,37 +104,28 @@ def parse_puppet_summary(vardir: Path, control_id: str, module: str) -> dict:
         status = "PASS"
         message = "All SSH hardening settings in desired state (no drift detected)"
     
-    # Extract evidence from report (which resources were out of sync)
+    # Extract evidence
     evidence_parts = [
         f"Puppet noop run: {total} resources checked, {out_of_sync} out of sync, {failed} failed."
     ]
     
-    # Extract out-of-sync resources
-    resource_statuses = report.get("resource_statuses", {})
-    for resource_name, resource_data in resource_statuses.items():
-        if resource_data.get("out_of_sync", False) or resource_data.get("change_count", 0) > 0:
-            events_list = resource_data.get("events", [])
-            if events_list:
-                event_details = []
-                for event in events_list:
-                    if event.get("status") == "noop":
-                        # Extract check name from resource name (e.g. "check_password_auth")
-                        resource_short = resource_name.split("/")[-1].replace("]", "")
-                        desired = event.get("desired_value", [""])[0] if isinstance(event.get("desired_value"), list) else event.get("desired_value", "")
-                        event_details.append(f"{resource_short}")
-                if event_details:
-                    evidence_parts.append(", ".join(event_details))
+    resource_statuses = data.get("resource_statuses", {})
+    failing_checks = []
+    for resource_name in resource_statuses.keys():
+        # Extract check name from resource (e.g. "Exec[check_password_auth]" -> "check_password_auth")
+        resource_short = resource_name.split("[")[-1].replace("]", "")
+        failing_checks.append(resource_short)
+    
+    if failing_checks:
+        evidence_parts.append("Failing checks: " + ", ".join(failing_checks))
     
     evidence = " ".join(evidence_parts)
-    
-    # Get timestamp from report
-    timestamp = report.get("time", "")
     
     finding.update({
         "status": status,
         "message": message,
-        "evidence": evidence[:1000],  # Truncate to 1000 chars
-        "timestamp": str(timestamp) if timestamp else "",
+        "evidence": evidence[:1000],
+        "timestamp": str(data.get("time", "")),
     })
     
     return finding
