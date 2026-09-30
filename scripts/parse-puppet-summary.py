@@ -75,12 +75,22 @@ puts JSON.generate({
             timeout=5
         )
         if result.returncode != 0:
+            finding["evidence"] = f"Ruby script failed (exit {result.returncode}): {result.stderr[:500]}"
             return finding
         
         import json
         data = json.loads(result.stdout)
+    except subprocess.TimeoutExpired:
+        finding["evidence"] = "Ruby script timed out after 5 seconds"
+        return finding
+    except FileNotFoundError:
+        finding["evidence"] = "Ruby not found in PATH"
+        return finding
+    except json.JSONDecodeError as e:
+        finding["evidence"] = f"Failed to parse Ruby JSON output: {e}. Output: {result.stdout[:500]}"
+        return finding
     except Exception as e:
-        finding["evidence"] = f"Failed to parse report: {e}"
+        finding["evidence"] = f"Failed to parse report: {type(e).__name__}: {e}"
         return finding
     
     # Extract metrics
