@@ -18,6 +18,7 @@ def parse_puppet_summary(vardir: Path, control_id: str, module: str) -> dict:
     """Parse Puppet structured output and return GRCToolKit finding."""
     
     import subprocess
+    import re
     
     report_file = vardir / "state" / "last_run_report.yaml"
     
@@ -32,76 +33,55 @@ def parse_puppet_summary(vardir: Path, control_id: str, module: str) -> dict:
         "grc_audit_mode": "read_only",
     }
     
-    # Parse report file using Ruby (since Puppet YAML contains Ruby objects)
     if not report_file.exists():
         return finding
     
-    # Use Ruby to parse Puppet YAML and extract metrics as JSON
-    ruby_script = """
-require 'yaml'
-require 'json'
-report = YAML.unsafe_load_file(ARGV[0])
-metrics = {}
-['resources', 'events'].each do |category|
-  if report.metrics && report.metrics[category]
-    metrics[category] = report.metrics[category].values.to_h
-  end
-end
-# Extract resource statuses
-statuses = {}
-if report.resource_statuses
-  report.resource_statuses.each do |name, status|
-    if status.out_of_sync || status.change_count > 0
-      statuses[name] = {
-        'out_of_sync' => status.out_of_sync,
-        'change_count' => status.change_count,
-        'events' => status.events.map { |e| {'status' => e.status} }
-      }
-    end
-  end
-end
-puts JSON.generate({
-  'metrics' => metrics,
-  'resource_statuses' => statuses,
-  'time' => report.time.to_s
-})
-"""
-    
+    # Extract metrics using text processing (avoid Ruby class instantiation issues)
     try:
-        result = subprocess.run(
-            ['ruby', '-e', ruby_script, str(report_file)],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        if result.returncode != 0:
-            finding["evidence"] = f"Ruby script failed (exit {result.returncode}): {result.stderr[:500]}"
-            return finding
+        with report_file.open("r") as f:
+            content = f.read()
         
-        import json
-        data = json.loads(result.stdout)
-    except subprocess.TimeoutExpired:
-        finding["evidence"] = "Ruby script timed out after 5 seconds"
-        return finding
-    except FileNotFoundError:
-        finding["evidence"] = "Ruby not found in PATH"
-        return finding
-    except json.JSONDecodeError as e:
-        finding["evidence"] = f"Failed to parse Ruby JSON output: {e}. Output: {result.stdout[:500]}"
-        return finding
+        # Extract resource metrics using regex
+        total = 0
+        out_of_sync = 0
+        failed = 0
+        noop_events = 0
+        
+        # Look for metrics section in YAML
+        resources_match = re.search(r'resources:\s+!ruby/object:Puppet::Util::Metric.*?values:\s+(.*?)(?=\w+:|$)', content, re.DOTALL)
+        if resources_match:
+            values_text = resources_match.group(1)
+            total_match = re.search(r'total:\s+(\d+)', values_text)
+            out_of_sync_match = re.search(r'out_of_sync:\s+(\d+)', values_text)
+            failed_match = re.search(r'failed:\s+(\d+)', values_text)
+            if total_match:
+                total = int(total_match.group(1))
+            if out_of_sync_match:
+                out_of_sync = int(out_of_sync_match.group(1))
+            if failed_match:
+                failed = int(failed_match.group(1))
+        
+        events_match = re.search(r'events:\s+!ruby/object:Puppet::Util::Metric.*?values:\s+(.*?)(?=\w+:|$)', content, re.DOTALL)
+        if events_match:
+            values_text = events_match.group(1)
+            noop_match = re.search(r'noop:\s+(\d+)', values_text)
+            if noop_match:
+                noop_events = int(noop_match.group(1))
+        
+        # Extract out-of-sync resource names
+        failing_checks = []
+        resource_statuses_match = re.search(r'resource_statuses:(.*)', content, re.DOTALL)
+        if resource_statuses_match:
+            statuses_text = resource_statuses_match.group(1)
+            # Find Exec[check_*] resources that are out of sync
+            for match in re.finditer(r'Exec\[([^\]]+)\]:.*?out_of_sync:\s*true', statuses_text, re.DOTALL):
+                check_name = match.group(1)
+                if 'check_' in check_name:
+                    failing_checks.append(check_name)
+        
     except Exception as e:
-        finding["evidence"] = f"Failed to parse report: {type(e).__name__}: {e}"
+        finding["evidence"] = f"Failed to parse report text: {type(e).__name__}: {e}"
         return finding
-    
-    # Extract metrics
-    metrics = data.get("metrics", {})
-    resources_metrics = metrics.get("resources", {})
-    events_metrics = metrics.get("events", {})
-    
-    total = resources_metrics.get("total", 0)
-    out_of_sync = resources_metrics.get("out_of_sync", 0)
-    failed = resources_metrics.get("failed", 0)
-    noop_events = events_metrics.get("noop", 0)
     
     # Determine status based on counts
     if failed > 0:
@@ -119,13 +99,6 @@ puts JSON.generate({
         f"Puppet noop run: {total} resources checked, {out_of_sync} out of sync, {failed} failed."
     ]
     
-    resource_statuses = data.get("resource_statuses", {})
-    failing_checks = []
-    for resource_name in resource_statuses.keys():
-        # Extract check name from resource (e.g. "Exec[check_password_auth]" -> "check_password_auth")
-        resource_short = resource_name.split("[")[-1].replace("]", "")
-        failing_checks.append(resource_short)
-    
     if failing_checks:
         evidence_parts.append("Failing checks: " + ", ".join(failing_checks))
     
@@ -135,7 +108,7 @@ puts JSON.generate({
         "status": status,
         "message": message,
         "evidence": evidence[:1000],
-        "timestamp": str(data.get("time", "")),
+        "timestamp": "",  # Extract timestamp if needed
     })
     
     return finding
