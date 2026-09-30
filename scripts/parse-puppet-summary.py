@@ -17,35 +17,38 @@ import yaml
 def parse_puppet_summary(vardir: Path, control_id: str, module: str) -> dict:
     """Parse Puppet structured output and return GRCToolKit finding."""
     
-    summary_file = vardir / "state" / "last_run_summary.yaml"
     report_file = vardir / "state" / "last_run_report.yaml"
     
     # Default finding
     finding = {
         "control": control_id,
         "status": "SKIP",
-        "message": "Could not parse Puppet summary",
-        "evidence": f"Summary file not found: {summary_file}",
+        "message": "Could not parse Puppet report",
+        "evidence": f"Report file not found: {report_file}",
         "puppet_module": module,
         "timestamp": "",
         "grc_audit_mode": "read_only",
     }
     
-    # Parse summary file (resource counts)
-    if not summary_file.exists():
+    # Parse report file
+    if not report_file.exists():
         return finding
     
-    with summary_file.open("r") as f:
-        summary = yaml.safe_load(f)
+    with report_file.open("r") as f:
+        report = yaml.safe_load(f)
     
-    # Extract resource counts
-    resources = summary.get("resources", {})
-    events = summary.get("events", {})
+    # Extract metrics from report
+    metrics = report.get("metrics", {})
     
-    out_of_sync = resources.get("out_of_sync", 0)
-    failed = resources.get("failed", 0)
-    total = resources.get("total", 0)
-    noop_events = events.get("noop", 0)
+    # Resource metrics
+    resources_metrics = metrics.get("resources", {})
+    total = resources_metrics.get("total", 0)
+    out_of_sync = resources_metrics.get("out_of_sync", 0)
+    failed = resources_metrics.get("failed", 0)
+    
+    # Event metrics
+    events_metrics = metrics.get("events", {})
+    noop_events = events_metrics.get("noop", 0)
     
     # Determine status based on counts
     # FAIL: any failures
@@ -66,38 +69,26 @@ def parse_puppet_summary(vardir: Path, control_id: str, module: str) -> dict:
         f"Puppet noop run: {total} resources checked, {out_of_sync} out of sync, {failed} failed."
     ]
     
-    if report_file.exists():
-        with report_file.open("r") as f:
-            report = yaml.safe_load(f)
-        
-        # Extract out-of-sync resources
-        resource_statuses = report.get("resource_statuses", {})
-        for resource_name, resource_data in resource_statuses.items():
-            if resource_data.get("out_of_sync", False) or resource_data.get("change_count", 0) > 0:
-                events_list = resource_data.get("events", [])
-                if events_list:
-                    event_details = []
-                    for event in events_list:
-                        if event.get("status") == "noop":
-                            prop = event.get("property", "unknown")
-                            desired = event.get("desired_value", "")
-                            previous = event.get("previous_value", "")
-                            event_details.append(
-                                f"{prop}: was {previous}, should be {desired}"
-                            )
-                    if event_details:
-                        evidence_parts.append(
-                            f"{resource_name}: {'; '.join(event_details)}"
-                        )
+    # Extract out-of-sync resources
+    resource_statuses = report.get("resource_statuses", {})
+    for resource_name, resource_data in resource_statuses.items():
+        if resource_data.get("out_of_sync", False) or resource_data.get("change_count", 0) > 0:
+            events_list = resource_data.get("events", [])
+            if events_list:
+                event_details = []
+                for event in events_list:
+                    if event.get("status") == "noop":
+                        # Extract check name from resource name (e.g. "check_password_auth")
+                        resource_short = resource_name.split("/")[-1].replace("]", "")
+                        desired = event.get("desired_value", [""])[0] if isinstance(event.get("desired_value"), list) else event.get("desired_value", "")
+                        event_details.append(f"{resource_short}")
+                if event_details:
+                    evidence_parts.append(", ".join(event_details))
     
     evidence = " ".join(evidence_parts)
     
     # Get timestamp from report
-    timestamp = ""
-    if report_file.exists():
-        with report_file.open("r") as f:
-            report = yaml.safe_load(f)
-            timestamp = report.get("time", "")
+    timestamp = report.get("time", "")
     
     finding.update({
         "status": status,
