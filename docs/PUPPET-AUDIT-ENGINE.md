@@ -362,11 +362,12 @@ Add "Engine" dropdown: **Ansible** | **Puppet**
 
 ## Open Questions & Future Work
 
-1. **Agent vs Agentless:** POC uses `puppet apply` (agentless). Do we need agent mode for fleet scale?
-2. **Hiera integration:** Use Hiera for environment-specific baselines (dev vs prod SSH settings)?
-3. **Custom facts:** Do we need custom Facter facts for GRC metadata (e.g., `$::compliance_tier`)?
-4. **Windows priority:** Windows Registry/ACL checks in Phase 3, or sooner to align with Chocolatey track?
-5. **Catalog compilation time:** Large manifests may be slow; cache catalogs or pre-compile?
+1. **Ingest existing Puppet reports (Post-Gate):** Query PuppetDB or read node report files from existing Puppet infrastructure instead of running our own noop checks
+2. **Agent vs Agentless:** POC uses `puppet apply` (agentless). Do we need agent mode for fleet scale?
+3. **Hiera integration:** Use Hiera for environment-specific baselines (dev vs prod SSH settings)?
+4. **Custom facts:** Do we need custom Facter facts for GRC metadata (e.g., `$::compliance_tier`)?
+5. **Windows priority:** Windows Registry/ACL checks in Phase 3, or sooner to align with Chocolatey track?
+6. **Catalog compilation time:** Large manifests may be slow; cache catalogs or pre-compile?
 
 ---
 

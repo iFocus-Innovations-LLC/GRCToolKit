@@ -1,8 +1,37 @@
 # Puppet Audit Engine — Quick Start
 
+**Status: EXPERIMENTAL - POC stage, not production-ready**
+
 This guide shows how to use the Puppet audit engine POC for SSH hardening validation.
 
 ## Prerequisites
+
+**Recommended**: Ansible 2.9+ for managed execution (Puppet checks if installed, SKIPs if not)  
+**OR**: Puppet 7.x/8.x or OpenVox on target for standalone
+
+## Managed Execution via Ansible (Recommended)
+
+Run Puppet audits across your infrastructure without installing Puppet everywhere:
+
+```bash
+# Ansible checks if Puppet installed, reports SKIP if not (never installs it)
+ansible-playbook ansible/playbooks/puppet-audit.yml \
+  -i inventory.ini \
+  -e "puppet_module=grc_audit::ssh_hardening" \
+  -e "control_id=IA-2" \
+  -e "oscal_output=/tmp/grc-oscal-reports"
+
+# Results: /tmp/grc-oscal-reports/puppet-<hostname>-<control>-<timestamp>.json
+```
+
+**What it does:**
+1. Checks if Puppet installed on each target (SKIPs if not)
+2. Copies GRC modules to target temp directory
+3. Runs `puppet apply --noop` (read-only)
+4. Fetches report YAML back to Ansible controller
+5. Parses locally and exports to OSCAL
+
+## Standalone Execution (If Puppet Already Installed)
 
 ### Option 1: Install Puppet (Local Testing)
 
