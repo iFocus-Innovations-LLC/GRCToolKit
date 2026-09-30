@@ -41,40 +41,55 @@ def parse_puppet_summary(vardir: Path, control_id: str, module: str) -> dict:
         with report_file.open("r") as f:
             content = f.read()
         
-        # Extract resource metrics using regex
+        # Extract resource metrics from nested list structure
+        # Format: - - total\n      - Total\n      - 10
         total = 0
         out_of_sync = 0
         failed = 0
         noop_events = 0
         
-        # Look for metrics section in YAML
-        resources_match = re.search(r'resources:\s+!ruby/object:Puppet::Util::Metric.*?values:\s+(.*?)(?=\w+:|$)', content, re.DOTALL)
-        if resources_match:
-            values_text = resources_match.group(1)
-            total_match = re.search(r'total:\s+(\d+)', values_text)
-            out_of_sync_match = re.search(r'out_of_sync:\s+(\d+)', values_text)
-            failed_match = re.search(r'failed:\s+(\d+)', values_text)
-            if total_match:
-                total = int(total_match.group(1))
-            if out_of_sync_match:
-                out_of_sync = int(out_of_sync_match.group(1))
-            if failed_match:
-                failed = int(failed_match.group(1))
+        # Find resources section
+        resources_start = content.find('  resources:')
+        if resources_start != -1:
+            # Extract the values section
+            values_start = content.find('values:', resources_start)
+            if values_start != -1:
+                # Find next top-level metric (time:, changes:, events:)
+                next_section = re.search(r'\n  \w+:', content[values_start + 100:])
+                if next_section:
+                    values_section = content[values_start:values_start + 100 + next_section.start()]
+                else:
+                    values_section = content[values_start:values_start + 1000]
+                
+                # Extract metrics from nested list format
+                total_match = re.search(r'- - total\s+- [^\n]+\s+- (\d+)', values_section, re.IGNORECASE)
+                out_of_sync_match = re.search(r'- - out_of_sync\s+- [^\n]+\s+- (\d+)', values_section, re.IGNORECASE)
+                failed_match = re.search(r'- - failed\s+- [^\n]+\s+- (\d+)', values_section, re.IGNORECASE)
+                
+                if total_match:
+                    total = int(total_match.group(1))
+                if out_of_sync_match:
+                    out_of_sync = int(out_of_sync_match.group(1))
+                if failed_match:
+                    failed = int(failed_match.group(1))
         
-        events_match = re.search(r'events:\s+!ruby/object:Puppet::Util::Metric.*?values:\s+(.*?)(?=\w+:|$)', content, re.DOTALL)
-        if events_match:
-            values_text = events_match.group(1)
-            noop_match = re.search(r'noop:\s+(\d+)', values_text)
-            if noop_match:
-                noop_events = int(noop_match.group(1))
+        # Find events section for noop count
+        events_start = content.find('  events:')
+        if events_start != -1:
+            values_start = content.find('values:', events_start)
+            if values_start != -1:
+                values_section = content[values_start:values_start + 500]
+                noop_match = re.search(r'- - noop\s+- [^\n]+\s+- (\d+)', values_section, re.IGNORECASE)
+                if noop_match:
+                    noop_events = int(noop_match.group(1))
         
         # Extract out-of-sync resource names
         failing_checks = []
-        resource_statuses_match = re.search(r'resource_statuses:(.*)', content, re.DOTALL)
-        if resource_statuses_match:
-            statuses_text = resource_statuses_match.group(1)
+        resource_statuses_start = content.find('resource_statuses:')
+        if resource_statuses_start != -1:
+            statuses_text = content[resource_statuses_start:]
             # Find Exec[check_*] resources that are out of sync
-            for match in re.finditer(r'Exec\[([^\]]+)\]:.*?out_of_sync:\s*true', statuses_text, re.DOTALL):
+            for match in re.finditer(r'Exec\[([^\]]+)\]:[^\n]*\n(?:[^\n]*\n){0,30}?.*?out_of_sync:\s*true', statuses_text, re.DOTALL):
                 check_name = match.group(1)
                 if 'check_' in check_name:
                     failing_checks.append(check_name)
