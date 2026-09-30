@@ -63,9 +63,11 @@ jobs:
           grc_audit::ssh_hardening \
           IA-2 \
           /tmp/puppet-fixtures/sshd_config_compliant \
-          > /tmp/wrapper-compliant.json 2>&1
+          > /tmp/wrapper-compliant.json 2> /tmp/wrapper-compliant.err
         
         cat /tmp/wrapper-compliant.json
+        echo "--- stderr ---"
+        cat /tmp/wrapper-compliant.err
         
         # Verify JSON structure and status
         if command -v jq &>/dev/null; then
@@ -89,9 +91,11 @@ jobs:
           grc_audit::ssh_hardening \
           IA-2 \
           /tmp/puppet-fixtures/sshd_config_noncompliant \
-          > /tmp/wrapper-noncompliant.json 2>&1
+          > /tmp/wrapper-noncompliant.json 2> /tmp/wrapper-noncompliant.err
         
         cat /tmp/wrapper-noncompliant.json
+        echo "--- stderr ---"
+        cat /tmp/wrapper-noncompliant.err
         
         # Verify JSON structure and status
         if command -v jq &>/dev/null; then
