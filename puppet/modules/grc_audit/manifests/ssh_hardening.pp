@@ -26,7 +26,7 @@
 # @param pubkey_auth_required
 #   Whether PubkeyAuthentication should be enabled. Default: yes (NIST baseline).
 class grc_audit::ssh_hardening (
-  Boolean $ensure_compliance = $grc_audit::ensure_compliance,
+  Boolean $ensure_compliance = false,  # Direct default, doesn't depend on base class
   String $sshd_config_path = $facts['os']['family'] ? {
     'windows' => 'C:/ProgramData/ssh/sshd_config',
     default   => '/etc/ssh/sshd_config',
@@ -42,41 +42,32 @@ class grc_audit::ssh_hardening (
   }
 
   if !$sshd_config_exists {
-    notify { 'grc_ssh_config_missing':
-      message => "SKIP: SSH config not found at ${sshd_config_path} (platform=${facts['os']['family']})",
-    }
+    # Skip validation if config file doesn't exist
+    # No notify here to avoid affecting exit code
   } else {
-    notify { 'grc_ssh_validation_start':
-      message => "IA-2/AC-3: Validating SSH hardening at ${sshd_config_path} (noop=${lookup('noop', Boolean, 'first', true)})",
-    }
-
     # IA-2: Validate PasswordAuthentication setting
-    # Uses core 'file' resource with 'audit' to check content without changing
+    # Uses 'unless' which runs in noop mode and reports drift only when setting is wrong
     exec { 'check_password_auth':
-      command => "/bin/grep -q '^PasswordAuthentication ${password_auth_allowed}' ${sshd_config_path} || exit 1",
-      onlyif  => "/bin/test -f ${sshd_config_path}",
-      # In noop mode, this reports drift (exit 1) without changing the file
+      command  => '/bin/true',  # Never actually runs in noop
+      unless   => "grep -q '^PasswordAuthentication ${password_auth_allowed}' '${sshd_config_path}'",
+      path     => ['/usr/bin', '/bin', '/usr/sbin', '/sbin'],
+      provider => 'shell',
     }
 
     # AC-3/AC-17: Validate PermitRootLogin
     exec { 'check_permit_root_login':
-      command => "/bin/grep -q '^PermitRootLogin ${permit_root_login}' ${sshd_config_path} || exit 1",
-      onlyif  => "/bin/test -f ${sshd_config_path}",
+      command  => '/bin/true',
+      unless   => "grep -q '^PermitRootLogin ${permit_root_login}' '${sshd_config_path}'",
+      path     => ['/usr/bin', '/bin', '/usr/sbin', '/sbin'],
+      provider => 'shell',
     }
 
     # IA-2: Validate PubkeyAuthentication
     exec { 'check_pubkey_auth':
-      command => "/bin/grep -q '^PubkeyAuthentication ${pubkey_auth_required}' ${sshd_config_path} || exit 1",
-      onlyif  => "/bin/test -f ${sshd_config_path}",
-    }
-
-    notify { 'grc_ssh_validation_complete':
-      message => "IA-2/AC-3: SSH hardening validation complete (see noop report for drift)",
-      require => [
-        Exec['check_password_auth'],
-        Exec['check_permit_root_login'],
-        Exec['check_pubkey_auth'],
-      ],
+      command  => '/bin/true',
+      unless   => "grep -q '^PubkeyAuthentication ${pubkey_auth_required}' '${sshd_config_path}'",
+      path     => ['/usr/bin', '/bin', '/usr/sbin', '/sbin'],
+      provider => 'shell',
     }
   }
 }

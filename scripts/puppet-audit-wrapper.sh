@@ -55,6 +55,14 @@ run_puppet_noop() {
   local output
   local exit_code=0
   
+  # Build puppet apply command
+  local puppet_cmd="include ${MODULE}"
+  
+  # If config_path provided, use it as a parameter
+  if [[ -n "$CONFIG_PATH" ]]; then
+    puppet_cmd="class { '${MODULE}': sshd_config_path => '${CONFIG_PATH}' }"
+  fi
+  
   # Run puppet apply in noop mode with YAML report
   # --modulepath: use our grc_audit module
   # --noop: never apply changes
@@ -62,7 +70,7 @@ run_puppet_noop() {
   output=$(puppet apply --noop \
     --modulepath="${ROOT}/puppet/modules" \
     --detailed-exitcodes \
-    -e "include ${MODULE}" \
+    -e "$puppet_cmd" \
     2>&1) || exit_code=$?
   
   echo "$output"
