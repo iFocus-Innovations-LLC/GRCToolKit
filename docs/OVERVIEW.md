@@ -65,6 +65,7 @@ For roadmap detail, see [ROADMAP.md](ROADMAP.md#market-positioning-grctoolkit-vs
 - NIST 800-53 Rev. 5 OSCAL catalog (`oscal/catalog/`)
 - Ansible playbooks for control validation and evidence collection
 - **Production handoff:** [Ansible Audit Operations](ANSIBLE-AUDIT-OPERATIONS.md) (ITIL window, manual CLI, SysAdmin RACI)
+- **Experimental:** Puppet noop audit engine — Ansible-driven read-only validation using `puppet apply --noop` on targets with Puppet/OpenVox already installed. Parses structured reports (`last_run_report.yaml`) for drift detection. SKIP if Puppet not found (never installs it). No k8s/sidecar changes. See [docs/PUPPET-AUDIT-ENGINE.md](PUPPET-AUDIT-ENGINE.md)
 - Auditor-ready report generation (`compliance-docs/`)
 - **Roadmap:** Windows targets via [Chocolatey](https://chocolatey.org/) bootstrap + WinRM inventory; mobile companion (Android/iOS) via PWA → Capacitor  
   → [Windows OS Ansible validation](ROADMAP.md#windows-os-ansible-validation-chocolatey) · [Mobile groundwork](ROADMAP.md#44-mobile-app-level-groundwork-android-and-ios)
@@ -114,6 +115,7 @@ flowchart LR
         E[Ansible Playbooks<br/>ansible/]
         F[Audit Reports<br/>compliance-docs/]
         G[HITL Guardrails]
+        P[Puppet Modules<br/>puppet/modules/<br/><i>experimental</i>]
     end
 
     subgraph External
@@ -129,6 +131,9 @@ flowchart LR
     B --> E
     E --> I
     E --> F
+    E -.optional.-> P
+    P -.noop audit.-> I
+    P -.OSCAL.-> F
     F --> A
 ```
 
@@ -138,6 +143,7 @@ flowchart LR
 2. AI engine recommends NIST 800-53 controls (with confidence scoring).
 3. Analyst reviews recommendations (HITL gate for medium/high risk).
 4. **Validate Controls** runs Ansible playbooks against localhost (lab) or **manual Ansible** per [ANSIBLE-AUDIT-OPERATIONS.md](ANSIBLE-AUDIT-OPERATIONS.md) for production targets.
+   - **Experimental:** Ansible playbook can optionally invoke `puppet apply --noop` on targets that already have Puppet/OpenVox installed (SKIP if not found; never installs Puppet). Fetches `last_run_report.yaml`, parses via `parse-puppet-summary.py`, generates PASS/WARN/FAIL findings and OSCAL exports. **No sidecar, DaemonSet, or k8s changes** — pure read-only validation driven by Ansible runner.
 5. **Generate Audit Report** produces OSCAL-aligned documentation.
 
 ---
@@ -226,7 +232,7 @@ We are transparent about maturity so evaluators — including government innovat
 | UI | HTML5, Tailwind CSS, JavaScript |
 | AI | Google Gemini API (`gemini-2.5-flash`, structured JSON) |
 | Compliance data | NIST 800-53 R5 OSCAL catalog |
-| Automation | Ansible |
+| Automation | Ansible (primary); Puppet noop (experimental, Ansible-driven) |
 | Runtime | Docker, nginx (non-root) |
 | Orchestration | Kubernetes, Helm |
 | IaC | Terraform (GCP bootstrap) |
@@ -241,6 +247,7 @@ We are transparent about maturity so evaluators — including government innovat
 - [OSCAL Integration](OSCAL-INTEGRATION.md)
 - [HITL Framework](HITL-FRAMEWORK.md)
 - [PQC Integration Summary](PQC-INTEGRATION-SUMMARY.md)
+- [Puppet Audit Engine](PUPPET-AUDIT-ENGINE.md) — experimental read-only validation (Ansible-driven)
 - [Zero-Trust Agentic AI](../ai-agent/openclaw/SOUL.md) — future autonomous auditor direction
 - [Branch Protection](BRANCH-PROTECTION.md) — merge gates and CI requirements
 - [Changelog](CHANGELOG.md)
