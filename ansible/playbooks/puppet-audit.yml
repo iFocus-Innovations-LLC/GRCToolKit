@@ -1,0 +1,114 @@
+---
+# Experimental: Puppet-based audit via Ansible runner
+# Copies GRC Puppet modules to targets, runs noop audit, fetches reports
+# SKIP if Puppet not installed (never installs it)
+#
+# Usage:
+#   ansible-playbook puppet-audit.yml \
+#     -e "puppet_module=grc_audit::ssh_hardening" \
+#     -e "control_id=IA-2" \
+#     -e "oscal_output=/tmp/oscal-results"
+
+- name: Run Puppet noop audit (experimental)
+  hosts: all
+  gather_facts: yes
+  vars:
+    puppet_module: "{{ puppet_module | default('grc_audit::ssh_hardening') }}"
+    control_id: "{{ control_id | default('IA-2') }}"
+    oscal_output: "{{ oscal_output | default('/tmp/grc-oscal-reports') }}"
+    timestamp: "{{ ansible_date_time.epoch }}"
+    puppet_vardir: "/tmp/grc-puppet-run-{{ timestamp }}"
+  
+  tasks:
+    - name: Check if Puppet is installed
+      command: which puppet
+      register: puppet_check
+      changed_when: false
+      failed_when: false
+      tags: [always]
+    
+    - name: Report SKIP if Puppet not found
+      debug:
+        msg: "SKIP: Puppet not installed on {{ inventory_hostname }}"
+      when: puppet_check.rc != 0
+      tags: [always]
+    
+    - name: End play if Puppet not found
+      meta: end_host
+      when: puppet_check.rc != 0
+    
+    - name: Create remote temp directory for Puppet modules
+      tempfile:
+        state: directory
+        prefix: grc-puppet-modules-
+      register: remote_modules_dir
+      tags: [setup]
+    
+    - name: Copy GRC Puppet modules to target
+      synchronize:
+        src: "{{ playbook_dir }}/../../puppet/modules/grc_audit"
+        dest: "{{ remote_modules_dir.path }}/grc_audit"
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=*.swp"
+      tags: [setup]
+    
+    - name: Create vardir for this Puppet run
+      file:
+        path: "{{ puppet_vardir }}"
+        state: directory
+        mode: '0700'
+      tags: [setup]
+    
+    - name: Run Puppet apply in noop mode
+      command: >
+        puppet apply --noop
+        --vardir="{{ puppet_vardir }}"
+        --modulepath="{{ remote_modules_dir.path }}"
+        --detailed-exitcodes
+        -e "include {{ puppet_module }}"
+      register: puppet_run
+      changed_when: false
+      failed_when: false
+      tags: [audit]
+    
+    - name: Fetch Puppet report YAML
+      fetch:
+        src: "{{ puppet_vardir }}/state/last_run_report.yaml"
+        dest: "/tmp/grc-puppet-reports/{{ inventory_hostname }}-{{ timestamp }}.yaml"
+        flat: yes
+      tags: [fetch]
+    
+    - name: Parse Puppet report locally
+      delegate_to: localhost
+      command: >
+        python3 {{ playbook_dir }}/../../scripts/parse-puppet-summary.py
+        "{{ puppet_vardir }}"
+        "{{ control_id }}"
+        "{{ puppet_module }}"
+      environment:
+        PUPPET_REPORT_PATH: "/tmp/grc-puppet-reports/{{ inventory_hostname }}-{{ timestamp }}.yaml"
+      register: puppet_finding
+      tags: [parse]
+    
+    - name: Convert to OSCAL format
+      delegate_to: localhost
+      shell: |
+        echo '{{ puppet_finding.stdout }}' | \
+        python3 {{ playbook_dir }}/../../scripts/puppet-to-oscal.py \
+        > {{ oscal_output }}/puppet-{{ inventory_hostname }}-{{ control_id }}-{{ timestamp }}.json
+      tags: [oscal]
+    
+    - name: Display finding
+      debug:
+        msg: "{{ puppet_finding.stdout | from_json }}"
+      tags: [always]
+    
+    - name: Cleanup remote temp directories
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ remote_modules_dir.path }}"
+        - "{{ puppet_vardir }}"
+      tags: [cleanup]

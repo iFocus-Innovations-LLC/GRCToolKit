@@ -111,7 +111,9 @@ This application provides a modern UI for interacting with a GRC Compliance Engi
 
 ### 📄 OSCAL & Automation
 - **OSCAL Integration**: Full NIST 800-53 R5 OSCAL catalog integration.
-- **Ansible Playbooks**: Automated validation for AC-3, AC-6, AU-2, SC-7, and PQC controls.
+- **Dual Audit Engines**: 
+  - **Ansible Playbooks**: Automated validation for AC-3, AC-6, AU-2, SC-7, and PQC controls.
+  - **Puppet Noop Mode**: Declarative drift detection for SSH hardening (IA-2), file permissions (AC-6), and system baselines (POC).
 - **Safe production handoff**: [docs/ANSIBLE-AUDIT-OPERATIONS.md](docs/ANSIBLE-AUDIT-OPERATIONS.md) — ITIL change window, manual CLI, SysAdmin RACI (v1 UI is lab/localhost only).
 - **Auditor Reports**: Automated generation of compliance test reports.
 
