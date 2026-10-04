@@ -415,6 +415,7 @@ DoW and civilian/NIST timelines are **not the same**. GRCToolKit must track them
   - **Usage metering API** for agentic token workflows (BYOK + bundled pools)
   - **Hosted agent runtime** on [Google ADK](https://adk.dev/) (Python) — Cloud Run / GKE; requires [token throttle policy](#agentic-grc-runtime-adk--token-throttling) before enabling schedulers in GCP QA
   - Shields Up fleet architecture assist (Gold+)
+- **Overlay repo**: public [shieldsup](https://github.com/iFocus-Innovations-LLC/shieldsup) (Apache-2.0). Community stays MIT in this repository. The overlay pins Community; it does not fork OSCAL or Ansible.
 
 ---
 
@@ -832,7 +833,7 @@ All remediation requires **Human-in-the-Loop (HITL)** approval — no silent cha
 
 ### Brand
 
-Optional product name **Shields Up** under the GRCToolKit / future sentinel brand line. Module lives inside this repository (not a separate repo for v1).
+Optional product name **Shields Up** under the GRCToolKit / future sentinel brand line. OSS probes stay in this repository (MIT). The Enterprise overlay lives in public [shieldsup](https://github.com/iFocus-Innovations-LLC/shieldsup) (Apache-2.0). Robotics probe implementation has not moved and is still gated on the production tag.
 
 ---
 
@@ -844,7 +845,7 @@ The multi-mandate deadline model (DoW 2030 support / 2031 use, CNSA 2.0 for NSS,
 
 ---
 
-**Last Updated**: 2026-07-30  
+**Last Updated**: 2026-10-04  
 **Version**: 2.5  
 **Status**: Active Development (QA/Demo freeze via `v2.1.0-qa-demo` after this MVP CI cleanup lands — see [RELEASE-BRANCHING.md](RELEASE-BRANCHING.md))  
 **External PQC reference**: [DoW Post Quantum Cryptography Strategy](https://dowcio.war.gov/Portals/0/Documents/Library/DoW-PQC-Strategy.pdf)  

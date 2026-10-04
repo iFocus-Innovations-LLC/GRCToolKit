@@ -1,6 +1,6 @@
 # GRCToolKit — Brand Ladder and Editions
 
-**Last updated:** 2026-07-23  
+**Last updated:** 2026-10-04  
 **Maintainer:** [iFocus Innovations LLC](https://github.com/iFocus-Innovations-LLC)
 
 ---
@@ -50,14 +50,16 @@ Optional future campaign language (e.g. sentinel / Phylax-style themes) must **p
 
 | | Community Edition | Enterprise |
 |---|-------------------|------------|
-| **License** | MIT | Commercial agreement (EULA + support terms) |
-| **Code** | Full OSS repo — OSCAL, Ansible, AI engine, Shields Up probes | Same codebase; no proprietary fork of core compliance logic |
+| **License** | MIT | Overlay source is Apache-2.0 in [shieldsup](https://github.com/iFocus-Innovations-LLC/shieldsup). Support and SLA terms are commercial and do not relicense Community. |
+| **Code** | Full OSS repo — OSCAL, Ansible, AI engine, Shields Up probes | Public overlay pins this repo. No copy of `oscal/` or `ansible/playbooks` into the overlay. |
 | **Support** | GitHub Issues, community | Bronze → Platinum SLAs |
 | **Training** | Docs, demo guides | Tiered catalogs (webinar → on-site) |
 | **AI / agentic usage** | BYOK (your Gemini/Anthropic keys) | BYOK + optional **bundled token pools** and usage guidance |
 | **Shields Up robotics** | OSS read-only playbooks (self-serve) | Gold+ setup assist, operator training, fleet architecture review |
 
 Enterprise adds **relationship, SLAs, training, token economics, and optional hosted agent runtime** — not a paywall on core OSCAL or Ansible in the public repo.
+
+**Repository split:** OSS probes stay in this repository (MIT). The Enterprise overlay — tenant stub, HITL AU-2 audit log, and BYOK vs pool metering stub — lives in public [shieldsup](https://github.com/iFocus-Innovations-LLC/shieldsup) (Apache-2.0). Robotics probe implementation stays here and remains gated on the production tag. It has not moved.
 
 ---
 
@@ -133,3 +135,4 @@ See also [OVERVIEW.md](OVERVIEW.md#why-grctoolkit-vs-traditional-grc) and [ROADM
 - [ROADMAP.md](ROADMAP.md) — Technical and commercial roadmap
 - [PM-TODO.md](PM-TODO.md) — P2 DoW PQC, P3 ADK tokens/throttle, P4 Windows/Chocolatey, P5 Mobile Android/iOS, P0–P1 production gates
 - [LICENSE](../LICENSE) — MIT (Community Edition software)
+- [shieldsup](https://github.com/iFocus-Innovations-LLC/shieldsup) — public Apache-2.0 Enterprise overlay
