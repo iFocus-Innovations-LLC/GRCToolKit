@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import re
 import shutil
@@ -14,9 +15,10 @@ import subprocess
 import sys
 import urllib.error
 import urllib.request
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse, unquote
+from urllib.parse import unquote, urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 PLAYBOOKS_DIR = (ROOT / "ansible" / "playbooks").resolve()
@@ -27,6 +29,29 @@ REPORT_PREFIX = "oscal-assessment-"
 REPORT_SUFFIX = ".pdf"
 MAX_REPORT_FILENAME = 128
 MAX_JSON_BODY_BYTES = 10_000_000
+
+
+class UpstreamHTTPError(RuntimeError):
+    def __init__(self, status: int, detail: str):
+        super().__init__(detail)
+        self.status = status
+
+
+def _redact_upstream_detail(detail: str, req: urllib.request.Request) -> str:
+    """Keep provider diagnostics useful without recording credentials."""
+    secrets = []
+    for name, value in req.header_items():
+        if name.lower() in {"authorization", "x-api-key"}:
+            secrets.append(value)
+            if name.lower() == "authorization" and " " in value:
+                secrets.append(value.split(" ", 1)[1])
+    for match in re.finditer(r"(?i)(?:[?&]key=)([^&\s]+)", req.full_url):
+        secrets.append(match.group(1))
+        secrets.append(unquote(match.group(1)))
+    for secret in secrets:
+        if secret:
+            detail = detail.replace(secret, "[REDACTED]")
+    return re.sub(r"(?i)([?&]key=)[^&\s]+", r"\1[REDACTED]", detail)
 
 
 def _build_playbook_allowlist() -> dict[str, Path]:
@@ -247,9 +272,12 @@ def _http_json(
             return json.loads(body or "{}")
     except urllib.error.HTTPError as exc:
         err_body = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"Upstream HTTP {exc.code}: {err_body[:800]}") from exc
+        raise UpstreamHTTPError(
+            exc.code, _redact_upstream_detail(err_body, req)
+        ) from exc
     except urllib.error.URLError as exc:
-        raise RuntimeError(f"Upstream unreachable: {exc.reason}") from exc
+        detail = _redact_upstream_detail(str(exc.reason), req)
+        raise RuntimeError(f"Upstream unreachable: {detail}") from exc
 
 
 def analyze_llm(provider: str, prompt: str, model: str | None, api_key: str | None) -> dict:
@@ -473,6 +501,13 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_internal_error(self) -> None:
+        request_id = uuid.uuid4().hex
+        logging.exception("Unexpected API error requestId=%s", request_id)
+        self._send_json(
+            500, {"error": "Internal server error", "requestId": request_id}
+        )
+
     def do_OPTIONS(self) -> None:
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -496,9 +531,12 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
             raise ValueError("Request body too large")
         raw = self.rfile.read(length).decode("utf-8") if length else "{}"
         try:
-            return json.loads(raw or "{}")
+            data = json.loads(raw or "{}")
         except json.JSONDecodeError as exc:
             raise ValueError("Invalid JSON body") from exc
+        if not isinstance(data, dict):
+            raise ValueError("JSON body must be an object")
+        return data
 
     def _handle_report_download(self, path: str) -> None:
         prefix = "/api/reports/download/"
@@ -554,7 +592,7 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
         except RuntimeError as exc:
             self._send_json(503, {"error": str(exc)})
         except Exception as exc:  # noqa: BLE001
-            self._send_json(500, {"error": str(exc)})
+            self._send_internal_error()
 
     def do_GET(self) -> None:
         path = urlparse(self.path).path
@@ -600,9 +638,43 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
             except ValueError as exc:
                 self._send_json(400, {"error": str(exc)})
             except RuntimeError as exc:
-                self._send_json(502, {"error": str(exc)})
+                request_id = uuid.uuid4().hex
+                status = exc.status if isinstance(exc, UpstreamHTTPError) else None
+                provider = data.get("provider") or "gemini"
+                if isinstance(provider, str):
+                    provider = provider.strip().lower()
+                if not isinstance(provider, str) or provider not in {
+                    "gemini",
+                    "openai",
+                    "anthropic",
+                    "groq",
+                    "vertex",
+                }:
+                    provider = "unknown"
+                if status in (401, 403):
+                    message = "Provider rejected credentials"
+                elif status == 429:
+                    message = "Provider rate limited the request"
+                else:
+                    message = "LLM provider request failed"
+                logging.error(
+                    "LLM provider request failed requestId=%s provider=%s status=%s detail=%r",
+                    request_id,
+                    provider,
+                    status or "unavailable",
+                    str(exc),
+                )
+                self._send_json(
+                    502,
+                    {
+                        "error": message,
+                        "provider": provider,
+                        "status": status,
+                        "requestId": request_id,
+                    },
+                )
             except Exception as exc:  # noqa: BLE001
-                self._send_json(500, {"error": str(exc)})
+                self._send_internal_error()
             return
         if path != "/api/ansible/playbook":
             self._send_json(404, {"error": "Not found"})
@@ -629,7 +701,7 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
         except RuntimeError as exc:
             self._send_json(503, {"error": str(exc)})
         except Exception as exc:  # noqa: BLE001 — surface runner failures to UI
-            self._send_json(500, {"error": str(exc)})
+            self._send_internal_error()
 
 
 def main() -> None:
