@@ -68,6 +68,11 @@ docker run -p 8080:8080 -e GEMINI_API_KEY=$GEMINI_API_KEY -e LLM_PROVIDER=gemini
 
 **CORS / proxy:** OpenAI, Anthropic, Groq, and Vertex calls from the browser go through `http://127.0.0.1:8081/api/llm/analyze` (started by `run-local.sh`). The proxy never logs API keys; it binds **localhost only**.
 
+Provider failures return a short client-safe message and a `requestId`; the
+upstream response detail is written to the local runner log with credentials
+redacted. Use the ID when diagnosing a failed request without exposing vendor
+error bodies or API keys in the browser.
+
 **If the app shows `API error: 400 - API key expired`:** Google uses that wording for several failures—not only clock expiry. Typical causes: key deleted or rotated in [Google AI Studio](https://aistudio.google.com/); API key **restrictions** in GCP (Credentials) blocking **Generative Language API** or the wrong **HTTP referrer** (browser vs `file://`); or the page still has an **old embedded key** (restart `./scripts/run-local.sh` or the container, then hard-refresh). Verify the value the browser uses: DevTools → Console → `window.GEMINI_API_KEY` (check length/prefix only; do not paste the full key into chat).
 
 ### Option B: Kubernetes Secret (for K8s deploy)
