@@ -60,6 +60,147 @@ class LLMProxyErrorTests(unittest.TestCase):
         finally:
             connection.close()
 
+    def post_llm(self, payload):
+        connection = http.client.HTTPConnection(
+            "127.0.0.1", self.server.server_address[1]
+        )
+        try:
+            connection.request(
+                "POST",
+                "/api/llm/analyze",
+                json.dumps(payload),
+                {"Content-Type": "application/json"},
+            )
+            response = connection.getresponse()
+            return response.status, json.loads(response.read())
+        finally:
+            connection.close()
+
+    def test_invalid_provider_url_does_not_log_api_key(self):
+        api_key = "fake-invalid-url-key"
+        # URL validation runs before connect; prevent any external connection.
+        with patch.dict(runner.os.environ, {}, clear=True), patch.object(
+            http.client.HTTPSConnection,
+            "connect",
+            side_effect=AssertionError("Unexpected provider connection"),
+        ), self.assertLogs(level="ERROR") as logged:
+            status, body = self.post_llm(
+                {
+                    "provider": "gemini",
+                    "prompt": "test",
+                    "model": "gemini\n.invalid",
+                    "apiKey": api_key,
+                }
+            )
+
+        self.assertNotIn(api_key, json.dumps(body))
+        self.assertNotIn(api_key, "\n".join(logged.output))
+        self.assertEqual(status, 502)
+        self.assertEqual(body["error"], "LLM provider request failed")
+        self.assertIn("URL can't contain control characters", "\n".join(logged.output))
+        self.assertIn(body["requestId"], "\n".join(logged.output))
+
+    def test_malformed_upstream_response_uses_provider_error(self):
+        for raw in (b"not-json", b"\xff"):
+            with self.subTest(raw=raw):
+                with patch.object(runner.urllib.request, "urlopen") as urlopen:
+                    urlopen.return_value.__enter__.return_value.read.return_value = raw
+                    with self.assertLogs(level="ERROR") as logged:
+                        status, body = self.post_llm(
+                            {
+                                "provider": "openai",
+                                "prompt": "test",
+                                "apiKey": "fake-parse-key",
+                            }
+                        )
+
+                self.assertEqual(status, 502)
+                self.assertEqual(body["error"], "LLM provider request failed")
+                self.assertEqual(body["provider"], "openai")
+                self.assertIsNone(body["status"])
+                self.assertIn(body["requestId"], "\n".join(logged.output))
+
+    def test_invalid_provider_header_does_not_log_escaped_api_key(self):
+        for provider in ("openai", "anthropic", "groq"):
+            for api_key in (
+                "fake-sensitive-key\nextra",
+                "fake-sensitive-key\rextra",
+                "fake-sensitive-key\n\u00e9extra",
+            ):
+                with self.subTest(provider=provider, api_key=api_key):
+                    with patch.dict(runner.os.environ, {}, clear=True), patch.object(
+                        http.client.HTTPSConnection,
+                        "connect",
+                        side_effect=AssertionError("Unexpected provider connection"),
+                    ), self.assertLogs(level="ERROR") as logged:
+                        status, body = self.post_llm(
+                            {"provider": provider, "prompt": "test", "apiKey": api_key}
+                        )
+
+                    self.assertEqual(status, 502)
+                    self.assertEqual(body["error"], "LLM provider request failed")
+                    self.assertNotIn("fake-sensitive-key", json.dumps(body))
+                    self.assertNotIn("fake-sensitive-key", "\n".join(logged.output))
+                    self.assertIn("Invalid header value", "\n".join(logged.output))
+                    self.assertIn(body["requestId"], "\n".join(logged.output))
+
+    def test_unreadable_upstream_error_retains_status_and_redacts_key(self):
+        api_key = "fake-read-error-key"
+        error_body = io.BytesIO()
+        error = urllib.error.HTTPError(
+            "https://api.example.test/", 429, "upstream error", {}, error_body
+        )
+        with patch.object(
+            error, "read", side_effect=OSError(f"read failed for {api_key}")
+        ):
+            with patch.object(
+                runner.urllib.request, "urlopen", side_effect=error
+            ), self.assertLogs(level="ERROR") as logged:
+                status, body = self.post_llm(
+                    {"provider": "anthropic", "prompt": "test", "apiKey": api_key}
+                )
+
+        self.assertEqual(status, 502)
+        self.assertEqual(body["status"], 429)
+        self.assertEqual(body["error"], "Provider rate limited the request")
+        self.assertNotIn(api_key, "\n".join(logged.output))
+        self.assertIn("read failed", "\n".join(logged.output))
+
+    def test_successful_provider_responses_are_unchanged(self):
+        text = '{"controls": []}'
+        fixtures = {
+            "gemini": {"candidates": [{"content": {"parts": [{"text": text}]}}]},
+            "openai": {"choices": [{"message": {"content": text}}]},
+            "anthropic": {"content": [{"type": "text", "text": text}]},
+            "groq": {"choices": [{"message": {"content": text}}]},
+            "vertex": {"candidates": [{"content": {"parts": [{"text": text}]}}]},
+        }
+        for provider, result in fixtures.items():
+            with self.subTest(provider=provider):
+                with patch.object(runner.urllib.request, "urlopen") as urlopen:
+                    response = urlopen.return_value.__enter__.return_value
+                    response.read.return_value = json.dumps(result).encode()
+                    status, body = self.post_llm(
+                        {
+                            "provider": provider,
+                            "prompt": "test",
+                            "model": "test-model",
+                            "apiKey": "fake-success-key",
+                        }
+                    )
+
+                self.assertEqual(status, 200)
+                self.assertEqual(
+                    body,
+                    {
+                        "provider": provider,
+                        "modelId": "test-model",
+                        "text": text,
+                        "parsedJson": {"controls": []},
+                        "via": "proxy",
+                    },
+                )
+
     def test_provider_error_does_not_return_upstream_body_or_api_key(self):
         with self.assertLogs(level="ERROR") as logged:
             status, body = self.post_with_upstream_error(

@@ -48,9 +48,18 @@ def _redact_upstream_detail(detail: str, req: urllib.request.Request) -> str:
     for match in re.finditer(r"(?i)(?:[?&]key=)([^&\s]+)", req.full_url):
         secrets.append(match.group(1))
         secrets.append(unquote(match.group(1)))
+    variants = set()
     for secret in secrets:
         if secret:
-            detail = detail.replace(secret, "[REDACTED]")
+            # HTTP-client exceptions and JSON bodies can escape credentials.
+            variants.update((secret, repr(secret)[1:-1], json.dumps(secret)[1:-1]))
+            try:
+                # http.client validates headers after encoding them as Latin-1.
+                variants.add(repr(secret.encode("latin-1"))[2:-1])
+            except UnicodeEncodeError:
+                pass
+    for secret in sorted(variants, key=len, reverse=True):
+        detail = detail.replace(secret, "[REDACTED]")
     return re.sub(r"(?i)([?&]key=)[^&\s]+", r"\1[REDACTED]", detail)
 
 
@@ -271,13 +280,21 @@ def _http_json(
             body = resp.read().decode("utf-8")
             return json.loads(body or "{}")
     except urllib.error.HTTPError as exc:
-        err_body = exc.read().decode("utf-8", errors="replace")
+        try:
+            err_body = exc.read().decode("utf-8", errors="replace")
+        except Exception as read_exc:  # noqa: BLE001 — sanitize transport diagnostics
+            err_body = f"Could not read upstream error body: {read_exc}"
         raise UpstreamHTTPError(
             exc.code, _redact_upstream_detail(err_body, req)
         ) from exc
     except urllib.error.URLError as exc:
         detail = _redact_upstream_detail(str(exc.reason), req)
         raise RuntimeError(f"Upstream unreachable: {detail}") from exc
+    except Exception as exc:  # noqa: BLE001 — provider errors may contain credentials
+        # HTTP client validation and response decoding errors also originate
+        # upstream. Keep them out of request-validation and raw traceback paths.
+        detail = _redact_upstream_detail(str(exc), req)
+        raise RuntimeError(f"Upstream request failed: {detail}") from exc
 
 
 def analyze_llm(provider: str, prompt: str, model: str | None, api_key: str | None) -> dict:
