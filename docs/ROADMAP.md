@@ -46,6 +46,7 @@ GRCToolKit is evolving as open-source **infrastructure for automated NIST valida
 | **Future — Windows + Chocolatey** | WinRM inventory, read-only Windows probes | Validate Microsoft OS targets alongside Linux |
 | **Future — Mobile Android/iOS** | PWA → Capacitor companion apps | HITL approvals and reports on the go |
 | **Future — sim / ovrtx** | Synthetic lab, sensor evidence (post v0.1) | Demo and train without production robot risk |
+| **Future — Threat advisory intake** | CISA/FBI/NSA advisory ingest → control gap reports | Turn every new CISA advisory into a control gap report |
 
 ---
 
@@ -482,6 +483,48 @@ Community interactive BYOK stays on-demand (user-triggered). Scheduled ADK runti
 
 ---
 
+## Future: Threat-informed compliance (Advisory Intake)
+
+### Objective
+
+Ingest government cybersecurity advisories (CISA/FBI/NSA joint CSAs) and their machine-readable indicators of compromise (STIX 2.x JSON/XML), extract MITRE ATT&CK techniques and advisory mitigations, map them to NIST SP 800-53 R5 controls and CISA Cross-Sector Cybersecurity Performance Goals (CPGs), and produce a gap report comparing advisory requirements against the customer's implemented controls, OSCAL SSP, and Ansible probe evidence. All findings require HITL review before any remediation playbook execution.
+
+### Features
+
+- **Advisory ingest**: Accept advisory URL or uploaded STIX 2.x bundle
+- **Technique extraction**: Parse MITRE ATT&CK technique IDs from advisory text and STIX
+- **Control mapping**: Use MITRE Center for Threat-Informed Defense ATT&CK-to-800-53 mappings to translate techniques into NIST SP 800-53 R5 controls
+- **CPG integration**: Cross-reference CISA CPG citations from advisories
+- **Gap analysis**: Compare mapped controls against customer's OSCAL SSP and Ansible probe evidence
+- **OSCAL output**: Generate OSCAL assessment-results bundle with gap findings
+- **Markdown report**: Human-readable gap report ('which controls cover this advisory, where are the gaps')
+- **HITL gate**: All findings require human review before any remediation playbook runs
+
+### MVP scope
+
+- **Input**: Paste advisory URL or upload STIX 2.x file
+- **Processing pipeline**: Advisory → technique list → NIST 800-53 control list → gap table
+- **Output**: Gap report as Markdown table and OSCAL assessment-results JSON
+- **Test case / reference**: Joint advisory AA26-281A 'Chinese Government-linked Cyber Threat Actors Combine Automated and Hands-on Hacking Tools to Steal Sensitive Data' (Oct 8, 2026), https://media.defense.gov/2026/Oct/08/2004013557/-1/-1/0/CSA_CHINESE_GOV_LINKED_ACTORS_HACKING_TOOLS.PDF
+  - Techniques: T1595.002, T1189, T1059.001/.004/.006/.007, T1133, T1036.003, T1003.006, T1110.001/.003, T1114.002, T1560.003, T1074.001, T1020
+  - CPGs cited: 1.C, 2.B, 3.F, 3.G, 3.H, 3.I, 3.J, 3.O, 3.Q, 3.S, 4.B
+
+### Out of scope (MVP)
+
+- Automated CISA advisory feed monitoring (deferred to post-production ADK agents item — scheduled, HITL-gated, token-throttled)
+- Real-time STIX/TAXII subscriptions
+- Automated remediation without HITL approval
+- Integration with commercial threat intelligence platforms
+- Advisory-to-advisory trend analysis or multi-advisory aggregation
+
+### Target
+
+Post-production, sprint TBD during backlog grooming. Requires ADK runtime (P3) and threat-intel feed throttle policy before enabling automated advisory watch.
+
+**Tracker:** [PM-TODO.md](PM-TODO.md) **P8 — Threat advisory intake**.
+
+---
+
 ## GenAI model and agent market research
 
 **Objective:** Stay informed on GenAI development without expanding MVP token spend.
@@ -845,8 +888,8 @@ The multi-mandate deadline model (DoW 2030 support / 2031 use, CNSA 2.0 for NSS,
 
 ---
 
-**Last Updated**: 2026-10-04  
-**Version**: 2.5  
+**Last Updated**: 2026-10-11  
+**Version**: 2.6  
 **Status**: Active Development (QA/Demo freeze via `v2.1.0-qa-demo` after this MVP CI cleanup lands — see [RELEASE-BRANCHING.md](RELEASE-BRANCHING.md))  
 **External PQC reference**: [DoW Post Quantum Cryptography Strategy](https://dowcio.war.gov/Portals/0/Documents/Library/DoW-PQC-Strategy.pdf)  
 **Agent framework reference**: [Google ADK](https://adk.dev/)  

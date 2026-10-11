@@ -3,7 +3,7 @@
 Lightweight backlog for post-production initiatives and cross-cutting release gates.
 For technical roadmap detail, see [ROADMAP.md](ROADMAP.md).
 
-**Last updated:** 2026-07-30
+**Last updated:** 2026-10-11
 
 ---
 
@@ -169,6 +169,42 @@ Companion app for executives/analysts (status, HITL, reports) — not a jump-hos
 - [x] Document MVP alignment table (honest “aligned toward”)
 - [ ] SBOM generation for release container images (2026 minimum elements)
 - [ ] Publish consumer-oriented trust / provenance notes as needed
+
+### P8 — Threat advisory intake (Advisory Intake)
+
+**Roadmap:** [ROADMAP.md — Future: Threat-informed compliance (Advisory Intake)](ROADMAP.md#future-threat-informed-compliance-advisory-intake)  
+**Test case:** Joint advisory AA26-281A 'Chinese Government-linked Cyber Threat Actors Combine Automated and Hands-on Hacking Tools to Steal Sensitive Data' (Oct 8, 2026)
+
+Ingest CISA/FBI/NSA advisories + STIX 2.x, extract MITRE ATT&CK techniques, map to NIST SP 800-53 R5 controls and CISA CPGs, compare against customer's OSCAL SSP and Ansible evidence, produce gap report. HITL review before remediation.
+
+#### Docs / design
+
+- [x] ROADMAP Future section published (threat-informed compliance)
+- [ ] Advisory ingest API spec (URL paste or STIX upload)
+- [ ] MITRE ATT&CK-to-800-53 mapping integration design
+- [ ] CPG catalog schema and cross-reference logic
+- [ ] Gap analysis logic: OSCAL SSP + Ansible evidence → coverage table
+
+#### Product (after P0; requires P3 ADK runtime for automated feed watch)
+
+- [ ] Advisory parser: STIX 2.x JSON/XML → technique list
+- [ ] Technique-to-control mapping engine (use MITRE Center for Threat-Informed Defense mappings)
+- [ ] CPG cross-reference module
+- [ ] Gap report generator: Markdown table + OSCAL assessment-results
+- [ ] HITL gate for all remediation playbooks triggered by advisory findings
+- [ ] Test against AA26-281A reference advisory (T1595.002, T1189, T1059.001/.004/.006/.007, etc.; CPGs 1.C, 2.B, 3.F–3.J, 3.O, 3.Q, 3.S, 4.B)
+
+#### Future (post-MVP)
+
+- [ ] Auto-watch CISA advisories feed (scheduled, HITL-gated, token-throttled via ADK agents)
+- [ ] STIX/TAXII subscription support
+- [ ] Multi-advisory trend analysis
+
+#### Explicit out of scope
+
+- Automated remediation without HITL
+- Real-time feed monitoring in MVP (requires P3 throttle policy first)
+- Commercial threat intelligence platform integration
 
 ---
 
