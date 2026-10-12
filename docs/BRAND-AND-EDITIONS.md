@@ -1,6 +1,6 @@
 # GRCToolKit — Brand Ladder and Editions
 
-**Last updated:** 2026-10-04  
+**Last updated:** 2026-10-11  
 **Maintainer:** [iFocus Innovations LLC](https://github.com/iFocus-Innovations-LLC)
 
 ---
@@ -74,6 +74,8 @@ Support and training tiers. **Pricing TBD** — see [PM-TODO.md](PM-TODO.md) P3 
 | **Silver** | Business-hours support | Admin + analyst training | Playbook guidance | Optional small bundled pool |
 | **Gold** | Priority support, named contact | HITL + OSCAL auditor workshops | Lab setup assist | Bundled pool + overage policy |
 | **Platinum** | 24/7 option, custom SLA | On-site / gov-style briefings | Fleet scan architecture review | Large pool + dedicated model routing |
+
+**Threat advisory intake (Advisory Intake):** Shields Up Enterprise feature (tier TBD, likely Gold+). Ingest CISA/FBI/NSA advisories + STIX 2.x, extract MITRE ATT&CK techniques, map to NIST SP 800-53 R5 controls and CISA CPGs, produce gap reports. Includes Puppet/OpenVox continuous IOC checks (Enterprise). Community Edition may link to MITRE CTID free ATT&CK-to-800-53 mappings as reference; advisory ingest pipeline is Enterprise only. See [ROADMAP.md — Future: Threat-informed compliance](ROADMAP.md#future-threat-informed-compliance-advisory-intake) and [PM-TODO.md P8](PM-TODO.md#p8--threat-advisory-intake-advisory-intake).
 
 ### Typical conversion triggers (Community → Enterprise)
 
