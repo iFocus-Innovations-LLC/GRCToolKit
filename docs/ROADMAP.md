@@ -886,6 +886,148 @@ Optional product name **Shields Up** under the GRCToolKit / future sentinel bran
 
 ---
 
+## Post-Production: Additional Enterprise Features
+
+The following features are planned for post-production implementation as part of the Enterprise roadmap. These items are not committed to Sprint 2 and are tracked as backlog candidates.
+
+**Note:** PR [#73](https://github.com/iFocus-Innovations-LLC/GRCToolKit/pull/73) (branch `cursor/threat-advisory-roadmap-d313`) also edits ROADMAP.md with threat advisory integration. This section is kept separate to minimize merge conflicts.
+
+### Local LLM Provider via Ollama
+
+**Objective:** Community-tier on-premise AI inference option
+
+**Features:**
+
+- OpenAI-compatible API surface
+- Pluggable integration with existing LLM provider abstraction
+- Community edition: BYOK (Bring Your Own Key) or BYO (Bring Your Own) Ollama
+- Self-hosted model deployment for air-gapped environments
+- Compatible with existing Gemini/OpenAI/Anthropic provider interface
+
+**Tier:** Community (MIT) and Enterprise
+
+**Dependencies:** Existing `ai-agent/llm-providers.js` abstraction layer
+
+---
+
+### Enterprise AI Gateway
+
+**Objective:** Production-grade, enterprise-ready AI request routing and policy enforcement
+
+**Architecture:** See [ENTERPRISE-AI-GATEWAY.md](architecture/ENTERPRISE-AI-GATEWAY.md)
+
+**Components:**
+
+- **Edge layer:** Apache/nginx with TLS, mTLS, WAF, IP allowlist, rate limiting
+- **Router:** LiteLLM (OpenAI-compatible) for model abstraction and routing
+- **Cloud egress:** Disabled by default; opt-in per tenant
+- **Air-gapped option:** Local-only deployment with offline install
+
+**Features:**
+
+- Tenant-scoped virtual keys with budgets and rate limits
+- PII/secret redaction before cloud egress
+- Model allowlist with pinned versions and checksums
+- Prompt/response logging to encrypted, tenant-scoped store
+- Never fall back from local to cloud without tenant permission
+- Audit events mapping to AU-2/AU-12 controls
+
+**Tier:** **Shields Up Enterprise**
+
+**Related Issues:** [#68 - LLM Proxy](https://github.com/iFocus-Innovations-LLC/GRCToolKit/issues/68), [#69 - Enterprise Platform](https://github.com/iFocus-Innovations-LLC/GRCToolKit/issues/69)
+
+---
+
+### Grounding Guarantee: Authoritative Sources Only
+
+**Objective:** Ensure all findings come from authoritative sources, not model memory
+
+**Principles:**
+
+- **Source store:** Versioned NIST 800-53 Rev5 OSCAL catalog, CISA advisories, STIX 2.1 IOCs
+- **Retrieval-first:** Candidate controls retrieved by ID/text; model may only select from retrieved IDs
+- **Schema-validated output:** Structured JSON validated against schema; unknown control IDs rejected
+- **Citations required:** Every finding cites source ID, version, and URL
+- **Human approval:** All reports require analyst approval before finalization
+- **Regression testing:** Fixed eval set (e.g., AA26-281A) run on every model/version change
+
+**Tier:** All tiers (core principle)
+
+**Technical implementation:**
+
+- RAG (Retrieval-Augmented Generation) over authoritative catalogs
+- JSON schema validation for AI responses
+- Source version tracking and provenance metadata in reports
+- HITL approval workflow integration
+
+---
+
+### Desktop Application (Tauri)
+
+**Objective:** Native desktop application for Windows, macOS, and Linux
+
+**Build targets:**
+
+- **macOS:** `.dmg` installer
+- **Windows:** `.msi` and `.exe` installers
+- **Linux:** AppImage and `.deb` packages
+
+**Features:**
+
+- Built with Tauri (Rust backend + web frontend)
+- GitHub Actions CI/CD for multi-platform builds
+- Optional local Ollama management
+- Full offline capability for air-gapped environments
+- Native OS integration (file system, notifications, system tray)
+
+**Code signing:**
+
+- **Apple:** Developer Program ($99/yr) for notarization
+- **Windows:** Azure Trusted Signing or OV certificate
+
+**Tier:** Community and Enterprise
+
+**Dependencies:** Existing web UI; Ollama provider integration
+
+---
+
+### Mobile Thin Client (Future)
+
+**Objective:** Mobile companion for compliance status and HITL approvals
+
+**Phases:**
+
+1. Responsive web / mobile-friendly layouts (covered in [ROADMAP.md §4.4](#44-mobile-app-level-groundwork-android-and-ios))
+2. PWA (Progressive Web App) for installability
+3. Capacitor shells for App Store / Play Store
+
+**Mobile-specific features:**
+
+- Compliance status dashboards
+- HITL approval queue (approve/deny with AU-2 audit trail)
+- OSCAL/PDF report download and offline viewing
+- Push notifications for critical findings
+- Deep-link approve/deny flows
+
+**Syncing:**
+
+- All data syncs through the edge/API
+- No direct model calls from mobile devices
+- Offline queue for approval actions
+
+**Security constraints:**
+
+- No API keys hardcoded in mobile binaries
+- BYOK / Enterprise pools via secure storage or backend
+- HITL approvals require authenticated identity
+- Remediations never auto-run from push notifications
+
+**Tier:** **Shields Up Enterprise** (advanced features)
+
+**Status:** Post-production; see PM-TODO P5 for detailed planning
+
+---
+
 ## Conclusion
 
 GRCToolKit is positioned as open-source **infrastructure for automated NIST validation, OSCAL evidence, and HITL-guarded PQC workflows** — with explicit alignment to the DoW PQC Strategy’s **Commercial Solutions** track (LOE 2 inventory and planning; LOE 5 HITL-gated deployment evidence). Existing OSCAL integration, AI-assisted control mapping, and Ansible automation provide a foundation for that evidence path; HA-ECU / Type 1 certification remains out of scope.
