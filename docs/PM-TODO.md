@@ -170,6 +170,68 @@ Companion app for executives/analysts (status, HITL, reports) — not a jump-hos
 - [ ] SBOM generation for release container images (2026 minimum elements)
 - [ ] Publish consumer-oriented trust / provenance notes as needed
 
+### P8 — Post-production Enterprise features (backlog candidates)
+
+**Roadmap:** [ROADMAP.md — Post-Production: Additional Enterprise Features](ROADMAP.md#post-production-additional-enterprise-features)  
+**Architecture:** [ENTERPRISE-AI-GATEWAY.md](architecture/ENTERPRISE-AI-GATEWAY.md)
+
+These items are backlog candidates, not committed to Sprint 2.
+
+#### Local LLM Provider via Ollama
+
+- [ ] Design Ollama provider integration (OpenAI-compatible API)
+- [ ] Implement provider plugin for `ai-agent/llm-providers.js`
+- [ ] Document Community BYOK/BYO Ollama setup
+- [ ] Test air-gapped deployment scenarios
+- [ ] Add Ollama health checks and fallback logic
+
+#### Enterprise AI Gateway
+
+**Related Issues:** [#68](https://github.com/iFocus-Innovations-LLC/GRCToolKit/issues/68), [#69](https://github.com/iFocus-Innovations-LLC/GRCToolKit/issues/69)
+
+- [ ] Evaluate LiteLLM vs Portkey vs Envoy AI Gateway
+- [ ] Design edge layer (Apache/nginx) with TLS, mTLS, WAF
+- [ ] Implement tenant-scoped virtual keys and rate limits
+- [ ] Build PII/secret redaction pipeline
+- [ ] Create model allowlist with pinned versions and checksums
+- [ ] Implement prompt/response logging with encryption
+- [ ] Wire audit events to AU-2/AU-12
+- [ ] Document cloud egress toggle (off by default)
+- [ ] Test air-gapped deployment mode
+- [ ] Determine hosting model (customer on-prem vs managed tenant)
+
+#### Grounding Guarantee: Authoritative Sources Only
+
+- [ ] Design source store schema (NIST 800-53, CISA, STIX 2.1)
+- [ ] Implement versioning and provenance tracking
+- [ ] Build retrieval-first RAG pipeline
+- [ ] Create JSON schema validation for AI responses
+- [ ] Add citation generation (source ID, version, URL)
+- [ ] Wire to HITL approval workflow
+- [ ] Build regression eval set (e.g., AA26-281A)
+- [ ] Document source catalog refresh procedures
+
+#### Desktop Application (Tauri)
+
+- [ ] Evaluate Tauri vs Electron for desktop app
+- [ ] Design cross-platform build pipeline (macOS, Windows, Linux)
+- [ ] Implement GitHub Actions CI for multi-platform builds
+- [ ] Add optional Ollama management features
+- [ ] Plan code signing strategy (Apple Developer, Windows OV cert)
+- [ ] Create installer packages (.dmg, .msi/.exe, AppImage/.deb)
+- [ ] Test offline/air-gapped mode
+- [ ] Document desktop-specific features vs web UI
+
+#### Mobile Thin Client (later)
+
+**Status:** Post-production; see P5 for detailed mobile groundwork
+
+- [ ] Cross-reference with P5 mobile groundwork
+- [ ] Design edge sync protocol for mobile
+- [ ] Ensure no direct model calls from mobile
+- [ ] Plan push notification workflow for critical findings
+- [ ] Document security constraints (no hardcoded keys, HITL auth)
+
 ---
 
 ## Production gate (Shields Up implementation)
