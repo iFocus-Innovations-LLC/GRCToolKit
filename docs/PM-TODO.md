@@ -3,7 +3,7 @@
 Lightweight backlog for post-production initiatives and cross-cutting release gates.
 For technical roadmap detail, see [ROADMAP.md](ROADMAP.md).
 
-**Last updated:** 2026-07-30
+**Last updated:** 2026-10-11
 
 ---
 
@@ -231,8 +231,52 @@ These items are backlog candidates, not committed to Sprint 2.
 - [ ] Ensure no direct model calls from mobile
 - [ ] Plan push notification workflow for critical findings
 - [ ] Document security constraints (no hardcoded keys, HITL auth)
+=======
+### P8 — Threat advisory intake (Advisory Intake)
 
----
+**Roadmap:** [ROADMAP.md — Future: Threat-informed compliance (Advisory Intake)](ROADMAP.md#future-threat-informed-compliance-advisory-intake)  
+**Edition:** Shields Up Enterprise (tier TBD, likely Gold+)  
+**Test case:** Joint advisory AA26-281A 'Chinese Government-linked Cyber Threat Actors Combine Automated and Hands-on Hacking Tools to Steal Sensitive Data' (Oct 8, 2026)
+
+Ingest CISA/FBI/NSA advisories + STIX 2.x, extract MITRE ATT&CK techniques from advisory text (HTML/PDF tables) and STIX IOCs, map to NIST SP 800-53 R5 controls and CISA CPGs using [MITRE Center for Threat-Informed Defense](https://ctid.mitre-engenuity.org/) mappings, compare against customer's OSCAL SSP and Ansible evidence, produce gap report. HITL review before remediation. Community Edition may link to MITRE CTID free ATT&CK-to-800-53 mappings as reference; advisory ingest pipeline is Enterprise only.
+
+#### Docs / design
+
+- [x] ROADMAP Future section published (threat-informed compliance, Enterprise tier)
+- [x] Design note: CISA STIX 2.1 bundles primarily carry IOCs; ATT&CK techniques are in advisory text tables (HTML/PDF), so parser must read advisory document in addition to STIX
+- [x] Mapping source: MITRE Center for Threat-Informed Defense ATT&CK-to-NIST-800-53 mappings
+- [ ] Advisory ingest API spec (URL paste or STIX upload)
+- [ ] Advisory parser design: HTML/PDF text extraction for ATT&CK technique IDs
+- [ ] MITRE CTID mapping integration design (ATT&CK technique → 800-53 control)
+- [ ] CPG catalog schema and cross-reference logic
+- [ ] Gap analysis logic: OSCAL SSP + Ansible evidence → coverage table
+- [ ] Puppet/OpenVox continuous IOC check design: STIX → Hiera/module data, custom facts, PuppetDB evidence, noop resources
+
+#### Product (after P0; requires P3 ADK runtime for automated feed watch)
+
+- [ ] Advisory parser: HTML/PDF text extraction for ATT&CK technique IDs + STIX 2.x JSON/XML for IOCs
+- [ ] Technique-to-control mapping engine (use MITRE Center for Threat-Informed Defense ATT&CK-to-800-53 mappings)
+- [ ] CPG cross-reference module
+- [ ] Gap report generator: Markdown table + OSCAL assessment-results
+- [ ] HITL gate for all remediation playbooks triggered by advisory findings
+- [ ] Test against AA26-281A reference advisory (T1595.002, T1189, T1059.001/.004/.006/.007, etc.; CPGs 1.C, 2.B, 3.F–3.J, 3.O, 3.Q, 3.S, 4.B)
+- [ ] Puppet/OpenVox continuous IOC check module (Enterprise): STIX 2.1 → Hiera/module data converter
+- [ ] Custom Puppet facts: bounded IOC lookups (hash/domain/process matches from cache file or targeted checks)
+- [ ] PuppetDB (PQL) integration: query IOC match evidence → OSCAL assessment-results
+- [ ] Puppet remediation resources with `noop => true` default; HITL approval required to enable
+- [ ] Community Edition: add link to MITRE CTID free ATT&CK-to-800-53 mapping resources (reference pointer only)
+
+#### Future (post-MVP)
+
+- [ ] Auto-watch CISA advisories feed (scheduled, HITL-gated, token-throttled via ADK agents)
+- [ ] STIX/TAXII subscription support
+- [ ] Multi-advisory trend analysis
+
+#### Explicit out of scope
+
+- Automated remediation without HITL
+- Real-time feed monitoring in MVP (requires P3 throttle policy first)
+- Commercial threat intelligence platform integration
 
 ## Production gate (Shields Up implementation)
 
