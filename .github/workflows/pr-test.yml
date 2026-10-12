@@ -15,6 +15,9 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
 
+    - name: Test LLM proxy error handling
+      run: python3 -m unittest discover -s tests/python -v
+
     - name: Enforce pinned image versions
       run: |
         chmod +x scripts/check-image-pins.sh
