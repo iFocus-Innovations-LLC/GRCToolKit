@@ -165,7 +165,7 @@ docker run -p 8080:8080 -e GEMINI_API_KEY=$GEMINI_API_KEY grc-toolkit
 ## Technical appendix (for evaluators)
 
 - **UI:** `grctoolkit.html` → `local-index.html` via `scripts/run-local.sh`
-- **Engine:** Gemini v1beta structured JSON (`gemini-2.5-flash` default)
+- **Engine:** Gemini v1beta structured JSON (`gemini-3.8-flash` default)
 - **Validation:** `ansible/playbooks/` — purple-team pack (AC-2/3/6, IA-2/5, AU-2/3/12, CM-6/7, SC-7/8/28, SI-4; read-only)
 - **Skills:** `skills/nist-validator/` — K8s-scoped control validation (explore for cluster audits)
 - **Reports:** `scripts/oscal_pdf.py` + local runner API

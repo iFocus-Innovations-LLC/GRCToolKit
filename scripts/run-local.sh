@@ -76,6 +76,12 @@ ANTHROPIC_K="$(trim "${ANTHROPIC_API_KEY:-}")"
 GROQ_K="$(trim "${GROQ_API_KEY:-}")"
 VERTEX_K="$(trim "${VERTEX_API_KEY:-}")"
 
+GEMINI_M="$(trim "${GEMINI_MODEL:-}")"
+OPENAI_M="$(trim "${OPENAI_MODEL:-}")"
+ANTHROPIC_M="$(trim "${ANTHROPIC_MODEL:-}")"
+GROQ_M="$(trim "${GROQ_MODEL:-}")"
+VERTEX_M="$(trim "${VERTEX_MODEL:-}")"
+
 if [[ -z "$GEMINI_K" && "$PROVIDER" == "gemini" ]]; then
   echo "warning: GEMINI_API_KEY is unset. Get a key from https://aistudio.google.com/ then either:" >&2
   echo "  .env.local (see .env.local.example), repo-root .env, or export GEMINI_API_KEY for this session" >&2
@@ -85,6 +91,7 @@ if [[ "$PROVIDER" != "gemini" ]]; then
   echo "info: LLM_PROVIDER=${PROVIDER} — browser calls go through local proxy http://127.0.0.1:${RUNNER_PORT}/api/llm/analyze (CORS)." >&2
 fi
 
+# Inject both API keys and model overrides into the served page, with safe escaping.
 sed \
   -e "s|__LLM_PROVIDER__|$(esc_sed "$PROVIDER")|g" \
   -e "s|__GEMINI_API_KEY__|$(esc_sed "$GEMINI_K")|g" \
@@ -93,6 +100,24 @@ sed \
   -e "s|__GROQ_API_KEY__|$(esc_sed "$GROQ_K")|g" \
   -e "s|__VERTEX_API_KEY__|$(esc_sed "$VERTEX_K")|g" \
   grctoolkit.html > "$OUT"
+
+# Inject model overrides if set; prepend before the || fallback in local-index.html
+if [[ -n "$GEMINI_M" ]]; then
+  sed -i.bak "s|window\.GEMINI_MODEL = window\.GEMINI_MODEL|window.GEMINI_MODEL = \"$(esc_sed "$GEMINI_M")\"; window.GEMINI_MODEL = window.GEMINI_MODEL|" "$OUT"
+fi
+if [[ -n "$OPENAI_M" ]]; then
+  sed -i.bak "s|window\.OPENAI_MODEL = window\.OPENAI_MODEL|window.OPENAI_MODEL = \"$(esc_sed "$OPENAI_M")\"; window.OPENAI_MODEL = window.OPENAI_MODEL|" "$OUT"
+fi
+if [[ -n "$ANTHROPIC_M" ]]; then
+  sed -i.bak "s|window\.ANTHROPIC_MODEL = window\.ANTHROPIC_MODEL|window.ANTHROPIC_MODEL = \"$(esc_sed "$ANTHROPIC_M")\"; window.ANTHROPIC_MODEL = window.ANTHROPIC_MODEL|" "$OUT"
+fi
+if [[ -n "$GROQ_M" ]]; then
+  sed -i.bak "s|window\.GROQ_MODEL = window\.GROQ_MODEL|window.GROQ_MODEL = \"$(esc_sed "$GROQ_M")\"; window.GROQ_MODEL = window.GROQ_MODEL|" "$OUT"
+fi
+if [[ -n "$VERTEX_M" ]]; then
+  sed -i.bak "s|window\.VERTEX_MODEL = window\.VERTEX_MODEL|window.VERTEX_MODEL = \"$(esc_sed "$VERTEX_M")\"; window.VERTEX_MODEL = window.VERTEX_MODEL|" "$OUT"
+fi
+rm -f "$OUT.bak"
 
 LOCAL_VENV="$ROOT/.venv-local-demo"
 PYTHON="python3"

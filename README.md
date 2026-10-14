@@ -87,12 +87,12 @@ Detailed documentation for the GRCToolKit can be found in the `docs/` directory:
 
 ## 🏗️ Architecture
 
-This application provides a modern UI for interacting with a GRC Compliance Engine. It uses the **Gemini API** (`generateContent` on **v1beta**) with a default model such as **`gemini-2.5-flash`** (supports structured JSON / `response_mime_type`). Avoid legacy IDs like **`gemini-pro`** for JSON mode. The engine integrates with Ansible playbooks for automated control validation and generates OSCAL-compliant documentation.
+This application provides a modern UI for interacting with a GRC Compliance Engine. It uses the **Gemini API** (`generateContent` on **v1beta**) with a default model such as **`gemini-3.8-flash`** (supports structured JSON / `response_mime_type`). Avoid legacy IDs like **`gemini-pro`** for JSON mode. The engine integrates with Ansible playbooks for automated control validation and generates OSCAL-compliant documentation.
 
 ## ✨ Key Features
 
 ### 🤖 AI Compliance Engine
-- **Gemini API integration**: **v1beta** `generateContent` with **`gemini-2.5-flash`** by default (configurable via `window.GEMINI_MODEL`); structured JSON output for GRC analysis.
+- **Gemini API integration**: **v1beta** `generateContent` with **`gemini-3.8-flash`** by default (configurable via `window.GEMINI_MODEL`); structured JSON output for GRC analysis.
 - **Scenario Recognition**: Automatically detects PQC migration, quantum risk, and standard GRC scenarios.
 - **Structured JSON Output**: AI responses include controls, CSF mappings, and implementation recommendations.
 

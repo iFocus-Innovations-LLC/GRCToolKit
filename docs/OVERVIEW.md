@@ -230,7 +230,7 @@ We are transparent about maturity so evaluators — including government innovat
 | Layer | Technology |
 |-------|------------|
 | UI | HTML5, Tailwind CSS, JavaScript |
-| AI | Google Gemini API (`gemini-2.5-flash`, structured JSON) |
+| AI | Google Gemini API (`gemini-3.8-flash`, structured JSON) |
 | Compliance data | NIST 800-53 R5 OSCAL catalog |
 | Automation | Ansible (primary); Puppet noop (experimental, Ansible-driven) |
 | Runtime | Docker, nginx (non-root) |

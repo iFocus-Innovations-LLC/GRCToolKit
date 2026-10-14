@@ -317,7 +317,7 @@ def analyze_llm(provider: str, prompt: str, model: str | None, api_key: str | No
 
     if provider == "gemini":
         key = key or env_key("GEMINI_API_KEY")
-        model_id = model_id or os.environ.get("GEMINI_MODEL", "gemini-2.5-flash").strip()
+        model_id = model_id or os.environ.get("GEMINI_MODEL", "gemini-3.8-flash").strip()
         if not key:
             raise ValueError("Missing Gemini API key (body.apiKey or GEMINI_API_KEY)")
         url = (
@@ -416,7 +416,7 @@ def analyze_llm(provider: str, prompt: str, model: str | None, api_key: str | No
         key = key or env_key("VERTEX_API_KEY", "GEMINI_API_KEY")
         project = os.environ.get("VERTEX_PROJECT", "").strip()
         location = os.environ.get("VERTEX_LOCATION", "us-central1").strip()
-        model_id = model_id or os.environ.get("VERTEX_MODEL", "gemini-2.5-flash").strip()
+        model_id = model_id or os.environ.get("VERTEX_MODEL", "gemini-3.8-flash").strip()
         if not key:
             raise ValueError(
                 "Missing Vertex API key (body.apiKey, VERTEX_API_KEY, or GEMINI_API_KEY). "
