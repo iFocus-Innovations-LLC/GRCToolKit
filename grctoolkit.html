@@ -254,23 +254,22 @@
     <script src="/compliance-docs/auditor-report-generator.js?v=2.1.0-dev"></script>
     
     <script type="module">
-        // Multi-LLM BYOK — placeholders injected by docker-entrypoint.sh / scripts/run-local.sh
+        // Multi-LLM BYOK for Cloud Run / production: API keys stay server-side in the proxy
+        // For local development, keys can be injected or use local proxy on 127.0.0.1:8081
         // Never commit real keys. Gemini remains the Community default.
-        window.LLM_PROVIDER = "__LLM_PROVIDER__";
-        window.GEMINI_API_KEY = "__GEMINI_API_KEY__";
-        window.OPENAI_API_KEY = "__OPENAI_API_KEY__";
-        window.ANTHROPIC_API_KEY = "__ANTHROPIC_API_KEY__";
-        window.GROQ_API_KEY = "__GROQ_API_KEY__";
-        window.VERTEX_API_KEY = "__VERTEX_API_KEY__";
+        
+        // Use relative path for Cloud Run (same origin), localhost for local dev
+        window.ANSIBLE_API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? "http://127.0.0.1:8081"
+            : window.location.origin;
+        
+        // Provider and models can be set via environment or defaults
+        window.LLM_PROVIDER = window.LLM_PROVIDER || "gemini";
         window.GEMINI_MODEL = window.GEMINI_MODEL || "gemini-3.8-flash";
         window.OPENAI_MODEL = window.OPENAI_MODEL || "gpt-4o-mini";
         window.ANTHROPIC_MODEL = window.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
         window.GROQ_MODEL = window.GROQ_MODEL || "llama-3.3-70b-versatile";
         window.VERTEX_MODEL = window.VERTEX_MODEL || "gemini-3.8-flash";
-        window.ANSIBLE_API_BASE = window.ANSIBLE_API_BASE || "http://127.0.0.1:8081";
-        if (window.LLM_PROVIDER === "__LLM_PROVIDER__" || !window.LLM_PROVIDER) {
-            window.LLM_PROVIDER = "gemini";
-        }
 
         // Firebase Configuration
         const firebaseConfig = {

@@ -166,10 +166,68 @@ jobs:
         cache-to: type=gha,mode=max
         platforms: linux/amd64,linux/arm64
 
+  deploy-cloudrun:
+    needs: build-and-push
+    runs-on: ubuntu-24.04
+    # Cloud Run QA environment: IAM-gated, cheap demo deploy. Opt in with repo variable ENABLE_CLOUD_RUN_DEPLOY=true
+    if: |
+      github.ref == 'refs/heads/main' &&
+      vars.ENABLE_CLOUD_RUN_DEPLOY == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Google Auth
+      id: auth
+      uses: 'google-github-actions/auth@v3'
+      with:
+        workload_identity_provider: '${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}'
+        service_account: '${{ secrets.GCP_SA_EMAIL }}'
+
+    - name: Set up Cloud SDK
+      uses: 'google-github-actions/setup-gcloud@v3'
+
+    - name: Deploy to Cloud Run
+      id: deploy
+      uses: google-github-actions/deploy-cloudrun@v3.1.0
+      with:
+        service: grc-toolkit-qa
+        region: ${{ env.REGION }}
+        image: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:main-${{ github.sha }}
+        flags: |
+          --no-allow-unauthenticated
+          --min-instances=0
+          --max-instances=2
+          --memory=512Mi
+          --cpu=1
+          --timeout=60s
+          --service-account=cloudrun-runtime-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+          --update-secrets=GEMINI_API_KEY=gemini-api-key:latest
+          --set-env-vars=LLM_PROVIDER=gemini,GEMINI_MODEL=gemini-3.8-flash
+
+    - name: Enable IAP on Cloud Run service
+      run: |
+        # IAP on Cloud Run requires the service to be already deployed
+        gcloud iap web enable \
+          --resource-type=cloud-run \
+          --service=grc-toolkit-qa \
+          --region=$REGION \
+          --project=$PROJECT_ID
+
+    - name: Output Cloud Run URL
+      run: |
+        echo "✅ Cloud Run QA deployment successful!"
+        echo "Service URL: ${{ steps.deploy.outputs.url }}"
+        echo "Access requires IAP authentication (see docs/CLOUD-RUN-QA.md)"
+
   deploy-staging:
     needs: build-and-push
     runs-on: ubuntu-24.04
-    if: github.ref == 'refs/heads/develop'
+    # GKE staging deploy - gated off by default, enable with repo variable ENABLE_GKE_DEPLOY=true
+    if: |
+      github.ref == 'refs/heads/develop' &&
+      vars.ENABLE_GKE_DEPLOY == 'true'
     environment: staging
     
     steps:
@@ -219,7 +277,10 @@ jobs:
   deploy-production:
     needs: build-and-push
     runs-on: ubuntu-24.04
-    if: github.ref == 'refs/heads/main'
+    # GKE production deploy - gated off by default, enable with repo variable ENABLE_GKE_DEPLOY=true
+    if: |
+      github.ref == 'refs/heads/main' &&
+      vars.ENABLE_GKE_DEPLOY == 'true'
     environment: production
     
     steps:
