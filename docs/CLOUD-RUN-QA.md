@@ -16,7 +16,7 @@ The container runs both nginx (static UI on port 8080) and a Python LLM proxy se
 
 - GCP project with billing enabled
 - [gcloud CLI](https://cloud.google.com/sdk/docs/install) installed and authenticated
-- Terraform >= 1.9.0
+- Terraform >= 1.9.0 (Homebrew's default terraform is stuck at 1.5.7; install from `hashicorp/tap` instead: `brew tap hashicorp/tap && brew install hashicorp/tap/terraform`)
 - GitHub repository admin access (for secrets/variables)
 - Google account(s) for IAP allowlist
 
@@ -33,7 +33,6 @@ cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars with your values:
 # - project_id: Your GCP project ID
 # - github_repo: "iFocus-Innovations-LLC/GRCToolKit" (or your fork)
-# - iap_support_email: Project owner/editor email
 # - iap_allowed_users: List of user:email@example.com or group:group@example.com
 # - billing_account_id: Find via `gcloud billing accounts list`
 # - budget_alert_emails: List of emails for budget alerts
@@ -75,7 +74,7 @@ Add these secrets in **Settings → Secrets and variables → Actions → Secret
 
 | Secret Name | Value | Where to find |
 |-------------|-------|---------------|
-| `WORKLOAD_IDENTITY_PROVIDER` | From `terraform output workload_identity_provider` | Full resource path like `projects/123.../providers/github-provider` |
+| `WORKLOAD_IDENTITY_PROVIDER` | From `terraform output -raw workload_identity_provider` | Full resource path like `projects/123.../providers/github-provider` |
 | `GCP_SA_EMAIL` | From `terraform output deployer_service_account` | Email like `cloudrun-deployer-sa@PROJECT_ID.iam.gserviceaccount.com` |
 | `GCP_PROJECT_ID` | Your GCP project ID | Same as in terraform.tfvars |
 
@@ -370,8 +369,6 @@ gcloud secrets delete gemini-api-key --project=$GCP_PROJECT_ID
 
 # Remove GitHub secrets/variables (manual in Settings UI)
 ```
-
-**Note**: The IAP Brand (OAuth consent screen) cannot be deleted via Terraform and must remain. This is a GCP limitation.
 
 ## Security Notes
 

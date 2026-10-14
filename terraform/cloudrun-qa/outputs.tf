@@ -29,10 +29,9 @@ output "secret_manager_secret" {
   value       = google_secret_manager_secret.gemini_api_key.id
 }
 
-output "iap_client_id" {
-  description = "IAP OAuth client ID"
-  value       = google_iap_client.cloudrun_client.client_id
-  sensitive   = true
+output "iap_settings_name" {
+  description = "IAP settings resource name"
+  value       = google_iap_settings.cloudrun_iap.name
 }
 
 output "budget_name" {
@@ -51,7 +50,7 @@ output "setup_instructions" {
        echo -n "YOUR_GEMINI_API_KEY" | gcloud secrets versions add ${google_secret_manager_secret.gemini_api_key.secret_id} --data-file=- --project=${var.project_id}
     
     2. Add GitHub Actions secrets (Settings → Secrets and variables → Actions):
-       - WORKLOAD_IDENTITY_PROVIDER: ${google_iam_workload_identity_pool_provider.github.name}
+       - WORKLOAD_IDENTITY_PROVIDER: Run `terraform output -raw workload_identity_provider` to get this value
        - GCP_SA_EMAIL: ${google_service_account.cloudrun_deployer.email}
        - GCP_PROJECT_ID: ${var.project_id}
     
