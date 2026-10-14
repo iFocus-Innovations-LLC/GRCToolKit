@@ -1,0 +1,23 @@
+# Cloud Run QA Environment Configuration
+# Copy to terraform.tfvars and fill in your values (gitignored)
+
+project_id = "your-gcp-project-id"
+region     = "us-central1"
+
+# GitHub repository for Workload Identity Federation
+github_repo = "iFocus-Innovations-LLC/GRCToolKit"
+
+# IAP configuration
+iap_support_email = "admin@grctoolkit.ai"
+iap_allowed_users = [
+  "user:admin@grctoolkit.ai",
+  # "group:qa-team@grctoolkit.ai",
+  # "user:demo-user@example.com",
+]
+
+# Billing
+billing_account_id = "012345-ABCDEF-678901"  # Find via: gcloud billing accounts list
+budget_alert_emails = [
+  "admin@grctoolkit.ai",
+  # "alerts@grctoolkit.ai",
+]
