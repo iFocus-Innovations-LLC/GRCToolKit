@@ -13,7 +13,7 @@
         gemini: {
             id: "gemini",
             label: "Google Gemini (default)",
-            defaultModel: "gemini-2.5-flash",
+            defaultModel: "gemini-3.8-flash",
             keyWindowVar: "GEMINI_API_KEY",
             supportsBrowserDirect: true,
         },
@@ -41,7 +41,7 @@
         vertex: {
             id: "vertex",
             label: "Google Vertex AI",
-            defaultModel: "gemini-2.5-flash",
+            defaultModel: "gemini-3.8-flash",
             keyWindowVar: "VERTEX_API_KEY",
             supportsBrowserDirect: false,
         },
@@ -79,9 +79,15 @@
 
     function getModelId(providerId) {
         const p = PROVIDERS[providerId] || PROVIDERS.gemini;
+        const RETIRED_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"];
         try {
             const stored = (localStorage.getItem(MODEL_STORAGE_KEY + ":" + p.id) || "").trim();
-            if (stored) return stored;
+            if (stored && !RETIRED_MODELS.includes(stored)) {
+                return stored;
+            }
+            if (stored && RETIRED_MODELS.includes(stored)) {
+                localStorage.removeItem(MODEL_STORAGE_KEY + ":" + p.id);
+            }
         } catch {
             /* */
         }

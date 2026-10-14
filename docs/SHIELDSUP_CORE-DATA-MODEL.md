@@ -53,7 +53,7 @@ AI is the only writer for this collection (via Cloud Function calling Gemini) �
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `model` | string | yes | e.g. `gemini-2.5-flash` |
+| `model` | string | yes | e.g. `gemini-3.8-flash` |
 | `analyzedAt` | timestamp | yes | |
 | `keywords` | array\<string\> | yes | Extracted scenario keywords |
 | `confidenceScore` | number | yes | 0–100. **Immutable once written** — this is the AI's original output |

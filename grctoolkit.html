@@ -262,11 +262,11 @@
         window.ANTHROPIC_API_KEY = "__ANTHROPIC_API_KEY__";
         window.GROQ_API_KEY = "__GROQ_API_KEY__";
         window.VERTEX_API_KEY = "__VERTEX_API_KEY__";
-        window.GEMINI_MODEL = window.GEMINI_MODEL || "gemini-2.5-flash";
+        window.GEMINI_MODEL = window.GEMINI_MODEL || "gemini-3.8-flash";
         window.OPENAI_MODEL = window.OPENAI_MODEL || "gpt-4o-mini";
         window.ANTHROPIC_MODEL = window.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
         window.GROQ_MODEL = window.GROQ_MODEL || "llama-3.3-70b-versatile";
-        window.VERTEX_MODEL = window.VERTEX_MODEL || "gemini-2.5-flash";
+        window.VERTEX_MODEL = window.VERTEX_MODEL || "gemini-3.8-flash";
         window.ANSIBLE_API_BASE = window.ANSIBLE_API_BASE || "http://127.0.0.1:8081";
         if (window.LLM_PROVIDER === "__LLM_PROVIDER__" || !window.LLM_PROVIDER) {
             window.LLM_PROVIDER = "gemini";
@@ -436,6 +436,10 @@
                 if (/API key|GEMINI|expired|PERMISSION_DENIED|API_KEY/i.test(msg) && /gemini/i.test(msg + (window.GRCLLM?.getProviderId?.() || ''))) {
                     msg +=
                         "\n\n— For Gemini: (1) new key https://aistudio.google.com/app/apikey (2) API restrictions include Generative Language API (3) Application restrictions allow http://127.0.0.1:8080/* (4) restart ./scripts/run-local.sh and open /local-index.html.";
+                }
+                if (/404|not found|no longer available|unavailable/i.test(msg) && /gemini/i.test(msg + (window.GRCLLM?.getProviderId?.() || ''))) {
+                    msg +=
+                        "\n\n— Model unavailable: Google has retired some models. Try setting GEMINI_MODEL=gemini-3.8-flash in .env.local and restart ./scripts/run-local.sh";
                 }
                 if (/proxy|CORS|Failed to fetch/i.test(msg)) {
                     msg +=
