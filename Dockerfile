@@ -3,7 +3,9 @@
 FROM nginx:1.30.0-alpine-slim@sha256:2fb5d772cea6ef1a8dab525df1b9485289eee167d26af9613fce27a12c060caa
 
 # Install Python 3 for the LLM proxy server (keeps API keys server-side)
+# Use venv to avoid PEP 668 externally-managed-environment error
 RUN apk add --no-cache python3 py3-pip && \
+    python3 -m venv /opt/venv && \
     rm -f /etc/nginx/conf.d/default.conf
 
 # Copy our nginx config (listens on 8080, /health, proxies /api/llm/ to Python server on 8081)
@@ -20,16 +22,17 @@ COPY assets ./assets/
 # Copy Python LLM proxy and requirements
 COPY scripts/ansible-runner-api.py /app/ansible-runner-api.py
 COPY scripts/requirements-local-demo.txt /app/requirements.txt
-RUN pip3 install --no-cache-dir -r /app/requirements.txt && \
+RUN /opt/venv/bin/pip install --no-cache-dir -r /app/requirements.txt && \
     mkdir -p /tmp/grc-oscal-reports && \
     chown nginx:nginx /tmp/grc-oscal-reports
 
 # Copy startup script that launches both nginx and Python proxy
 COPY scripts/docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod 550 /docker-entrypoint.sh
+RUN chmod 550 /docker-entrypoint.sh && \
+    chown nginx:nginx /docker-entrypoint.sh
 
 # Ensure nginx user can read files and write pid/cache
-RUN chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/log/nginx /tmp /app
+RUN chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/log/nginx /tmp /app /opt/venv
 
 # Run as non-root (required by container hardening checks)
 USER nginx

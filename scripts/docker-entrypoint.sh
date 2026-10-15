@@ -6,7 +6,7 @@ set -e
 # Start Python LLM proxy in the background on port 8081
 echo "Starting Python LLM proxy on 127.0.0.1:8081..."
 cd /app
-python3 ansible-runner-api.py --host 127.0.0.1 --port 8081 &
+/opt/venv/bin/python3 ansible-runner-api.py --host 127.0.0.1 --port 8081 &
 PROXY_PID=$!
 
 # Give the proxy a moment to bind
