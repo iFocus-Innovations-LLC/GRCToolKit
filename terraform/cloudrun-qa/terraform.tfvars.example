@@ -8,7 +8,6 @@ region     = "us-central1"
 github_repo = "iFocus-Innovations-LLC/GRCToolKit"
 
 # IAP configuration
-iap_support_email = "admin@grctoolkit.ai"
 iap_allowed_users = [
   "user:admin@grctoolkit.ai",
   # "group:qa-team@grctoolkit.ai",

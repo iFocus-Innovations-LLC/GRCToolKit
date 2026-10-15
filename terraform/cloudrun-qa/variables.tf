@@ -1,7 +1,6 @@
 variable "project_id" {
   description = "GCP project ID for Cloud Run QA environment"
   type        = string
-  sensitive   = true
 }
 
 variable "region" {
@@ -14,11 +13,6 @@ variable "github_repo" {
   description = "GitHub repository in format 'owner/repo' for WIF authentication"
   type        = string
   # Example: "iFocus-Innovations-LLC/GRCToolKit"
-}
-
-variable "iap_support_email" {
-  description = "Support email for IAP OAuth consent screen (must be project owner/editor)"
-  type        = string
 }
 
 variable "iap_allowed_users" {

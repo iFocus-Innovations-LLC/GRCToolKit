@@ -16,7 +16,7 @@ The container runs both nginx (static UI on port 8080) and a Python LLM proxy se
 
 - GCP project with billing enabled
 - [gcloud CLI](https://cloud.google.com/sdk/docs/install) installed and authenticated
-- Terraform >= 1.9.0
+- Terraform >= 1.9.0 (Homebrew's default terraform is stuck at 1.5.7; install from `hashicorp/tap` instead: `brew tap hashicorp/tap && brew install hashicorp/tap/terraform`)
 - GitHub repository admin access (for secrets/variables)
 - Google account(s) for IAP allowlist
 
@@ -33,7 +33,6 @@ cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars with your values:
 # - project_id: Your GCP project ID
 # - github_repo: "iFocus-Innovations-LLC/GRCToolKit" (or your fork)
-# - iap_support_email: Project owner/editor email
 # - iap_allowed_users: List of user:email@example.com or group:group@example.com
 # - billing_account_id: Find via `gcloud billing accounts list`
 # - budget_alert_emails: List of emails for budget alerts
@@ -75,7 +74,7 @@ Add these secrets in **Settings → Secrets and variables → Actions → Secret
 
 | Secret Name | Value | Where to find |
 |-------------|-------|---------------|
-| `WORKLOAD_IDENTITY_PROVIDER` | From `terraform output workload_identity_provider` | Full resource path like `projects/123.../providers/github-provider` |
+| `WORKLOAD_IDENTITY_PROVIDER` | From `terraform output -raw workload_identity_provider` | Full resource path like `projects/123.../providers/github-provider` |
 | `GCP_SA_EMAIL` | From `terraform output deployer_service_account` | Email like `cloudrun-deployer-sa@PROJECT_ID.iam.gserviceaccount.com` |
 | `GCP_PROJECT_ID` | Your GCP project ID | Same as in terraform.tfvars |
 
@@ -96,7 +95,27 @@ git push origin main
 
 Monitor the deployment in **Actions** tab. Once complete, the Cloud Run service URL is in the workflow logs.
 
-### 5. Access the Service
+### 5. Enable IAP on Cloud Run
+
+After the first deployment, enable IAP on the Cloud Run service (one-time step, idempotent):
+
+```bash
+# Set your project ID and region
+export GCP_PROJECT_ID="your-project-id"
+export REGION="us-central1"
+
+# Enable IAP on the Cloud Run service
+gcloud run services update grc-toolkit-qa \
+  --region=$REGION \
+  --iap \
+  --project=$GCP_PROJECT_ID
+```
+
+This enables IAP authentication on the service. Without this step, the service returns 403 to all requests.
+
+**Note**: The GitHub Actions workflow automatically runs this command on each deployment, so you typically only need to run it manually if you're setting up for the first time or if IAP was disabled.
+
+### 6. Access the Service
 
 The service URL is shown in `terraform output cloudrun_service_url` or the GitHub Actions logs.
 
@@ -370,8 +389,6 @@ gcloud secrets delete gemini-api-key --project=$GCP_PROJECT_ID
 
 # Remove GitHub secrets/variables (manual in Settings UI)
 ```
-
-**Note**: The IAP Brand (OAuth consent screen) cannot be deleted via Terraform and must remain. This is a GCP limitation.
 
 ## Security Notes
 

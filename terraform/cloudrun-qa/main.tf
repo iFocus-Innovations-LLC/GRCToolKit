@@ -24,6 +24,8 @@ locals {
     "cloudresourcemanager.googleapis.com",
     "billingbudgets.googleapis.com",
     "sts.googleapis.com",
+    "monitoring.googleapis.com",
+    "artifactregistry.googleapis.com",
   ])
 }
 
@@ -199,36 +201,17 @@ resource "google_cloud_run_v2_service" "grc_toolkit_qa" {
   }
 }
 
-# IAP Brand (OAuth consent screen) - required for IAP
-# Note: Only one brand per project, must be created manually or via Terraform once
-resource "google_iap_brand" "project_brand" {
-  support_email     = var.iap_support_email
-  application_title = "GRC Toolkit QA"
-  project           = var.project_id
-
-  depends_on = [google_project_service.enabled]
-
-  lifecycle {
-    # Brands cannot be deleted, only deactivated
-    prevent_destroy = true
-  }
-}
-
-# IAP OAuth Client for Cloud Run
-resource "google_iap_client" "cloudrun_client" {
-  display_name = "GRC Toolkit QA Cloud Run"
-  brand        = google_iap_brand.project_brand.name
-}
-
-# Enable IAP on the Cloud Run service
-resource "google_iap_web_iam_binding" "cloudrun_iap_users" {
-  project = var.project_id
-  role    = "roles/iap.httpsResourceAccessor"
-  members = var.iap_allowed_users
+# Grant IAP access to allowed users (Cloud Run-specific resource)
+resource "google_iap_web_cloud_run_service_iam_binding" "cloudrun_iap_users" {
+  project                = var.project_id
+  location               = var.region
+  cloud_run_service_name = google_cloud_run_v2_service.grc_toolkit_qa.name
+  role                   = "roles/iap.httpsResourceAccessor"
+  members                = var.iap_allowed_users
 
   depends_on = [
-    google_cloud_run_v2_service.grc_toolkit_qa,
-    google_iap_client.cloudrun_client
+    google_project_service.enabled,
+    google_cloud_run_v2_service.grc_toolkit_qa
   ]
 }
 
