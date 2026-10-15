@@ -29,11 +29,6 @@ output "secret_manager_secret" {
   value       = google_secret_manager_secret.gemini_api_key.id
 }
 
-output "iap_settings_name" {
-  description = "IAP settings resource name"
-  value       = google_iap_settings.cloudrun_iap.name
-}
-
 output "budget_name" {
   description = "Billing budget name"
   value       = google_billing_budget.cloudrun_qa_budget.name

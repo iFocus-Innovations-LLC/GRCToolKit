@@ -201,18 +201,8 @@ resource "google_cloud_run_v2_service" "grc_toolkit_qa" {
   }
 }
 
-# IAP Settings for Cloud Run service (Google-managed OAuth)
-# This configures IAP directly on the Cloud Run service without deprecated brand/client resources
-resource "google_iap_settings" "cloudrun_iap" {
-  name = "projects/${data.google_project.project.number}/iap_web/cloud_run-${var.region}-${google_cloud_run_v2_service.grc_toolkit_qa.name}/services/${google_cloud_run_v2_service.grc_toolkit_qa.name}"
-
-  depends_on = [
-    google_project_service.enabled,
-    google_cloud_run_v2_service.grc_toolkit_qa
-  ]
-}
-
 # Grant IAP access to allowed users (Cloud Run-specific resource)
+# IAP is automatically enabled on Cloud Run when IAM bindings are configured
 resource "google_iap_web_cloud_run_service_iam_binding" "cloudrun_iap_users" {
   project                = var.project_id
   location               = var.region
@@ -221,7 +211,8 @@ resource "google_iap_web_cloud_run_service_iam_binding" "cloudrun_iap_users" {
   members                = var.iap_allowed_users
 
   depends_on = [
-    google_iap_settings.cloudrun_iap
+    google_project_service.enabled,
+    google_cloud_run_v2_service.grc_toolkit_qa
   ]
 }
 

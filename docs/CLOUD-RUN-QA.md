@@ -5,7 +5,7 @@ Cheap, IAM-gated QA/demo environment for GRCToolKit on Google Cloud Run. Access 
 ## Architecture
 
 - **Platform**: Google Cloud Run (serverless, scales to zero)
-- **Security**: Identity-Aware Proxy (IAP) with Google account allowlist
+- **Security**: Identity-Aware Proxy (IAP) with Google account allowlist (automatically enabled via IAM bindings)
 - **Secrets**: GCP Secret Manager (Gemini API key never reaches browser)
 - **Cost**: ~$0-5/month with the configured budget ($5 cap with alerts at 50%, 90%, 100%)
 - **Deployment**: Automated via GitHub Actions on push to `main`
