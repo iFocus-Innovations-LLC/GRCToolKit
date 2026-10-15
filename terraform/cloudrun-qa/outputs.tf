@@ -55,7 +55,10 @@ output "setup_instructions" {
     
     4. Push to main branch to trigger deployment
     
-    5. Access the service:
+    5. Enable IAP on the Cloud Run service (one-time, idempotent):
+       gcloud run services update grc-toolkit-qa --region=${var.region} --iap --project=${var.project_id}
+    
+    6. Access the service:
        ${google_cloud_run_v2_service.grc_toolkit_qa.uri}
        (Requires IAP authentication with allowed user/group)
     

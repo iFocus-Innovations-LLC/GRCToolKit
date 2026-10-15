@@ -5,7 +5,7 @@ Cheap, IAM-gated QA/demo environment for GRCToolKit on Google Cloud Run. Access 
 ## Architecture
 
 - **Platform**: Google Cloud Run (serverless, scales to zero)
-- **Security**: Identity-Aware Proxy (IAP) with Google account allowlist (automatically enabled via IAM bindings)
+- **Security**: Identity-Aware Proxy (IAP) with Google account allowlist
 - **Secrets**: GCP Secret Manager (Gemini API key never reaches browser)
 - **Cost**: ~$0-5/month with the configured budget ($5 cap with alerts at 50%, 90%, 100%)
 - **Deployment**: Automated via GitHub Actions on push to `main`
@@ -95,7 +95,27 @@ git push origin main
 
 Monitor the deployment in **Actions** tab. Once complete, the Cloud Run service URL is in the workflow logs.
 
-### 5. Access the Service
+### 5. Enable IAP on Cloud Run
+
+After the first deployment, enable IAP on the Cloud Run service (one-time step, idempotent):
+
+```bash
+# Set your project ID and region
+export GCP_PROJECT_ID="your-project-id"
+export REGION="us-central1"
+
+# Enable IAP on the Cloud Run service
+gcloud run services update grc-toolkit-qa \
+  --region=$REGION \
+  --iap \
+  --project=$GCP_PROJECT_ID
+```
+
+This enables IAP authentication on the service. Without this step, the service returns 403 to all requests.
+
+**Note**: The GitHub Actions workflow automatically runs this command on each deployment, so you typically only need to run it manually if you're setting up for the first time or if IAP was disabled.
+
+### 6. Access the Service
 
 The service URL is shown in `terraform output cloudrun_service_url` or the GitHub Actions logs.
 

@@ -208,11 +208,10 @@ jobs:
 
     - name: Enable IAP on Cloud Run service
       run: |
-        # IAP on Cloud Run requires the service to be already deployed
-        gcloud iap web enable \
-          --resource-type=cloud-run \
-          --service=grc-toolkit-qa \
+        # Enable IAP directly on the Cloud Run service
+        gcloud run services update grc-toolkit-qa \
           --region=$REGION \
+          --iap \
           --project=$PROJECT_ID
 
     - name: Output Cloud Run URL

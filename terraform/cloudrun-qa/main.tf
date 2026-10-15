@@ -202,7 +202,6 @@ resource "google_cloud_run_v2_service" "grc_toolkit_qa" {
 }
 
 # Grant IAP access to allowed users (Cloud Run-specific resource)
-# IAP is automatically enabled on Cloud Run when IAM bindings are configured
 resource "google_iap_web_cloud_run_service_iam_binding" "cloudrun_iap_users" {
   project                = var.project_id
   location               = var.region
