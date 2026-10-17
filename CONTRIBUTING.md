@@ -4,6 +4,8 @@ Thank you for your interest in contributing to **GRCToolKit.ai** — an open sou
 
 This project is maintained by [Shields Up LLC](https://github.com/iFocus-Innovations-LLC). We welcome bug reports, documentation improvements, and well-scoped feature contributions.
 
+The `iFocus-Innovations-LLC` GitHub org name comes from iFocus Innovations, a registered DBA (doing business as) of Shields Up LLC.
+
 ## Before you start
 
 1. Read the [README](README.md) for architecture and quick start.
