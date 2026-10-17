@@ -13,9 +13,12 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
+import time
 import urllib.error
 import urllib.request
 import uuid
+from collections import defaultdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
@@ -29,6 +32,141 @@ REPORT_PREFIX = "oscal-assessment-"
 REPORT_SUFFIX = ".pdf"
 MAX_REPORT_FILENAME = 128
 MAX_JSON_BODY_BYTES = 10_000_000
+
+# Rate limiting configuration
+# Format: "count/unit" where unit is 'sec', 'min', or 'hour'
+# Example: "6/min" = 6 requests per minute
+RATE_LIMIT_PLAYBOOK = os.environ.get("GRC_RUNNER_RATE_PLAYBOOK", "6/min")
+RATE_LIMIT_LLM = os.environ.get("GRC_RUNNER_RATE_LLM", "20/min")
+RATE_LIMIT_PDF = os.environ.get("GRC_RUNNER_RATE_PDF", "10/min")
+MAX_CONCURRENT_PLAYBOOKS = int(os.environ.get("GRC_RUNNER_MAX_CONCURRENT_PLAYBOOKS", "1"))
+
+# Trusted proxy configuration
+# When false (default): Use direct client address only (safest for public-facing deployments)
+# When true: Trust proxy headers from localhost for Cloud Run nginx → app server setup
+#   - Prefers X-Real-IP (set by nginx with $remote_addr, cannot be spoofed)
+#   - Falls back to rightmost N entries in X-Forwarded-For (proxy-appended, not client-controlled)
+#   - Trusted hop count: how many proxy hops to trust (default 1 = only the immediate proxy)
+TRUST_PROXY_HEADERS = os.environ.get("GRC_RUNNER_TRUST_PROXY", "false").lower() in ("true", "1", "yes")
+TRUST_PROXY_HOP_COUNT = int(os.environ.get("GRC_RUNNER_TRUST_PROXY_HOPS", "1"))
+
+
+def _parse_rate_limit(rate_str: str) -> tuple[int, float]:
+    """
+    Parse rate limit string "count/unit" into (capacity, window_seconds).
+    Example: "6/min" -> (6, 60.0)
+    """
+    parts = rate_str.strip().split("/")
+    if len(parts) != 2:
+        raise ValueError(f"Invalid rate format '{rate_str}', expected 'count/unit'")
+    
+    try:
+        count = int(parts[0])
+    except ValueError as exc:
+        raise ValueError(f"Invalid rate count in '{rate_str}'") from exc
+    
+    unit = parts[1].strip().lower()
+    if unit in ("sec", "second", "seconds"):
+        window = 1.0
+    elif unit in ("min", "minute", "minutes"):
+        window = 60.0
+    elif unit in ("hour", "hours", "hr"):
+        window = 3600.0
+    else:
+        raise ValueError(f"Invalid rate unit '{unit}', use sec/min/hour")
+    
+    return count, window
+
+
+class TokenBucketLimiter:
+    """
+    Thread-safe token bucket rate limiter keyed by client identifier.
+    Each key gets its own bucket with capacity and refill rate.
+    """
+    
+    def __init__(self, rate_str: str):
+        self.capacity, self.window = _parse_rate_limit(rate_str)
+        self.lock = threading.Lock()
+        # key -> (tokens, last_refill_time)
+        self.buckets: dict[str, tuple[float, float]] = {}
+    
+    def reset(self) -> None:
+        """Clear all buckets (for test isolation)."""
+        with self.lock:
+            self.buckets.clear()
+    
+    def _refill(self, tokens: float, last_refill: float, now: float) -> float:
+        """Calculate tokens after refill based on elapsed time."""
+        elapsed = now - last_refill
+        # Refill at rate of capacity/window tokens per second
+        refill_rate = self.capacity / self.window
+        new_tokens = min(self.capacity, tokens + (elapsed * refill_rate))
+        return new_tokens
+    
+    def check_limit(self, key: str) -> tuple[bool, float]:
+        """
+        Check if request is allowed for the given key.
+        Returns (allowed, retry_after_seconds).
+        """
+        now = time.time()
+        
+        with self.lock:
+            if key not in self.buckets:
+                # New key: start with full bucket minus one token
+                self.buckets[key] = (self.capacity - 1.0, now)
+                return True, 0.0
+            
+            tokens, last_refill = self.buckets[key]
+            tokens = self._refill(tokens, last_refill, now)
+            
+            if tokens >= 1.0:
+                # Allow request and consume token
+                self.buckets[key] = (tokens - 1.0, now)
+                return True, 0.0
+            else:
+                # Deny request, calculate retry-after
+                # Need to wait until we have at least 1 token
+                tokens_needed = 1.0 - tokens
+                refill_rate = self.capacity / self.window
+                retry_after = tokens_needed / refill_rate
+                # Update last_refill to now to track time accurately
+                self.buckets[key] = (tokens, now)
+                return False, retry_after
+
+
+class ConcurrencyTracker:
+    """Thread-safe tracker for concurrent operations with a maximum limit."""
+    
+    def __init__(self, max_concurrent: int):
+        self.max_concurrent = max_concurrent
+        self.lock = threading.Lock()
+        self.count = 0
+    
+    def reset(self) -> None:
+        """Reset counter to zero (for test isolation)."""
+        with self.lock:
+            self.count = 0
+    
+    def try_acquire(self) -> bool:
+        """Try to acquire a slot. Returns True if successful, False if at capacity."""
+        with self.lock:
+            if self.count < self.max_concurrent:
+                self.count += 1
+                return True
+            return False
+    
+    def release(self) -> None:
+        """Release a slot."""
+        with self.lock:
+            if self.count > 0:
+                self.count -= 1
+
+
+# Global rate limiters and concurrency tracker
+playbook_limiter = TokenBucketLimiter(RATE_LIMIT_PLAYBOOK)
+llm_limiter = TokenBucketLimiter(RATE_LIMIT_LLM)
+pdf_limiter = TokenBucketLimiter(RATE_LIMIT_PDF)
+playbook_concurrency = ConcurrencyTracker(MAX_CONCURRENT_PLAYBOOKS)
 
 
 class UpstreamHTTPError(RuntimeError):
@@ -508,6 +646,74 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
 
     def log_message(self, fmt: str, *args) -> None:
         sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
+    
+    def _get_client_ip(self) -> str:
+        """
+        Extract client IP for rate limiting.
+        
+        Security model:
+        - Default: Use direct client address (safest)
+        - When TRUST_PROXY_HEADERS=true and request is from localhost:
+          1. Prefer X-Real-IP (set by nginx with $remote_addr, cannot be spoofed)
+          2. Fall back to rightmost N entries in X-Forwarded-For (proxy-appended)
+             where N = TRUST_PROXY_HOP_COUNT (default 1 = immediate proxy only)
+        
+        Why rightmost, not leftmost:
+        - Client sends: X-Forwarded-For: fake-ip
+        - Nginx appends: X-Forwarded-For: fake-ip, real-client-ip
+        - We extract rightmost (real-client-ip), not leftmost (fake-ip)
+        """
+        client_addr = self.client_address[0]
+        
+        if not (TRUST_PROXY_HEADERS and client_addr in ("127.0.0.1", "::1", "localhost")):
+            return client_addr
+        
+        # Prefer X-Real-IP (nginx: proxy_set_header X-Real-IP $remote_addr)
+        real_ip = self.headers.get("X-Real-IP", "").strip()
+        if real_ip:
+            return real_ip
+        
+        # Fall back to X-Forwarded-For, extract rightmost N entries
+        forwarded = self.headers.get("X-Forwarded-For", "").strip()
+        if not forwarded:
+            return client_addr
+        
+        # Split and take rightmost hop_count entries
+        ips = [ip.strip() for ip in forwarded.split(",") if ip.strip()]
+        if not ips:
+            return client_addr
+        
+        # Extract the trusted proxy-appended IP (rightmost)
+        # For hop_count=1: take the last IP (immediate proxy's append)
+        # For hop_count=2: take second-to-last if available, else last
+        trusted_index = max(0, len(ips) - TRUST_PROXY_HOP_COUNT)
+        return ips[trusted_index]
+    
+    def _check_rate_limit(self, limiter: TokenBucketLimiter, endpoint: str) -> bool:
+        """
+        Check rate limit for current request.
+        Returns True if allowed, False if rate limited (already sent 429 response).
+        """
+        client_ip = self._get_client_ip()
+        allowed, retry_after = limiter.check_limit(client_ip)
+        
+        if not allowed:
+            retry_after_int = max(1, int(retry_after + 0.5))
+            self.send_response(429)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Retry-After", str(retry_after_int))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            body = json.dumps({
+                "error": "Rate limit exceeded",
+                "endpoint": endpoint,
+                "retryAfter": retry_after_int,
+            }).encode("utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return False
+        
+        return True
 
     def _send_json(self, status: int, payload: dict) -> None:
         body = json.dumps(payload).encode("utf-8")
@@ -570,6 +776,10 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
         self._send_bytes(200, body, "application/pdf", canonical_name)
 
     def _handle_oscal_pdf(self) -> None:
+        # Rate limit check
+        if not self._check_rate_limit(pdf_limiter, "/api/reports/oscal-pdf"):
+            return
+        
         try:
             data = self._read_json_body()
         except ValueError as exc:
@@ -638,6 +848,10 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
             self._handle_oscal_pdf()
             return
         if path == "/api/llm/analyze":
+            # Rate limit check
+            if not self._check_rate_limit(llm_limiter, "/api/llm/analyze"):
+                return
+            
             try:
                 data = self._read_json_body()
             except ValueError as exc:
@@ -697,14 +911,36 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
             self._send_json(404, {"error": "Not found"})
             return
 
+        # Rate limit check
+        if not self._check_rate_limit(playbook_limiter, "/api/ansible/playbook"):
+            return
+        
+        # Concurrency limit check
+        if not playbook_concurrency.try_acquire():
+            self.send_response(429)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Retry-After", "5")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            body = json.dumps({
+                "error": "Playbook execution limit reached",
+                "reason": "Maximum concurrent playbook runs in progress",
+                "retryAfter": 5,
+            }).encode("utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         try:
             data = self._read_json_body()
         except ValueError as exc:
+            playbook_concurrency.release()
             self._send_json(400, {"error": str(exc)})
             return
 
         playbook = data.get("playbook")
         if not playbook:
+            playbook_concurrency.release()
             self._send_json(400, {"error": "Missing playbook field"})
             return
 
@@ -719,6 +955,8 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
             self._send_json(503, {"error": str(exc)})
         except Exception as exc:  # noqa: BLE001 — surface runner failures to UI
             self._send_internal_error()
+        finally:
+            playbook_concurrency.release()
 
 
 def main() -> None:
