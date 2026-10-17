@@ -1,7 +1,7 @@
 # GRCToolKit — Brand Ladder and Editions
 
 **Last updated:** 2026-10-11  
-**Maintainer:** [iFocus Innovations LLC](https://github.com/iFocus-Innovations-LLC)
+**Maintainer:** [Shields Up LLC](https://github.com/iFocus-Innovations-LLC)
 
 ---
 

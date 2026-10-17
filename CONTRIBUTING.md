@@ -2,7 +2,9 @@
 
 Thank you for your interest in contributing to **GRCToolKit.ai** — an open source GRC platform with NIST SP 800-53 Rev. 5, OSCAL, PQC migration tooling, and Human-in-the-Loop (HITL) guardrails.
 
-This project is maintained by [iFocus Innovations LLC](https://github.com/iFocus-Innovations-LLC). We welcome bug reports, documentation improvements, and well-scoped feature contributions.
+This project is maintained by [Shields Up LLC](https://github.com/iFocus-Innovations-LLC). We welcome bug reports, documentation improvements, and well-scoped feature contributions.
+
+The `iFocus-Innovations-LLC` GitHub org name comes from iFocus Innovations, a registered DBA (doing business as) of Shields Up LLC.
 
 ## Before you start
 

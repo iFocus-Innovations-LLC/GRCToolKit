@@ -4,7 +4,7 @@
 **Status:** Development / QA Ready  
 **License:** MIT  
 **Repository:** [github.com/iFocus-Innovations-LLC/GRCToolKit](https://github.com/iFocus-Innovations-LLC/GRCToolKit)  
-**Maintainer:** [iFocus Innovations LLC](https://github.com/iFocus-Innovations-LLC)
+**Maintainer:** [Shields Up LLC](https://github.com/iFocus-Innovations-LLC)
 
 ---
 

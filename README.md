@@ -85,6 +85,8 @@ Detailed documentation for the GRCToolKit can be found in the `docs/` directory:
 - [Code of Conduct](CODE_OF_CONDUCT.md) — community standards (Contributor Covenant 2.1).
 - [Branch Protection](docs/BRANCH-PROTECTION.md) — merge gates, labels, and required CI checks.
 
+Maintained by Shields Up LLC. The `iFocus-Innovations-LLC` GitHub org name comes from iFocus Innovations, a registered DBA (doing business as) of Shields Up LLC.
+
 ## 🏗️ Architecture
 
 This application provides a modern UI for interacting with a GRC Compliance Engine. It uses the **Gemini API** (`generateContent` on **v1beta**) with a default model such as **`gemini-3.8-flash`** (supports structured JSON / `response_mime_type`). Avoid legacy IDs like **`gemini-pro`** for JSON mode. The engine integrates with Ansible playbooks for automated control validation and generates OSCAL-compliant documentation.

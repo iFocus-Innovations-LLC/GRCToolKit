@@ -2,7 +2,7 @@ apiVersion: v2
 name: grc-toolkit
 description: GRC Toolkit — portable Kubernetes deployment (any CSP)
 type: application
-version: 0.1.0
+version: 0.1.1
 appVersion: "2.1.0-dev"
 keywords:
   - grc
@@ -10,4 +10,4 @@ keywords:
   - nist
   - oscal
 maintainers:
-  - name: iFocus Innovations
+  - name: Shields Up LLC
