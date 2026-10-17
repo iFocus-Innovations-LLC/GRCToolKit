@@ -42,13 +42,13 @@ RATE_LIMIT_PDF = os.environ.get("GRC_RUNNER_RATE_PDF", "10/min")
 MAX_CONCURRENT_PLAYBOOKS = int(os.environ.get("GRC_RUNNER_MAX_CONCURRENT_PLAYBOOKS", "1"))
 
 # Trusted proxy configuration
-# When true, trust X-Forwarded-For from localhost (Cloud Run nginx → app server)
-TRUST_PROXY_HEADERS = os.environ.get("GRC_RUNNER_TRUST_PROXY", "true").lower() in ("true", "1", "yes")
-
-
-# Trusted proxy configuration
-# When true, trust X-Forwarded-For from localhost (Cloud Run nginx → app server)
-TRUST_PROXY_HEADERS = os.environ.get("GRC_RUNNER_TRUST_PROXY", "true").lower() in ("true", "1", "yes")
+# When false (default): Use direct client address only (safest for public-facing deployments)
+# When true: Trust proxy headers from localhost for Cloud Run nginx → app server setup
+#   - Prefers X-Real-IP (set by nginx with $remote_addr, cannot be spoofed)
+#   - Falls back to rightmost N entries in X-Forwarded-For (proxy-appended, not client-controlled)
+#   - Trusted hop count: how many proxy hops to trust (default 1 = only the immediate proxy)
+TRUST_PROXY_HEADERS = os.environ.get("GRC_RUNNER_TRUST_PROXY", "false").lower() in ("true", "1", "yes")
+TRUST_PROXY_HOP_COUNT = int(os.environ.get("GRC_RUNNER_TRUST_PROXY_HOPS", "1"))
 
 
 def _parse_rate_limit(rate_str: str) -> tuple[int, float]:
@@ -89,6 +89,11 @@ class TokenBucketLimiter:
         self.lock = threading.Lock()
         # key -> (tokens, last_refill_time)
         self.buckets: dict[str, tuple[float, float]] = {}
+    
+    def reset(self) -> None:
+        """Clear all buckets (for test isolation)."""
+        with self.lock:
+            self.buckets.clear()
     
     def _refill(self, tokens: float, last_refill: float, now: float) -> float:
         """Calculate tokens after refill based on elapsed time."""
@@ -136,6 +141,11 @@ class ConcurrencyTracker:
         self.max_concurrent = max_concurrent
         self.lock = threading.Lock()
         self.count = 0
+    
+    def reset(self) -> None:
+        """Reset counter to zero (for test isolation)."""
+        with self.lock:
+            self.count = 0
     
     def try_acquire(self) -> bool:
         """Try to acquire a slot. Returns True if successful, False if at capacity."""
@@ -640,19 +650,44 @@ class AnsibleRunnerHandler(BaseHTTPRequestHandler):
     def _get_client_ip(self) -> str:
         """
         Extract client IP for rate limiting.
-        When TRUST_PROXY_HEADERS is true and request comes from localhost,
-        trust X-Forwarded-For header (Cloud Run nginx → app server setup).
-        Otherwise use direct client address.
+        
+        Security model:
+        - Default: Use direct client address (safest)
+        - When TRUST_PROXY_HEADERS=true and request is from localhost:
+          1. Prefer X-Real-IP (set by nginx with $remote_addr, cannot be spoofed)
+          2. Fall back to rightmost N entries in X-Forwarded-For (proxy-appended)
+             where N = TRUST_PROXY_HOP_COUNT (default 1 = immediate proxy only)
+        
+        Why rightmost, not leftmost:
+        - Client sends: X-Forwarded-For: fake-ip
+        - Nginx appends: X-Forwarded-For: fake-ip, real-client-ip
+        - We extract rightmost (real-client-ip), not leftmost (fake-ip)
         """
         client_addr = self.client_address[0]
         
-        if TRUST_PROXY_HEADERS and client_addr in ("127.0.0.1", "::1", "localhost"):
-            forwarded = self.headers.get("X-Forwarded-For", "").strip()
-            if forwarded:
-                # X-Forwarded-For can be a comma-separated list; take the first (original client)
-                return forwarded.split(",")[0].strip()
+        if not (TRUST_PROXY_HEADERS and client_addr in ("127.0.0.1", "::1", "localhost")):
+            return client_addr
         
-        return client_addr
+        # Prefer X-Real-IP (nginx: proxy_set_header X-Real-IP $remote_addr)
+        real_ip = self.headers.get("X-Real-IP", "").strip()
+        if real_ip:
+            return real_ip
+        
+        # Fall back to X-Forwarded-For, extract rightmost N entries
+        forwarded = self.headers.get("X-Forwarded-For", "").strip()
+        if not forwarded:
+            return client_addr
+        
+        # Split and take rightmost hop_count entries
+        ips = [ip.strip() for ip in forwarded.split(",") if ip.strip()]
+        if not ips:
+            return client_addr
+        
+        # Extract the trusted proxy-appended IP (rightmost)
+        # For hop_count=1: take the last IP (immediate proxy's append)
+        # For hop_count=2: take second-to-last if available, else last
+        trusted_index = max(0, len(ips) - TRUST_PROXY_HOP_COUNT)
+        return ips[trusted_index]
     
     def _check_rate_limit(self, limiter: TokenBucketLimiter, endpoint: str) -> bool:
         """
