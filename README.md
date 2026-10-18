@@ -35,8 +35,11 @@ A comprehensive Governance, Risk, and Compliance (GRC) toolkit that provides AI-
    export GRC_RUNNER_RATE_LLM="30/min"
    export GRC_RUNNER_RATE_PDF="15/min"
    export GRC_RUNNER_MAX_CONCURRENT_PLAYBOOKS="2"
-   export GRC_RUNNER_TRUST_PROXY="true"  # Trust X-Forwarded-For from localhost (Cloud Run setup)
+   export GRC_RUNNER_TRUST_PROXY="false"  # Default: false (security-first)
    ```
+   
+   **Cloud Run deployments**: Set `GRC_RUNNER_TRUST_PROXY="true"` for proper per-client rate limiting. The nginx real_ip module extracts client IPs from Google Cloud Load Balancer's X-Forwarded-For headers, preventing spoofing while enabling per-visitor limits. See [terraform/cloudrun-qa/main.tf](terraform/cloudrun-qa/main.tf) for the production configuration.
+   
    Rate-limited requests return HTTP 429 with `Retry-After` header. See [QA Testing Guide](docs/QA-TESTING-GUIDE.md) for testing rate limits.
 
 3. **Docker** — build and run:

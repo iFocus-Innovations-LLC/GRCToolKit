@@ -354,6 +354,75 @@ class TestIPExtraction(unittest.TestCase):
         ip = handler._get_client_ip(mock_handler)
         # With hop_count=2, trust last 2 entries, extract the earlier one
         self.assertEqual(ip, "proxy1-ip")
+    
+    def test_cloud_run_nginx_realip_chain(self):
+        """
+        Test Cloud Run deployment chain: Google LB → nginx (real_ip) → app.
+        
+        Flow:
+        1. Client sends request to Cloud Run
+        2. Google LB appends client IP to X-Forwarded-For
+        3. Nginx real_ip module resolves $remote_addr to client IP
+        4. Nginx sets X-Real-IP to resolved $remote_addr (client IP)
+        5. App trusts X-Real-IP from localhost (nginx)
+        
+        This prevents spoofing because:
+        - Client cannot set X-Real-IP (nginx overwrites it)
+        - Nginx's real_ip only trusts Google LB IP ranges
+        - App only trusts X-Real-IP from localhost (nginx)
+        """
+        handler = ansible_runner_api.AnsibleRunnerHandler
+        
+        ansible_runner_api.TRUST_PROXY_HEADERS = True
+        
+        mock_handler = Mock(spec=handler)
+        mock_handler.client_address = ("127.0.0.1", 12345)  # nginx → app
+        # After nginx real_ip processing, X-Real-IP = actual client (not Google LB)
+        mock_handler.headers = {
+            "X-Real-IP": "203.0.113.42",  # nginx set this to resolved client IP
+            "X-Forwarded-For": "203.0.113.42, 35.191.1.1"  # client, Google LB
+        }
+        
+        ip = handler._get_client_ip(mock_handler)
+        # Should prefer X-Real-IP (set by nginx after real_ip resolution)
+        self.assertEqual(ip, "203.0.113.42")
+    
+    def test_cloud_run_spoofed_xff_blocked(self):
+        """
+        Test that spoofed X-Forwarded-For is blocked in Cloud Run setup.
+        
+        Attack attempt:
+        1. Attacker sends X-Forwarded-For: fake-ip
+        2. Google LB appends: X-Forwarded-For: fake-ip, real-client-ip, 35.191.x.x
+        3. Nginx real_ip trusts Google LB range, resolves to real-client-ip
+        4. Nginx sets X-Real-IP: real-client-ip (overwrites any fake value)
+        5. App trusts X-Real-IP from nginx
+        
+        Result: Attacker cannot bypass rate limit with fake IPs
+        """
+        handler = ansible_runner_api.AnsibleRunnerHandler
+        limiter = TokenBucketLimiter("2/sec")
+        
+        ansible_runner_api.TRUST_PROXY_HEADERS = True
+        
+        mock_handler = Mock(spec=handler)
+        mock_handler.client_address = ("127.0.0.1", 12345)
+        
+        # Attacker tries to rotate fake IPs, but nginx sets X-Real-IP to real client
+        for fake_ip in ["spoofed-1", "spoofed-2", "spoofed-3"]:
+            # After nginx real_ip, X-Real-IP = actual client (nginx resolved it)
+            mock_handler.headers = {
+                "X-Real-IP": "203.0.113.42",  # nginx resolved from trusted Google LB
+                "X-Forwarded-For": f"{fake_ip}, 203.0.113.42, 35.191.1.1"
+            }
+            client_ip = handler._get_client_ip(mock_handler)
+            # All map to same real IP (X-Real-IP from nginx)
+            self.assertEqual(client_ip, "203.0.113.42")
+            limiter.check_limit(client_ip)
+        
+        # Real IP should be rate limited (exhausted bucket)
+        allowed, _ = limiter.check_limit("203.0.113.42")
+        self.assertFalse(allowed, "Cloud Run setup prevents XFF spoofing via nginx real_ip")
 
 
 class TestRateLimitIntegration(unittest.TestCase):
