@@ -22,6 +22,26 @@ A comprehensive Governance, Risk, and Compliance (GRC) toolkit that provides AI-
    ./scripts/run-local.sh
    ```
    Open **http://127.0.0.1:8080/local-index.html** (override port: `PORT=8090 ./scripts/run-local.sh`).
+
+   **Rate limiting**: The local runner API (`scripts/ansible-runner-api.py`) includes rate limiting on execution endpoints to protect prepaid LLM budgets and prevent runaway automation. Defaults are:
+   - Playbooks: 6 requests/minute per client IP
+   - LLM analysis: 20 requests/minute per client IP  
+   - PDF reports: 10 requests/minute per client IP
+   - Max concurrent playbook runs: 1
+   
+   Override via environment variables:
+   ```bash
+   export GRC_RUNNER_RATE_PLAYBOOK="10/min"
+   export GRC_RUNNER_RATE_LLM="30/min"
+   export GRC_RUNNER_RATE_PDF="15/min"
+   export GRC_RUNNER_MAX_CONCURRENT_PLAYBOOKS="2"
+   export GRC_RUNNER_TRUST_PROXY="false"  # Default: false (security-first)
+   ```
+   
+   **Cloud Run deployments**: Set `GRC_RUNNER_TRUST_PROXY="true"` for proper per-client rate limiting. The nginx real_ip module extracts client IPs from Google Cloud Load Balancer's X-Forwarded-For headers, preventing spoofing while enabling per-visitor limits. See [terraform/cloudrun-qa/main.tf](terraform/cloudrun-qa/main.tf) for the production configuration.
+   
+   Rate-limited requests return HTTP 429 with `Retry-After` header. See [QA Testing Guide](docs/QA-TESTING-GUIDE.md) for testing rate limits.
+
 3. **Docker** — build and run:
    ```bash
    docker build -t grc-toolkit .

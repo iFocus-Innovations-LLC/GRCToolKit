@@ -171,6 +171,11 @@ resource "google_cloud_run_v2_service" "grc_toolkit_qa" {
       }
 
       env {
+        name  = "GRC_RUNNER_TRUST_PROXY"
+        value = "true"
+      }
+
+      env {
         name = "GEMINI_API_KEY"
         value_source {
           secret_key_ref {

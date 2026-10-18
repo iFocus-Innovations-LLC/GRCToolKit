@@ -20,6 +20,12 @@ SPEC.loader.exec_module(runner)
 
 class LLMProxyErrorTests(unittest.TestCase):
     def setUp(self):
+        # Reset global rate limiters to prevent test pollution
+        runner.playbook_limiter.reset()
+        runner.llm_limiter.reset()
+        runner.pdf_limiter.reset()
+        runner.playbook_concurrency.reset()
+        
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), runner.AnsibleRunnerHandler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()

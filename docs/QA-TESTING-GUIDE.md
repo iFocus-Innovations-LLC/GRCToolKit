@@ -366,7 +366,80 @@ curl http://EXTERNAL_IP/health
 
 ### 8. Integration Tests
 
-#### Test 8.1: Gemini API Integration
+#### Test 8.1: Runner API Rate Limiting
+**Objective**: Verify rate limiting protects against runaway automation
+
+**Prerequisites**: Local runner API running (`scripts/run-local.sh`)
+
+**Steps**:
+1. Check rate limit configuration:
+   ```bash
+   # View current defaults or overrides
+   curl http://127.0.0.1:8081/health
+   ```
+
+2. Test playbook rate limit (default: 6/min):
+   ```bash
+   # Should succeed for first 6 requests
+   for i in {1..7}; do
+     curl -X POST http://127.0.0.1:8081/api/ansible/playbook \
+       -H "Content-Type: application/json" \
+       -d '{"playbook":"ac-3-access-control"}' \
+       -w "\nStatus: %{http_code}\n" \
+       -s | grep -E "(Status|error|retryAfter)"
+     sleep 0.5
+   done
+   ```
+
+3. Test LLM rate limit (default: 20/min):
+   ```bash
+   # Exhaust limit with rapid requests
+   for i in {1..21}; do
+     curl -X POST http://127.0.0.1:8081/api/llm/analyze \
+       -H "Content-Type: application/json" \
+       -d '{"provider":"gemini","prompt":"test","apiKey":"'$GEMINI_API_KEY'"}' \
+       -w "\nRequest $i Status: %{http_code}\n" \
+       -s -o /dev/null
+   done
+   ```
+
+4. Test concurrent playbook limit (default: 1):
+   ```bash
+   # Start two playbooks simultaneously
+   curl -X POST http://127.0.0.1:8081/api/ansible/playbook \
+     -H "Content-Type: application/json" \
+     -d '{"playbook":"ac-3-access-control"}' &
+   sleep 0.1
+   curl -X POST http://127.0.0.1:8081/api/ansible/playbook \
+     -H "Content-Type: application/json" \
+     -d '{"playbook":"ac-6-least-privilege"}' \
+     -w "\nStatus: %{http_code}\n"
+   wait
+   ```
+
+5. Test /health endpoint is never rate limited:
+   ```bash
+   # Should always succeed
+   for i in {1..20}; do
+     curl -s http://127.0.0.1:8081/health | jq -r '.ok'
+   done
+   ```
+
+**Expected Results**:
+- ✅ First N requests succeed (within rate limit)
+- ✅ Excess requests return HTTP 429
+- ✅ 429 responses include `Retry-After` header (integer seconds)
+- ✅ 429 responses include JSON: `{"error":"Rate limit exceeded","endpoint":"...","retryAfter":N}`
+- ✅ Concurrent playbook beyond limit returns 429
+- ✅ `/health` endpoint always returns 200 (never throttled)
+- ✅ After waiting for refill window, requests succeed again
+
+**Status**: ⬜ Pass / ⬜ Fail  
+**Notes**: _________________
+
+---
+
+#### Test 8.2: Gemini API Integration
 **Objective**: Verify Gemini API integration works correctly
 
 **Steps**:
@@ -384,7 +457,7 @@ curl http://EXTERNAL_IP/health
 
 ---
 
-#### Test 8.2: Ansible Playbook Integration
+#### Test 8.3: Ansible Playbook Integration
 **Objective**: Verify Ansible playbook references work
 
 **Steps**:
@@ -405,7 +478,7 @@ curl http://EXTERNAL_IP/health
 ## Test Results Summary
 
 ### Overall Status
-- **Total Tests**: 20
+- **Total Tests**: 21
 - **Passed**: _____
 - **Failed**: _____
 - **Blocked**: _____
