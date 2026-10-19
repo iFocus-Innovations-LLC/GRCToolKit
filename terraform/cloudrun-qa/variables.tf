@@ -31,3 +31,15 @@ variable "budget_alert_emails" {
   type        = list(string)
   default     = null
 }
+
+variable "bootstrap_image" {
+  description = "Placeholder image for initial Terraform apply (replaced by CI after first push). Use a public image that exists."
+  type        = string
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
+}
+
+variable "deletion_protection" {
+  description = "Prevent accidental deletion of the Cloud Run service via Terraform. Set to false to allow `terraform destroy`."
+  type        = bool
+  default     = true
+}

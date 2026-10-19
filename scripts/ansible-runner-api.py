@@ -452,10 +452,22 @@ def analyze_llm(provider: str, prompt: str, model: str | None, api_key: str | No
     key = (api_key or "").strip()
     text = ""
     model_id = (model or "").strip()
+    
+    # Security: When running on Cloud Run with a server-managed key (no client apiKey),
+    # pin the model to the configured GEMINI_MODEL to prevent IAP-allowlisted viewers
+    # from using pricier models on the server key (G7 mitigation).
+    using_server_key = not key
 
     if provider == "gemini":
         key = key or env_key("GEMINI_API_KEY")
-        model_id = model_id or os.environ.get("GEMINI_MODEL", "gemini-3.8-flash").strip()
+        configured_model = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash").strip()
+        
+        # When using server key, ignore client-supplied model and pin to configured model
+        if using_server_key and model_id and model_id != configured_model:
+            model_id = configured_model
+        else:
+            model_id = model_id or configured_model
+        
         if not key:
             raise ValueError("Missing Gemini API key (body.apiKey or GEMINI_API_KEY)")
         url = (
@@ -480,7 +492,14 @@ def analyze_llm(provider: str, prompt: str, model: str | None, api_key: str | No
 
     elif provider == "openai":
         key = key or env_key("OPENAI_API_KEY")
-        model_id = model_id or os.environ.get("OPENAI_MODEL", "gpt-4o-mini").strip()
+        configured_model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini").strip()
+        
+        # When using server key, ignore client-supplied model and pin to configured model
+        if using_server_key and model_id and model_id != configured_model:
+            model_id = configured_model
+        else:
+            model_id = model_id or configured_model
+        
         if not key:
             raise ValueError("Missing OpenAI API key (body.apiKey or OPENAI_API_KEY)")
         result = _http_json(
@@ -503,9 +522,16 @@ def analyze_llm(provider: str, prompt: str, model: str | None, api_key: str | No
 
     elif provider == "anthropic":
         key = key or env_key("ANTHROPIC_API_KEY")
-        model_id = model_id or os.environ.get(
+        configured_model = os.environ.get(
             "ANTHROPIC_MODEL", "claude-sonnet-4-20250514"
         ).strip()
+        
+        # When using server key, ignore client-supplied model and pin to configured model
+        if using_server_key and model_id and model_id != configured_model:
+            model_id = configured_model
+        else:
+            model_id = model_id or configured_model
+        
         if not key:
             raise ValueError("Missing Anthropic API key (body.apiKey or ANTHROPIC_API_KEY)")
         result = _http_json(
@@ -528,7 +554,14 @@ def analyze_llm(provider: str, prompt: str, model: str | None, api_key: str | No
 
     elif provider == "groq":
         key = key or env_key("GROQ_API_KEY")
-        model_id = model_id or os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
+        configured_model = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
+        
+        # When using server key, ignore client-supplied model and pin to configured model
+        if using_server_key and model_id and model_id != configured_model:
+            model_id = configured_model
+        else:
+            model_id = model_id or configured_model
+        
         if not key:
             raise ValueError("Missing Groq API key (body.apiKey or GROQ_API_KEY)")
         result = _http_json(
@@ -554,7 +587,14 @@ def analyze_llm(provider: str, prompt: str, model: str | None, api_key: str | No
         key = key or env_key("VERTEX_API_KEY", "GEMINI_API_KEY")
         project = os.environ.get("VERTEX_PROJECT", "").strip()
         location = os.environ.get("VERTEX_LOCATION", "us-central1").strip()
-        model_id = model_id or os.environ.get("VERTEX_MODEL", "gemini-3.8-flash").strip()
+        configured_model = os.environ.get("VERTEX_MODEL", "gemini-3.8-flash").strip()
+        
+        # When using server key, ignore client-supplied model and pin to configured model
+        if using_server_key and model_id and model_id != configured_model:
+            model_id = configured_model
+        else:
+            model_id = model_id or configured_model
+        
         if not key:
             raise ValueError(
                 "Missing Vertex API key (body.apiKey, VERTEX_API_KEY, or GEMINI_API_KEY). "

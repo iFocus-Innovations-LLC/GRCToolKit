@@ -96,6 +96,18 @@ resource "google_project_iam_member" "deployer_artifact_reader" {
   member  = "serviceAccount:${google_service_account.cloudrun_deployer.email}"
 }
 
+# Grant deployer SA write access to push images to Artifact Registry
+resource "google_artifact_registry_repository_iam_member" "deployer_artifact_writer" {
+  project    = var.project_id
+  location   = var.region
+  repository = "grc-toolkit"
+  role       = "roles/artifactregistry.writer"
+  member     = "serviceAccount:${google_service_account.cloudrun_deployer.email}"
+  
+  # Assumes the repository exists (created by gcp-bootstrap)
+  depends_on = [google_project_service.enabled]
+}
+
 # Workload Identity Federation pool
 resource "google_iam_workload_identity_pool" "github" {
   project                   = var.project_id
@@ -150,8 +162,9 @@ resource "google_cloud_run_v2_service" "grc_toolkit_qa" {
     }
 
     containers {
-      # Placeholder image - will be replaced by GitHub Actions deploy
-      image = "${var.region}-docker.pkg.dev/${var.project_id}/grc-toolkit/grc-toolkit:latest"
+      # Placeholder image for first apply (replaced by CI after first push)
+      # Use a public image that exists to avoid referencing grc-toolkit:latest before CI creates it
+      image = var.bootstrap_image
 
       resources {
         limits = {
@@ -175,12 +188,14 @@ resource "google_cloud_run_v2_service" "grc_toolkit_qa" {
         value = "true"
       }
 
+      # Secret mounting requires a version to exist; CI adds it before first deploy
+      # Terraform only creates the empty secret shell
       env {
         name = "GEMINI_API_KEY"
         value_source {
           secret_key_ref {
             secret  = google_secret_manager_secret.gemini_api_key.secret_id
-            version = "latest"
+            version = "1"
           }
         }
       }
@@ -198,8 +213,15 @@ resource "google_cloud_run_v2_service" "grc_toolkit_qa" {
   ]
 
   lifecycle {
+    # Prevent accidental deletion
+    prevent_destroy = var.deletion_protection
+    
+    # Let CI own these fields; Terraform only sets initial values
     ignore_changes = [
       template[0].containers[0].image,
+      template[0].containers[0].env,
+      template[0].scaling,
+      template[0].timeout,
       client,
       client_version,
     ]
@@ -243,13 +265,15 @@ resource "google_billing_budget" "cloudrun_qa_budget" {
 
   budget_filter {
     projects = ["projects/${data.google_project.project.number}"]
-    services = ["services/F25E-7A61-5C95"] # Cloud Run service ID
+    # Make budget project-wide instead of scoping to Cloud Run service ID
+    # Gemini API spend lives on the key's project, not the Cloud Run service
+    # Cloud Run service IDs vary by project and are hard to discover
   }
 
   amount {
     specified_amount {
       currency_code = "USD"
-      units         = "5"
+      units         = "20"
     }
   }
 

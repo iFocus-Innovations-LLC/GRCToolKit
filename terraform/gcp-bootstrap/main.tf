@@ -6,9 +6,9 @@ provider "google" {
 locals {
   apis = var.enable_apis ? toset([
     "artifactregistry.googleapis.com",
-    "containerregistry.googleapis.com",
     "container.googleapis.com",
     "secretmanager.googleapis.com",
+    # containerregistry.googleapis.com is retired; omit unless needed for legacy GCR
   ]) : toset([])
 }
 

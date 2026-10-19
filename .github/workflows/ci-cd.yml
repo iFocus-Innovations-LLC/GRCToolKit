@@ -5,6 +5,7 @@ on:
     branches: [ main, develop, qa ]
   pull_request:
     branches: [ main, develop, qa ]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -164,14 +165,14 @@ jobs:
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
-        platforms: linux/amd64,linux/arm64
+        platforms: linux/amd64
 
   deploy-cloudrun:
     needs: build-and-push
     runs-on: ubuntu-24.04
     # Cloud Run QA environment: IAM-gated, cheap demo deploy. Opt in with repo variable ENABLE_CLOUD_RUN_DEPLOY=true
     if: |
-      github.ref == 'refs/heads/main' &&
+      (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') &&
       vars.ENABLE_CLOUD_RUN_DEPLOY == 'true'
     
     steps:
@@ -204,7 +205,7 @@ jobs:
           --timeout=60s
           --service-account=cloudrun-runtime-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
           --update-secrets=GEMINI_API_KEY=gemini-api-key:latest
-          --set-env-vars=LLM_PROVIDER=gemini,GEMINI_MODEL=gemini-3.8-flash
+          --update-env-vars=LLM_PROVIDER=gemini,GEMINI_MODEL=gemini-3.8-flash
 
     - name: Enable IAP on Cloud Run service
       run: |
