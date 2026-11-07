@@ -21,12 +21,11 @@ GRCToolKit enforces a multi-layered security gate that blocks pull request merge
 **Blocking threshold:**
 - **HIGH**: Security severity ≥ 7.0/10
 - **CRITICAL**: Security severity ≥ 9.0/10
-- **Error-level rules**: Any rule with severity "error"
 
 **Configuration:** `.github/workflows/codeql.yml`
 
 **How it blocks:**
-The CodeQL workflow fails the CI check when HIGH/CRITICAL alerts are found in pull requests, preventing merge until issues are resolved.
+CodeQL uploads SARIF results to GitHub Security. Blocking is enforced via GitHub's native 'Require code scanning results' ruleset rule (Settings → Rules → Rulesets). Set the severity threshold to 'High or higher' to block PRs with HIGH/CRITICAL findings. This native enforcement correctly handles alert dismissals and provides consistent merge blocking across all code scanning tools.
 
 ### 2. Trivy (Container & Infrastructure Scanning)
 
@@ -35,22 +34,21 @@ The CodeQL workflow fails the CI check when HIGH/CRITICAL alerts are found in pu
 - On pushes to `main` (via `ci-cd.yml`)
 
 **What it scans:**
-- Container images for known vulnerabilities
-- Kubernetes manifests for misconfigurations
-- Infrastructure-as-Code (Terraform, Helm charts)
-- Secrets in code
+- Container images for known vulnerabilities (OS packages, language dependencies)
+- Note: Trivy scans the Docker image only. It does not scan Kubernetes manifests, Terraform, or Helm charts in this configuration.
 
 **Blocking threshold:**
 - **HIGH**: CVSS ≥ 7.0
 - **CRITICAL**: CVSS ≥ 9.0
+- With `ignore-unfixed: true`, only vulnerabilities with available patches block merges
 
 **Configuration:**
-- `.github/workflows/ci-cd.yml` (lines 91-99)
-- `.github/workflows/pr-test.yml` (lines 88-96)
+- `.github/workflows/ci-cd.yml` (Security scan with Trivy step)
+- `.github/workflows/pr-test.yml` (Security scan with Trivy step)
 
 **Key settings:**
 ```yaml
-uses: aquasecurity/trivy-action@0.29.0
+uses: aquasecurity/trivy-action@0.35.0
 with:
   severity: 'HIGH,CRITICAL'
   ignore-unfixed: true      # Ignore issues without available patches
@@ -92,9 +90,10 @@ The Trivy step fails with exit code 1 when HIGH/CRITICAL vulnerabilities are det
 A pull request can only be merged when:
 
 1. ✅ All required CI status checks pass:
-   - `test` (from pr-test.yml or ci-cd.yml)
-   - CodeQL analysis completes with no HIGH/CRITICAL alerts
-   - Trivy scan completes with no HIGH/CRITICAL vulnerabilities
+   - `pr-test` (from pr-test.yml) or `ci-test` (from ci-cd.yml)
+   - CodeQL analysis completes: `Analyze (javascript-typescript)`, `Analyze (python)`
+   - GitHub's code scanning ruleset enforces no HIGH/CRITICAL unresolved alerts
+   - Trivy scan completes with no HIGH/CRITICAL unfixed vulnerabilities
    - Docker Scout passes (if enabled)
 
 2. ✅ At least 1 human approval from a code owner
@@ -152,16 +151,17 @@ The CI will re-run automatically. If the fix is correct, the alert will be resol
 
 Only dismiss an alert if you're confident it's a false positive or won't-fix:
 
-1. Go to the alert in GitHub Security tab
+1. Go to the alert in **Security → Code scanning alerts** tab
 2. Click **Dismiss alert**
 3. Select reason:
    - **False positive** — The code is safe; the scanner misunderstood the context
    - **Won't fix** — The risk is accepted (document why in the PR)
    - **Used in tests** — Test code only, not in production
-4. **Required:** Add a detailed comment in your PR explaining:
+4. **Required:** Add a detailed comment explaining:
    - Why this is safe
    - What protections exist
    - Who approved the dismissal
+5. After dismissal, the GitHub code scanning ruleset will allow the PR to merge (the alert is now in a non-blocking state)
 
 **Who can dismiss alerts:**
 - Repository maintainers with write access
@@ -205,12 +205,12 @@ trivy image --severity HIGH,CRITICAL --exit-code 1 grc-toolkit:test
 
 ## Weekly Alert Review Cadence
 
-**When:** Every Saturday at 9:00 AM America/Phoenix (4:00 PM UTC)
+**When:** Every Saturday at 9:00 AM America/Phoenix (currently ~5:00 PM UTC during standard time)
 
-**Who:** Kevin (security lead) + automated weekly review
+**Who:** Kevin (security lead) + automated weekly CodeQL scan
 
 **Process:**
-1. **Automated scan:** Weekly CodeQL scan runs Saturday morning (4:00 PM UTC / 9:00 AM America/Phoenix)
+1. **Automated scan:** Weekly CodeQL scan runs Saturday morning (currently ~5:00 PM UTC during standard time / 9:00 AM America/Phoenix)
 2. **Review:** Kevin reviews all open HIGH/CRITICAL alerts in the Security tab
 3. **Triage new alerts:**
    - Assign to owners
@@ -236,11 +236,11 @@ Most security gate configuration is in code (workflows), but some settings requi
 
 **GitHub Default Setup (must be DISABLED after adding advanced workflow):**
 
-⚠️ **Action required:** Once the advanced CodeQL workflow (`.github/workflows/codeql.yml`) is merged, disable GitHub's default setup to prevent upload conflicts:
+⚠️ **Action required (admin only):** Once the advanced CodeQL workflow (`.github/workflows/codeql.yml`) is merged, disable GitHub's default setup to prevent upload conflicts:
 
-1. Go to **Settings → Code security and analysis**
+1. Go to **Settings → Security and quality → Advanced Security**
 2. Under **Code scanning**, find "CodeQL analysis"
-3. If "Default" is enabled, click **Disable**
+3. If "Default" is enabled, click the **⋮** menu and select **Disable CodeQL**
 
 The advanced workflow now handles all CodeQL scanning and uploads.
 
@@ -258,16 +258,22 @@ Create a ruleset named `main-security-gate`:
 - ✅ Require a pull request before merging
   - Required approvals: 1
   - Dismiss stale reviews: enabled
-  - Require review from code owners: enabled
 - ✅ Require status checks to pass before merging
   - ✅ Require branches to be up to date before merging
   - **Required checks:**
-    - `test` (from ci-cd.yml / pr-test.yml)
+    - `ci-test` (from ci-cd.yml on push to branches)
+    - `pr-test` (from pr-test.yml on pull requests)
     - `Analyze (javascript-typescript)` (from codeql.yml)
     - `Analyze (python)` (from codeql.yml)
+- ✅ **Require code scanning results** (GitHub native enforcement):
+  - Tools: All tools
+  - Security alerts: High or higher
+  - This blocks PRs with unresolved HIGH/CRITICAL CodeQL alerts
 - ✅ Require conversation resolution before merging
 - ✅ Block force pushes
 - ✅ Restrict deletions
+
+**Note:** Do NOT enable "Require review from code owners" in a solo-maintainer repository (you cannot self-approve).
 
 **Alternative: Branch Protection Rules (legacy)**
 
@@ -281,12 +287,14 @@ Branch name pattern: `main` (repeat for `dev`, `qa`)
 - ✅ Require status checks to pass before merging
   - ✅ Require branches to be up to date
   - **Status checks:**
-    - `test`
+    - `ci-test` (or `pr-test` depending on which applies)
     - `Analyze (javascript-typescript)`
     - `Analyze (python)`
 - ✅ Require conversation resolution
 - ✅ Include administrators (recommended)
 - ✅ Restrict who can push (maintainers only)
+
+**Note:** Legacy branch protection does not support GitHub's native 'Require code scanning results' rule. Consider using rulesets for full code scanning enforcement.
 
 #### 3. Code Scanning Alert Dismissal Permissions
 
@@ -313,11 +321,12 @@ Under "Alert dismissal permissions":
 
 If you don't have admin access to the repository, provide this checklist to your administrator:
 
-- [ ] Merge the security gate PR (this PR)
-- [ ] Disable GitHub default CodeQL setup (Settings → Code security → CodeQL analysis → Disable)
+- [ ] Merge the security gate fix PR
+- [ ] Disable GitHub default CodeQL setup (Settings → Security and quality → Advanced Security → CodeQL analysis → ⋮ menu → Disable CodeQL)
 - [ ] Create branch protection ruleset `main-security-gate` targeting `main`, `dev`, `qa`
-  - [ ] Require pull request reviews (1 approval, code owners)
-  - [ ] Require status checks: `test`, `Analyze (javascript-typescript)`, `Analyze (python)`
+  - [ ] Require pull request reviews (1 approval; do NOT enable code owners requirement in solo-maintainer repo)
+  - [ ] Require status checks: `ci-test`, `pr-test`, `Analyze (javascript-typescript)`, `Analyze (python)`
+  - [ ] Require code scanning results: High or higher (native GitHub enforcement)
   - [ ] Require branches up to date
   - [ ] Block force pushes
 - [ ] (Optional) Set `DOCKER_SCOUT_TOKEN` secret to enable Docker Scout mandatory scanning

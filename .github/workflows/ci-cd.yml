@@ -19,7 +19,7 @@ env:
   REGION: us-central1
 
 jobs:
-  test:
+  ci-test:
     runs-on: ubuntu-24.04
     env:
       DOCKER_SCOUT_TOKEN: ${{ secrets.DOCKER_SCOUT_TOKEN }}
@@ -120,7 +120,7 @@ jobs:
         sarif_file: 'docker-scout.sarif'
 
   build-and-push:
-    needs: test
+    needs: ci-test
     runs-on: ubuntu-24.04
     # Requires WIF + GCP secrets (see docs/BRANCH-PROTECTION.md). Opt in with repo variable ENABLE_GCP_GAR_DEPLOY=true.
     if: |
