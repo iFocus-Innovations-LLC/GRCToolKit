@@ -11,7 +11,7 @@ GRCToolKit enforces a multi-layered security gate that blocks pull request merge
 **When it runs:**
 - On every pull request to `main`, `dev`, or `qa` branches
 - On pushes to `main`, `dev`, or `qa` branches
-- Weekly scheduled scan (Mondays at 6:00 AM UTC)
+- Weekly scheduled scan (Saturdays at 4:00 PM UTC / 9:00 AM America/Phoenix)
 
 **What it scans:**
 - JavaScript/TypeScript code
@@ -205,25 +205,26 @@ trivy image --severity HIGH,CRITICAL --exit-code 1 grc-toolkit:test
 
 ## Weekly Alert Review Cadence
 
-**When:** Every Monday at 10:00 AM (team meeting)
+**When:** Every Saturday at 9:00 AM America/Phoenix (4:00 PM UTC)
 
-**Who:** Security lead + repository maintainers
+**Who:** Kevin (security lead) + automated weekly review
 
-**Agenda:**
-1. Review all open HIGH/CRITICAL alerts in the Security tab
-2. Triage new alerts:
+**Process:**
+1. **Automated scan:** Weekly CodeQL scan runs Saturday morning (4:00 PM UTC / 9:00 AM America/Phoenix)
+2. **Review:** Kevin reviews all open HIGH/CRITICAL alerts in the Security tab
+3. **Triage new alerts:**
    - Assign to owners
    - Set target resolution date
    - Document risk acceptance if needed
-3. Review dismissed alerts from the past week:
+4. **Review dismissed alerts from the past week:**
    - Verify justifications are sound
    - Re-open if needed
-4. Update the security dashboard
-5. Escalate unresolved critical alerts to management
+5. **Update the security dashboard**
+6. **Escalate unresolved critical alerts to management**
 
 **Alert aging policy:**
 - CRITICAL: Must be resolved within 7 days or risk-accepted by management
-- HIGH: Must be resolved within 30 days or risk-accepted by security lead
+- HIGH: Must be resolved within 30 days or risk-accepted by Kevin (security lead)
 
 ## Repository Configuration
 
@@ -321,7 +322,7 @@ If you don't have admin access to the repository, provide this checklist to your
   - [ ] Block force pushes
 - [ ] (Optional) Set `DOCKER_SCOUT_TOKEN` secret to enable Docker Scout mandatory scanning
 - [ ] Verify: Open a test PR, confirm security checks appear and are required
-- [ ] Schedule weekly security review meeting (Mondays 10:00 AM)
+- [ ] Schedule weekly security review (Saturdays 9:00 AM America/Phoenix, owned by Kevin)
 
 ## Testing the Security Gate
 

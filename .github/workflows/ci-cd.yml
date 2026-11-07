@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop, qa ]
+    branches: [ main, dev, qa ]
   pull_request:
-    branches: [ main, develop, qa ]
+    branches: [ main, dev, qa ]
 
 permissions:
   contents: read
@@ -89,7 +89,7 @@ jobs:
         fi
 
     - name: Security scan with Trivy
-      uses: aquasecurity/trivy-action@0.29.0
+      uses: aquasecurity/trivy-action@v0.29.0
       with:
         image-ref: 'grc-toolkit:test'
         format: 'sarif'
@@ -124,7 +124,7 @@ jobs:
     runs-on: ubuntu-24.04
     # Requires WIF + GCP secrets (see docs/BRANCH-PROTECTION.md). Opt in with repo variable ENABLE_GCP_GAR_DEPLOY=true.
     if: |
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') &&
       vars.ENABLE_GCP_GAR_DEPLOY == 'true'
     
     steps:
@@ -228,7 +228,7 @@ jobs:
     runs-on: ubuntu-24.04
     # GKE staging deploy - gated off by default, enable with repo variable ENABLE_GKE_DEPLOY=true
     if: |
-      github.ref == 'refs/heads/develop' &&
+      github.ref == 'refs/heads/dev' &&
       vars.ENABLE_GKE_DEPLOY == 'true'
     environment: staging
     
@@ -252,7 +252,7 @@ jobs:
     - name: Deploy to staging
       run: |
         # Update image tag in deployment
-        sed -i "s|gcr.io/PROJECT_ID/grc-toolkit:latest|$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$SERVICE:develop|g" k8s/deployment.yaml
+        sed -i "s|gcr.io/PROJECT_ID/grc-toolkit:latest|$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$SERVICE:dev|g" k8s/deployment.yaml
         
         # Apply Kubernetes manifests
         kubectl apply -f k8s/namespace.yaml
