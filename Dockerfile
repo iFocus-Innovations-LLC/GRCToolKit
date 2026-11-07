@@ -3,12 +3,14 @@
 FROM nginx:1.31.8-alpine-slim@sha256:9c68ad4f28e7dee4b9484a7859bf451da39ef661bcd038ef62e87593fcd91c86
 
 # Install Python 3 for the LLM proxy server (keeps API keys server-side)
-# Bootstrap pip within venv to avoid vulnerable system py3-* packages from Alpine
-# Immediately upgrade ensurepip's bundled packages to fix CVEs before app install
-RUN apk add --no-cache python3 && \
+# Use get-pip.py for clean bootstrap (no old METADATA from ensurepip bundled packages)
+# This prevents Trivy from finding vulnerable setuptools/wheel METADATA from ensurepip
+RUN apk add --no-cache python3 wget && \
     python3 -m venv /opt/venv && \
-    /opt/venv/bin/python -m ensurepip --upgrade && \
-    /opt/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    wget -q https://bootstrap.pypa.io/get-pip.py && \
+    /opt/venv/bin/python get-pip.py && \
+    rm get-pip.py && \
+    apk del wget && \
     rm -f /etc/nginx/conf.d/default.conf
 
 # Copy our nginx config (listens on 8080, /health, proxies /api/llm/ to Python server on 8081)
