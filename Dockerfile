@@ -4,11 +4,11 @@ FROM nginx:1.31.8-alpine-slim@sha256:9c68ad4f28e7dee4b9484a7859bf451da39ef661bcd
 
 # Install Python 3 for the LLM proxy server (keeps API keys server-side)
 # Bootstrap pip within venv to avoid vulnerable system py3-* packages from Alpine
-# This prevents CVEs in system-level setuptools, msgpack, urllib3, wheel, jaraco.context
+# Immediately upgrade ensurepip's bundled packages to fix CVEs before app install
 RUN apk add --no-cache python3 && \
     python3 -m venv /opt/venv && \
     /opt/venv/bin/python -m ensurepip --upgrade && \
-    /opt/venv/bin/pip install --no-cache-dir --upgrade pip && \
+    /opt/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel && \
     rm -f /etc/nginx/conf.d/default.conf
 
 # Copy our nginx config (listens on 8080, /health, proxies /api/llm/ to Python server on 8081)
