@@ -88,6 +88,8 @@ Detailed documentation for the GRCToolKit can be found in the `docs/` directory:
   - [GCP Deployment Checklist](docs/GCP-DEPLOYMENT-CHECKLIST.md) - Specific steps for Google Cloud Platform.
   - [Secrets Setup](docs/SECRETS-SETUP.md) - API keys and secrets (GitHub Actions, GCP Secret Manager, local).
   - [Security Policy](docs/SECURITY.md) - Security practices and reporting.
+  - [Security Gate](docs/SECURITY-GATE.md) - Automated security scanning and merge blocking (CodeQL, Trivy, Docker Scout).
+  - [Branch Protection](docs/BRANCH-PROTECTION.md) - Branch protection rules and merge requirements.
   - [Zero-Trust Agentic AI](ai-agent/openclaw/SOUL.md) - Our shift to autonomous, secret-less compliance auditing.
 
 - **Testing & QA**:

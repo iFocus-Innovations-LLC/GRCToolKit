@@ -4,6 +4,7 @@
 # Human-in-the-Loop (HITL) gate that mirrors HITL guardrails in the application.
 #
 # Branching model and QA/Demo freeze: [RELEASE-BRANCHING.md](RELEASE-BRANCHING.md)
+# Security scanning and merge gates: [SECURITY-GATE.md](SECURITY-GATE.md)
 #
 # Apply at: GitHub → Settings → Branches → Add branch ruleset
 # ─────────────────────────────────────────────────────────────────────────────
@@ -24,7 +25,7 @@
 | Dismiss stale reviews on new commits | Enabled | Re-review after changes |
 | Require review from Code Owners | Enabled | Enforces CODEOWNERS file |
 | Require status checks to pass | Enabled | CI must be green |
-| Required status checks | `test` (from ci-cd.yml / pr-test.yml) | Hardening, pins, Trivy, MVP tests — **no LLM peer-review job in MVP** |
+| Required status checks | `test`, `Analyze (javascript-typescript)`, `Analyze (python)` | CI, CodeQL security scanning, Trivy container scanning — **no LLM peer-review job in MVP** |
 | Require branches to be up to date | Enabled | No stale merges |
 | Require conversation resolution | Enabled | All PR comments must be resolved |
 | Restrict who can push to matching branches | Enabled → `@iFocus-Innovations-LLC` only | Only maintainer can merge |
@@ -53,7 +54,7 @@
 | Required approvals | **1** | At least one human review |
 | Require review from Code Owners | Enabled | CODEOWNERS applies here too |
 | Require status checks to pass | Enabled | |
-| Required status checks | `test` (from ci-cd.yml / pr-test.yml) | Same scanners as main; no Anthropic CI |
+| Required status checks | `test`, `Analyze (javascript-typescript)`, `Analyze (python)` | Same scanners as main; no Anthropic CI |
 | Require branches to be up to date | Enabled | |
 | Allow force pushes | Disabled | |
 | Allow deletions | Disabled | |
