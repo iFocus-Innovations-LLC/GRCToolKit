@@ -1,15 +1,12 @@
 # Local MVP demo dependencies (Mac mini / laptop QA — not required for production)
-# Pin to latest versions to resolve HIGH severity CVEs found by Trivy:
-# - CVE-2026-114613: msgpack 1.1.2 -> 1.2.3 (DoS via memory leak)
-# - CVE-2025-47273: setuptools 70.3.0 -> 78.1.1 (Path traversal)
-# - CVE-2026-97687: urllib3 2.7.0 -> 2.8.0 (HTTPS proxy TLS interception)
-# - CVE-2026-97689: urllib3 2.7.0 -> 2.8.0 (DoS via unbounded memory)
-# - CVE-2026-23949: jaraco.context 5.3.0 -> 6.1.0 (Path traversal via malicious tar)
-# - CVE-2026-24049: wheel 0.45.1 -> 0.46.2 (Privilege escalation)
+# Pin to resolve HIGH severity CVEs found by Trivy (confirmed from scan output):
+# - CVE-2026-114613: msgpack < 1.2.3 (DoS via memory leak)
+# - CVE-2026-97687, CVE-2026-97689: urllib3 < 2.8.0 (HTTPS proxy TLS + DoS)
+# Use >= floors to avoid downgrades from what multi-stage build produces:
 
 fpdf2==2.9.0
-jaraco.context==6.1.0
+jaraco.context>=6.1.0
 msgpack==1.2.3
-setuptools==78.1.1
+setuptools>=84.2.1
 urllib3==2.8.0
-wheel==0.46.2
+wheel>=0.48.0
