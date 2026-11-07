@@ -85,15 +85,6 @@ jobs:
           echo "exists=false" >> "$GITHUB_OUTPUT"
         fi
 
-    - name: Find vulnerable file paths in image
-      run: |
-        echo "=== Searching for vulnerable packages in image ==="
-        docker run --rm grc-toolkit:pr-test find /opt/venv -name "*jaraco.context*" -o -name "*setuptools*" -o -name "*wheel*" 2>/dev/null | grep -E "dist-info|_vendor|_bundled|\.whl" | head -50 || true
-        echo ""
-        echo "=== Checking pip _vendor directory ==="
-        docker run --rm grc-toolkit:pr-test ls -la /opt/venv/lib/python*/site-packages/pip/_vendor/ 2>/dev/null | head -20 || true
-      continue-on-error: true
-
     - name: Security scan with Trivy
       uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
       with:
