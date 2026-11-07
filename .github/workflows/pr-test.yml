@@ -107,6 +107,14 @@ jobs:
       continue-on-error: true
       id: trivy_scan
 
+    - name: Show SARIF vulnerabilities
+      if: always()
+      run: |
+        if [ -f trivy-results.sarif ]; then
+          echo "=== HIGH/CRITICAL vulnerabilities in SARIF ==="
+          jq '.runs[].results[] | select(.level == "error" or .level == "warning") | {ruleId: .ruleId, level: .level, message: .message.text, locations: [.locations[].physicalLocation.artifactLocation.uri]}' trivy-results.sarif || echo "No results"
+        fi
+
     - name: Verify Trivy found no HIGH/CRITICAL vulnerabilities
       run: |
         if [ -f trivy-results.sarif ]; then
