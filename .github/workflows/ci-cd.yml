@@ -97,6 +97,7 @@ jobs:
         severity: 'HIGH,CRITICAL'
         scanners: 'vuln'
         ignore-unfixed: true
+        limit-severities-for-sarif: true
         exit-code: '1'
 
     - name: Check Trivy results exist
