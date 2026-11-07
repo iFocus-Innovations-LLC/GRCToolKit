@@ -1,2 +1,3 @@
 # Local MVP demo dependencies (Mac mini / laptop QA — not required for production)
-fpdf2>=2.8.0
+# Pin to latest version to avoid known vulnerabilities
+fpdf2==2.9.0

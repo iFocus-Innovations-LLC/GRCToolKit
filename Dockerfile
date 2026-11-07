@@ -1,6 +1,6 @@
 # GRC Toolkit - nginx + Python LLM proxy for secure server-side API key handling
 # Zero-trust: pinned multi-arch index digest, non-root user, slim Alpine 3.23 base (fewer pkgs/CVEs vs full alpine + curl install)
-FROM nginx:1.30.0-alpine-slim@sha256:2fb5d772cea6ef1a8dab525df1b9485289eee167d26af9613fce27a12c060caa
+FROM nginx:1.31.8-alpine-slim@sha256:9c68ad4f28e7dee4b9484a7859bf451da39ef661bcd038ef62e87593fcd91c86
 
 # Install Python 3 for the LLM proxy server (keeps API keys server-side)
 # Use venv to avoid PEP 668 externally-managed-environment error
