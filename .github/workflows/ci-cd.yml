@@ -19,7 +19,7 @@ env:
   REGION: us-central1
 
 jobs:
-  test:
+  ci-test:
     runs-on: ubuntu-24.04
     env:
       DOCKER_SCOUT_TOKEN: ${{ secrets.DOCKER_SCOUT_TOKEN }}
@@ -89,13 +89,15 @@ jobs:
         fi
 
     - name: Security scan with Trivy
-      uses: aquasecurity/trivy-action@0.35.0
+      uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
       with:
         image-ref: 'grc-toolkit:test'
         format: 'sarif'
         output: 'trivy-results.sarif'
         severity: 'HIGH,CRITICAL'
+        scanners: 'vuln'
         ignore-unfixed: true
+        limit-severities-for-sarif: true
         exit-code: '1'
 
     - name: Check Trivy results exist
@@ -120,7 +122,7 @@ jobs:
         sarif_file: 'docker-scout.sarif'
 
   build-and-push:
-    needs: test
+    needs: ci-test
     runs-on: ubuntu-24.04
     # Requires WIF + GCP secrets (see docs/BRANCH-PROTECTION.md). Opt in with repo variable ENABLE_GCP_GAR_DEPLOY=true.
     if: |

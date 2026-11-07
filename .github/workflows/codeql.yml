@@ -46,56 +46,12 @@ jobs:
         output: sarif-results
         upload: true
 
-    - name: Filter SARIF for HIGH/CRITICAL on PRs
-      if: github.event_name == 'pull_request'
-      run: |
-        echo "Checking for HIGH or CRITICAL severity alerts..."
-        
-        for sarif_file in sarif-results/*.sarif; do
-          if [ -f "$sarif_file" ]; then
-            echo "Analyzing $sarif_file"
-            
-            # Extract HIGH and CRITICAL issues using jq
-            high_critical=$(jq -r '
-              [.runs[].results[]? | 
-               select(.properties."security-severity"? != null) | 
-               select((.properties."security-severity" | tonumber) >= 7.0)]
-              | length
-            ' "$sarif_file" || echo "0")
-            
-            # Also check for error-level rules (severity: error)
-            error_level=$(jq -r '
-              [.runs[].results[]? | 
-               select(.level? == "error")]
-              | length
-            ' "$sarif_file" || echo "0")
-            
-            echo "Found $high_critical HIGH/CRITICAL severity alerts"
-            echo "Found $error_level error-level alerts"
-            
-            total=$((high_critical + error_level))
-            
-            if [ "$total" -gt 0 ]; then
-              echo "❌ BLOCKING: Found $total HIGH/CRITICAL security alerts in $sarif_file"
-              echo ""
-              echo "Alert details:"
-              jq -r '.runs[].results[]? | 
-                select(
-                  (.properties."security-severity"? != null and ((.properties."security-severity" | tonumber) >= 7.0)) or
-                  (.level? == "error")
-                ) | 
-                "  - \(.ruleId): \(.message.text) (\(.locations[0].physicalLocation.artifactLocation.uri):\(.locations[0].physicalLocation.region.startLine))"
-              ' "$sarif_file" || true
-              
-              echo ""
-              echo "Please fix these security issues before merging."
-              echo "See the Code Scanning alerts tab for full details: ${{ github.event.repository.html_url }}/security/code-scanning"
-              exit 1
-            fi
-          fi
-        done
-        
-        echo "✅ No blocking security alerts found"
+    # Note: This workflow uploads SARIF results to GitHub Security.
+    # Blocking enforcement should use GitHub's native 'Require code scanning results' 
+    # ruleset rule (Settings → Rules → Rulesets). Set the severity threshold to 
+    # 'High or higher' to block PRs with HIGH/CRITICAL findings.
+    # 
+    # See SECURITY-GATE.md for setup instructions.
 
     - name: Upload SARIF results as artifact
       if: always()
