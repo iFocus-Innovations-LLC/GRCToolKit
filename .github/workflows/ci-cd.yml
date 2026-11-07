@@ -98,6 +98,21 @@ jobs:
         scanners: 'vuln'
         ignore-unfixed: true
         exit-code: '1'
+      continue-on-error: true
+      id: trivy_scan
+
+    - name: Verify Trivy found no HIGH/CRITICAL vulnerabilities
+      run: |
+        if [ -f trivy-results.sarif ]; then
+          HIGH_CRITICAL_COUNT=$(jq '[.runs[].results[] | select(.level == "error" or .level == "warning")] | length' trivy-results.sarif || echo "0")
+          echo "HIGH/CRITICAL vulnerabilities found: $HIGH_CRITICAL_COUNT"
+          if [ "$HIGH_CRITICAL_COUNT" -gt 0 ]; then
+            echo "::error::Found $HIGH_CRITICAL_COUNT HIGH/CRITICAL vulnerabilities"
+            exit 1
+          fi
+        else
+          echo "::warning::trivy-results.sarif not found"
+        fi
 
     - name: Check Trivy results exist
       run: |
