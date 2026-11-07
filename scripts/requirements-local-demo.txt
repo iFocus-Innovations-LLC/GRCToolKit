@@ -1,3 +1,11 @@
 # Local MVP demo dependencies (Mac mini / laptop QA — not required for production)
-# Pin to latest version to avoid known vulnerabilities
+# Pin to latest versions to resolve HIGH severity CVEs found by Trivy:
+# - CVE-2026-114613: msgpack 1.1.2 -> 1.2.3 (DoS via memory leak)
+# - CVE-2025-47273: setuptools 70.3.0 -> 78.1.1 (Path traversal)
+# - CVE-2026-97687: urllib3 2.7.0 -> 2.8.0 (HTTPS proxy TLS interception)
+# - CVE-2026-97689: urllib3 2.7.0 -> 2.8.0 (DoS via unbounded memory)
+
 fpdf2==2.9.0
+msgpack==1.2.3
+setuptools==78.1.1
+urllib3==2.8.0
