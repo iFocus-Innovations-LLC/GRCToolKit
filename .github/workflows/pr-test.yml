@@ -86,11 +86,14 @@ jobs:
         fi
 
     - name: Security scan with Trivy
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@0.29.0
       with:
         image-ref: 'grc-toolkit:pr-test'
         format: 'sarif'
         output: 'trivy-results.sarif'
+        severity: 'HIGH,CRITICAL'
+        ignore-unfixed: true
+        exit-code: '1'
 
     - name: Check Trivy results exist
       run: |
