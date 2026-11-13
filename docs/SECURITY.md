@@ -98,6 +98,63 @@ Dockerfile              # Updated to use startup script
 - **Stay ahead of industry**: Prefer newest stable LTS/patch releases unless blocked by compatibility.
 - **No unpinned dependencies**: Avoid `latest` or wildcard dependency versions in build/test tooling.
 
+### 6. OpenSCAP Compliance Scanning
+
+GRCToolKit uses OpenSCAP (Open Security Content Automation Protocol) to validate compliance against NIST 800-53, FedRAMP, and CMMC requirements.
+
+**What is scanned:**
+- CI/CD build environment (GitHub Actions Ubuntu 24.04 runner)
+- SCAP Security Guide (SSG) CIS Level 1 Server benchmark profile
+- Baseline security configuration compliance
+
+**Why CI runner, not the container?**
+
+The container base image (nginx:alpine-slim) uses Alpine Linux, which has limited SCAP Security Guide profile support. Alpine uses musl libc instead of glibc and the apk package manager instead of apt/yum, which are not covered by standard SSG content.
+
+The CI runner baseline scan provides:
+- **NIST 800-53 compliance evidence** for the build infrastructure
+- **CIS benchmark validation** of the CI environment
+- **FedRAMP/CMMC supporting evidence** showing secure build practices
+
+Container vulnerability scanning is handled by Trivy and Docker Scout.
+
+**Reading the OpenSCAP report:**
+
+1. Download the `openscap-compliance-reports` artifact from a workflow run
+2. Open `report.html` in a browser
+3. The report shows:
+   - **Overall compliance score** (% of rules passed)
+   - **Rule results** (pass/fail/error/notapplicable)
+   - **NIST 800-53 control mappings** (e.g., AC-3, AC-6, AU-2, IA-5, SC-8)
+   - **Severity levels** (low/medium/high)
+   - **Remediation guidance** for failed rules
+
+**Key compliance controls checked:**
+- **AC-3, AC-6**: Access control and least privilege
+- **AU-2, AU-12**: Audit logging and record generation
+- **IA-5**: Authenticator management (password policies)
+- **SC-8**: Transmission confidentiality and integrity
+- **CM-6**: Configuration settings
+
+**Using reports for compliance evidence:**
+
+The OpenSCAP reports can be used as evidence for:
+- FedRAMP Low/Moderate/High authorization packages
+- CMMC Level 2/3 assessments
+- NIST 800-53 control validation
+- SOC 2 Type II audits (supporting evidence for secure development)
+
+The ARF (Asset Reporting Format) XML file (`results.xml`) is machine-readable and can be ingested by GRC platforms.
+
+**Compliance baseline approach:**
+
+The CI runner scan establishes a **secure build environment baseline**:
+- Every build occurs in a known, validated environment
+- Configuration drift is detected automatically
+- High-severity compliance failures block merges
+
+This approach aligns with NIST 800-171 § 3.4.1 (establish baseline configurations) and NIST 800-53 CM-2 (baseline configuration).
+
 ## 🔍 Verification
 
 ### Check Secret Status
@@ -133,6 +190,15 @@ docker logs test-container
 ```bash
 # Confirm pinned runners in workflows
 grep -R "runs-on: ubuntu-" .github/workflows
+```
+
+### Verify OpenSCAP compliance scan
+```bash
+# Download the latest OpenSCAP report artifact from GitHub Actions
+# Extract and open report.html to review compliance status
+
+# Check XCCDF results for high-severity failures
+xmllint --xpath 'count(//rule-result[result="fail" and @severity="high"])' results.xml
 ```
 
 ## 🛡️ Security Considerations

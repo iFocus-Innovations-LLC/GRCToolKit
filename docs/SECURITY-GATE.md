@@ -75,6 +75,67 @@ The Trivy step fails with exit code 1 when HIGH/CRITICAL vulnerabilities are det
 
 **Configuration:** `.github/workflows/ci-cd.yml` and `.github/workflows/pr-test.yml` (Docker Scout steps)
 
+### 4. OpenSCAP Compliance Scanning
+
+**When it runs:**
+- On every pull request to `main`, `dev`, or `qa` branches
+- On pushes to `main`, `dev`, or `qa` branches
+- Can be triggered manually via workflow_dispatch
+
+**What it scans:**
+- **CI runner baseline** (Ubuntu 24.04) against SCAP Security Guide (SSG) profiles
+- Uses CIS Level 1 Server benchmark for NIST 800-53 alignment
+- Generates XCCDF results (ARF) and HTML compliance reports
+
+**Scanning scope:**
+This workflow scans the **build environment** (GitHub Actions runner), not the Alpine container itself. This design choice reflects a technical constraint: Alpine Linux lacks comprehensive SCAP Security Guide profile coverage because it uses musl libc instead of glibc and apk instead of apt/yum package managers.
+
+The CI runner baseline scan provides:
+- NIST 800-53 compliance evidence for the build infrastructure
+- CIS benchmark validation of the CI environment
+- Compliance baseline that can be used for FedRAMP and CMMC evidence
+
+Container security remains covered by existing Trivy and Docker Scout vulnerability scanning.
+
+**Blocking threshold:**
+- **HIGH severity rule failures**: SCAP rules marked as high severity that fail the compliance check
+- The scan gates merges when high-severity compliance failures are detected
+- Lower severity failures (medium, low) are reported but don't block
+
+**Configuration:** `.github/workflows/openscap-compliance.yml`
+
+**Key settings:**
+```yaml
+oscap xccdf eval \
+  --profile xccdf_org.ssgproject.content_profile_cis_level1_server \
+  --results openscap-reports/results.xml \
+  --report openscap-reports/report.html
+```
+
+**Output artifacts:**
+- `openscap-reports/report.html` - Human-readable compliance report
+- `openscap-reports/results.xml` - XCCDF results in ARF (Asset Reporting Format)
+- `openscap-reports/summary.txt` - Quick summary of pass/fail/error counts
+
+**How it blocks:**
+The workflow step fails when high-severity compliance rule failures are detected, blocking the required status check.
+
+**Alpine container limitation:**
+The container base image (nginx:alpine-slim) cannot be meaningfully scanned with OpenSCAP SSG profiles. Future enhancement options include:
+1. Migrating to RHEL Universal Base Image (UBI) for full SCAP coverage
+2. Custom OVAL vulnerability definitions for Alpine packages
+3. Accepting CI runner baseline as the compliance boundary (current approach)
+
+**Reading the report:**
+1. Download the workflow artifact `openscap-compliance-reports`
+2. Open `report.html` in a browser
+3. Review failed rules, especially those marked "high severity"
+4. Each rule includes:
+   - NIST 800-53 control mapping (e.g., AC-6, IA-5)
+   - Rule description and rationale
+   - Remediation guidance (commands or configuration changes)
+   - Pass/Fail/Not Applicable status
+
 ## Severity Thresholds
 
 | Scanner | LOW | MEDIUM | HIGH | CRITICAL |
@@ -82,8 +143,10 @@ The Trivy step fails with exit code 1 when HIGH/CRITICAL vulnerabilities are det
 | **CodeQL** | Advisory | Advisory | **BLOCKS** | **BLOCKS** |
 | **Trivy** | Silent | Advisory | **BLOCKS** | **BLOCKS** |
 | **Docker Scout** | Silent | Advisory | **BLOCKS*** | **BLOCKS*** |
+| **OpenSCAP** | Advisory | Advisory | **BLOCKS** | N/A** |
 
-\* Only when `DOCKER_SCOUT_TOKEN` is configured
+\* Only when `DOCKER_SCOUT_TOKEN` is configured  
+\*\* OpenSCAP uses SCAP severity levels (low/medium/high), not CVSS scoring, so "CRITICAL" doesn't directly apply
 
 ## Merge Requirements
 
@@ -95,6 +158,7 @@ A pull request can only be merged when:
    - GitHub's code scanning ruleset enforces no HIGH/CRITICAL unresolved alerts
    - Trivy scan completes with no HIGH/CRITICAL unfixed vulnerabilities
    - Docker Scout passes (if enabled)
+   - OpenSCAP compliance scan completes with no high-severity rule failures
 
 2. ✅ At least 1 human approval from a code owner
 
@@ -189,6 +253,71 @@ trivy image --severity HIGH,CRITICAL grc-toolkit:test
 
 Commit the updated dependency files.
 
+### Step 4b: Resolve OpenSCAP Compliance Failures
+
+If OpenSCAP blocks on high-severity compliance rule failures:
+
+1. **Download the report artifact:**
+   - Go to the failed workflow run
+   - Download `openscap-compliance-reports` artifact
+   - Open `report.html` in a browser
+
+2. **Identify the failing rules:**
+   - Look for rules marked **"high"** severity with **"fail"** result
+   - Note the rule ID (e.g., `xccdf_org.ssgproject.content_rule_accounts_password_minlen_login_defs`)
+   - Review the rule description, rationale, and NIST 800-53 mapping
+
+3. **Understand the failure context:**
+   - OpenSCAP scans the **CI runner** (Ubuntu 24.04), not your application code
+   - Failures typically indicate baseline security configuration issues in the build environment
+   - Some rules may be pre-existing environment conditions (not caused by your PR)
+
+4. **Resolution options:**
+
+   **Option A: Fix is not applicable to CI environment (most common)**
+   
+   Many CIS benchmark rules target production servers, not ephemeral CI runners. If a rule failure is:
+   - Not relevant to CI/CD security posture
+   - Caused by GitHub Actions runner defaults
+   - Outside the control of this repository
+   
+   Then document why it's not applicable and continue with the PR. The repository maintainers can adjust the OpenSCAP profile or accept the baseline.
+
+   **Option B: Fix applies to repository configuration**
+   
+   If the failure relates to repository security configuration (e.g., workflow permissions, secret handling), fix it:
+   
+   ```bash
+   # Example: If OpenSCAP flags overly permissive workflow permissions
+   # Edit .github/workflows/*.yml to use minimal permissions
+   permissions:
+     contents: read
+     security-events: write
+   ```
+
+   **Option C: Fix applies to container/application security**
+   
+   If the failure relates to your application's runtime security:
+   
+   ```bash
+   # Example: If OpenSCAP flags weak crypto settings
+   # Update application configuration or Dockerfile
+   ```
+
+5. **Note on CI runner baseline failures:**
+   
+   If your PR introduces no security-relevant changes but OpenSCAP still blocks:
+   - This may indicate a pre-existing baseline issue
+   - Maintainers should review if the profile is appropriate for CI runners
+   - Consider excluding non-applicable rules or documenting accepted risks
+
+6. **Testing locally:**
+   
+   You cannot easily replicate the exact CI runner environment locally. Instead:
+   - Review the HTML report to understand the failure
+   - Fix issues in your repository files (workflows, Dockerfiles, configs)
+   - Push changes and let CI re-run the OpenSCAP scan
+
 ### Step 5: Verify Locally
 
 Before pushing, verify the fix locally:
@@ -265,6 +394,7 @@ Create a ruleset named `main-security-gate`:
     - `pr-test` (from pr-test.yml on pull requests)
     - `Analyze (javascript-typescript)` (from codeql.yml)
     - `Analyze (python)` (from codeql.yml)
+    - `openscap-scan` (from openscap-compliance.yml)
 - ✅ **Require code scanning results** (GitHub native enforcement):
   - Tools: All tools
   - Security alerts: High or higher
@@ -290,6 +420,7 @@ Branch name pattern: `main` (repeat for `dev`, `qa`)
     - `ci-test` (or `pr-test` depending on which applies)
     - `Analyze (javascript-typescript)`
     - `Analyze (python)`
+    - `openscap-scan`
 - ✅ Require conversation resolution
 - ✅ Include administrators (recommended)
 - ✅ Restrict who can push (maintainers only)
@@ -325,7 +456,7 @@ If you don't have admin access to the repository, provide this checklist to your
 - [ ] Disable GitHub default CodeQL setup (Settings → Security and quality → Advanced Security → CodeQL analysis → ⋮ menu → Disable CodeQL)
 - [ ] Create branch protection ruleset `main-security-gate` targeting `main`, `dev`, `qa`
   - [ ] Require pull request reviews (1 approval; do NOT enable code owners requirement in solo-maintainer repo)
-  - [ ] Require status checks: `ci-test`, `pr-test`, `Analyze (javascript-typescript)`, `Analyze (python)`
+  - [ ] Require status checks: `ci-test`, `pr-test`, `Analyze (javascript-typescript)`, `Analyze (python)`, `openscap-scan`
   - [ ] Require code scanning results: High or higher (native GitHub enforcement)
   - [ ] Require branches up to date
   - [ ] Block force pushes

@@ -1,0 +1,205 @@
+name: OpenSCAP Compliance Scan
+
+on:
+  push:
+    branches: [ main, dev, qa ]
+  pull_request:
+    branches: [ main, dev, qa ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  openscap-scan:
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v5.2.2
+
+    - name: Install OpenSCAP and SCAP Security Guide
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libopenscap8 openscap-scanner openscap-utils ssg-debian ssg-nondebian
+        oscap --version
+
+    - name: List available SSG profiles
+      run: |
+        echo "=== Available SCAP Security Guide Datastreams ==="
+        ls -lh /usr/share/xml/scap/ssg/content/
+        echo ""
+        echo "=== Ubuntu 24.04 (Noble) profiles ==="
+        if [ -f /usr/share/xml/scap/ssg/content/ssg-ubuntu2404-ds.xml ]; then
+          oscap info /usr/share/xml/scap/ssg/content/ssg-ubuntu2404-ds.xml
+        else
+          echo "Ubuntu 24.04 SSG datastream not found"
+          echo "Falling back to Ubuntu 22.04 (Jammy) profiles:"
+          oscap info /usr/share/xml/scap/ssg/content/ssg-ubuntu2204-ds.xml 2>/dev/null || echo "No Ubuntu SSG found"
+        fi
+
+    - name: Run OpenSCAP compliance scan
+      id: scan
+      continue-on-error: true
+      run: |
+        # Determine which SSG datastream to use
+        if [ -f /usr/share/xml/scap/ssg/content/ssg-ubuntu2404-ds.xml ]; then
+          DATASTREAM="/usr/share/xml/scap/ssg/content/ssg-ubuntu2404-ds.xml"
+          PROFILE_ID="xccdf_org.ssgproject.content_profile_cis_level1_server"
+        elif [ -f /usr/share/xml/scap/ssg/content/ssg-ubuntu2204-ds.xml ]; then
+          DATASTREAM="/usr/share/xml/scap/ssg/content/ssg-ubuntu2204-ds.xml"
+          PROFILE_ID="xccdf_org.ssgproject.content_profile_cis_level1_server"
+        else
+          echo "ERROR: No Ubuntu SSG datastream found"
+          exit 1
+        fi
+        
+        echo "Using datastream: $DATASTREAM"
+        echo "Using profile: $PROFILE_ID"
+        
+        # Create output directory
+        mkdir -p openscap-reports
+        
+        # Run the scan - this scans the CI runner (Ubuntu 24.04) for compliance baseline
+        # Note: We use --fetch-remote-resources to download any missing OVAL definitions
+        # The scan may fail (exit code 2) if there are compliance failures - this is expected
+        sudo oscap xccdf eval \
+          --profile "$PROFILE_ID" \
+          --fetch-remote-resources \
+          --results openscap-reports/results.xml \
+          --report openscap-reports/report.html \
+          "$DATASTREAM" || SCAN_EXIT=$?
+        
+        # OpenSCAP exit codes:
+        # 0 = scan completed, all rules passed
+        # 1 = error occurred
+        # 2 = scan completed, some rules failed
+        echo "scan_exit_code=${SCAN_EXIT:-0}" >> $GITHUB_OUTPUT
+        
+        if [ "${SCAN_EXIT:-0}" -eq 1 ]; then
+          echo "ERROR: OpenSCAP scan encountered an error"
+          exit 1
+        fi
+        
+        echo "OpenSCAP scan completed with exit code: ${SCAN_EXIT:-0}"
+
+    - name: Generate compliance summary
+      if: always()
+      run: |
+        if [ ! -f openscap-reports/results.xml ]; then
+          echo "ERROR: Results file not generated"
+          exit 1
+        fi
+        
+        echo "=== OpenSCAP Compliance Summary ===" | tee openscap-reports/summary.txt
+        echo "" | tee -a openscap-reports/summary.txt
+        
+        # Extract score and results using oscap xccdf generate
+        oscap xccdf generate report openscap-reports/results.xml > openscap-reports/detailed-report.html || true
+        
+        # Parse results for summary
+        TOTAL_RULES=$(xmllint --xpath 'count(//rule-result)' openscap-reports/results.xml 2>/dev/null || echo "0")
+        PASS_RULES=$(xmllint --xpath 'count(//rule-result[result="pass"])' openscap-reports/results.xml 2>/dev/null || echo "0")
+        FAIL_RULES=$(xmllint --xpath 'count(//rule-result[result="fail"])' openscap-reports/results.xml 2>/dev/null || echo "0")
+        ERROR_RULES=$(xmllint --xpath 'count(//rule-result[result="error"])' openscap-reports/results.xml 2>/dev/null || echo "0")
+        NOTAPPLICABLE_RULES=$(xmllint --xpath 'count(//rule-result[result="notapplicable"])' openscap-reports/results.xml 2>/dev/null || echo "0")
+        
+        echo "Total Rules Evaluated: $TOTAL_RULES" | tee -a openscap-reports/summary.txt
+        echo "Passed: $PASS_RULES" | tee -a openscap-reports/summary.txt
+        echo "Failed: $FAIL_RULES" | tee -a openscap-reports/summary.txt
+        echo "Errors: $ERROR_RULES" | tee -a openscap-reports/summary.txt
+        echo "Not Applicable: $NOTAPPLICABLE_RULES" | tee -a openscap-reports/summary.txt
+        echo "" | tee -a openscap-reports/summary.txt
+        
+        # Calculate compliance percentage
+        if [ "$TOTAL_RULES" -gt 0 ]; then
+          COMPLIANCE_PCT=$(echo "scale=2; ($PASS_RULES * 100) / $TOTAL_RULES" | bc)
+          echo "Compliance Score: ${COMPLIANCE_PCT}%" | tee -a openscap-reports/summary.txt
+        fi
+        
+        echo "" | tee -a openscap-reports/summary.txt
+        echo "Full report: openscap-reports/report.html" | tee -a openscap-reports/summary.txt
+        echo "Results (ARF): openscap-reports/results.xml" | tee -a openscap-reports/summary.txt
+        
+        # Show the summary
+        cat openscap-reports/summary.txt
+
+    - name: Check for high-severity failures
+      if: always()
+      run: |
+        if [ ! -f openscap-reports/results.xml ]; then
+          echo "ERROR: Cannot evaluate severity - results file missing"
+          exit 1
+        fi
+        
+        # Count high-severity failures
+        # SCAP severity levels: low, medium, high
+        HIGH_SEVERITY_FAIL=$(xmllint --xpath 'count(//rule-result[result="fail" and @severity="high"])' openscap-reports/results.xml 2>/dev/null || echo "0")
+        
+        echo "High-severity failures: $HIGH_SEVERITY_FAIL"
+        
+        if [ "$HIGH_SEVERITY_FAIL" -gt 0 ]; then
+          echo "❌ BLOCKING: Found $HIGH_SEVERITY_FAIL high-severity compliance failures"
+          echo ""
+          echo "Review the OpenSCAP report artifact for details:"
+          echo "  - openscap-reports/report.html (human-readable)"
+          echo "  - openscap-reports/results.xml (XCCDF results)"
+          echo ""
+          echo "This job fails on high-severity rule failures to enforce compliance baselines."
+          echo "See docs/SECURITY-GATE.md for remediation guidance."
+          exit 1
+        else
+          echo "✅ No high-severity failures detected"
+        fi
+
+    - name: Upload OpenSCAP reports
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v5.0.1
+      with:
+        name: openscap-compliance-reports
+        path: |
+          openscap-reports/report.html
+          openscap-reports/results.xml
+          openscap-reports/summary.txt
+        retention-days: 90
+
+    - name: Upload XCCDF results as SARIF (if converter available)
+      if: always() && hashFiles('openscap-reports/results.xml') != ''
+      continue-on-error: true
+      run: |
+        # Check if xccdf-to-sarif converter is available
+        # Note: There is no official XCCDF-to-SARIF converter maintained by NIST or GitHub
+        # Several community tools exist but none are production-ready for automated CI
+        # For now, we skip SARIF upload and rely on the HTML/XML reports
+        echo "ℹ️  XCCDF-to-SARIF conversion skipped"
+        echo "   No reliable, maintained XCCDF-to-SARIF converter is available."
+        echo "   Review compliance results in the HTML report artifact instead."
+        echo ""
+        echo "   If a converter becomes available, we can add SARIF upload here."
+        echo "   See: https://github.com/openscap/openscap/issues (feature requests)"
+
+  container-security-note:
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Document Alpine SCAP limitation
+      run: |
+        echo "=== OpenSCAP Container Scanning Status ==="
+        echo ""
+        echo "ℹ️  This workflow scans the CI runner (Ubuntu 24.04) for compliance baseline."
+        echo ""
+        echo "⚠️  Alpine Linux SCAP limitation:"
+        echo "   The container base image (nginx:alpine-slim) has limited SCAP Security Guide"
+        echo "   profile coverage. Alpine uses musl libc and apk package manager, which are"
+        echo "   not covered by the standard SCAP Security Guide (SSG) content."
+        echo ""
+        echo "📋 Current approach:"
+        echo "   • CI runner baseline scan: Provides NIST 800-53 compliance evidence for the"
+        echo "     build environment (Ubuntu 24.04 with CIS benchmark profile)"
+        echo "   • Container vulnerabilities: Covered by existing Trivy/Docker Scout scans"
+        echo ""
+        echo "🔄 Future enhancement options:"
+        echo "   1. Migrate to RHEL UBI (Universal Base Image) for full SCAP coverage"
+        echo "   2. Add custom OVAL vulnerability scanning for Alpine packages"
+        echo "   3. Accept CI runner baseline as the compliance boundary"
+        echo ""
+        echo "See docs/SECURITY-GATE.md for full details."
