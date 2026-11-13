@@ -21,7 +21,7 @@ jobs:
     - name: Install OpenSCAP and SCAP Security Guide
       run: |
         sudo apt-get update
-        sudo apt-get install -y libopenscap8 openscap-scanner openscap-utils ssg-debian ssg-nondebian
+        sudo apt-get install -y libopenscap25t64 openscap-scanner openscap-utils ssg-debian ssg-nondebian
         oscap --version
 
     - name: List available SSG profiles
@@ -38,9 +38,8 @@ jobs:
           oscap info /usr/share/xml/scap/ssg/content/ssg-ubuntu2204-ds.xml 2>/dev/null || echo "No Ubuntu SSG found"
         fi
 
-    - name: Run OpenSCAP compliance scan
+    - name: Run OpenSCAP compliance scan (report-only, runner baseline)
       id: scan
-      continue-on-error: true
       run: |
         # Determine which SSG datastream to use
         if [ -f /usr/share/xml/scap/ssg/content/ssg-ubuntu2404-ds.xml ]; then
@@ -56,6 +55,11 @@ jobs:
         
         echo "Using datastream: $DATASTREAM"
         echo "Using profile: $PROFILE_ID"
+        echo ""
+        echo "ℹ️  REPORT-ONLY MODE: This scans the GitHub-hosted runner baseline."
+        echo "   Compliance failures are reported but do not block merges."
+        echo "   The runner is ephemeral and controlled by GitHub, not this project."
+        echo ""
         
         # Create output directory
         mkdir -p openscap-reports
@@ -72,26 +76,28 @@ jobs:
         
         # OpenSCAP exit codes:
         # 0 = scan completed, all rules passed
-        # 1 = error occurred
-        # 2 = scan completed, some rules failed
+        # 1 = error occurred (fail the job - this is a real error)
+        # 2 = scan completed, some rules failed (report only, don't fail)
         echo "scan_exit_code=${SCAN_EXIT:-0}" >> $GITHUB_OUTPUT
         
         if [ "${SCAN_EXIT:-0}" -eq 1 ]; then
-          echo "ERROR: OpenSCAP scan encountered an error"
+          echo "❌ ERROR: OpenSCAP scan encountered an error"
           exit 1
+        elif [ "${SCAN_EXIT:-0}" -eq 2 ]; then
+          echo "⚠️  OpenSCAP scan completed with compliance rule failures (exit code 2)"
+          echo "   This is report-only and does not block the build."
+        else
+          echo "✅ OpenSCAP scan completed successfully (exit code 0)"
         fi
-        
-        echo "OpenSCAP scan completed with exit code: ${SCAN_EXIT:-0}"
 
-    - name: Generate compliance summary
-      if: always()
+    - name: Generate compliance summary and report high-severity findings
+      if: always() && hashFiles('openscap-reports/results.xml') != ''
       run: |
-        if [ ! -f openscap-reports/results.xml ]; then
-          echo "ERROR: Results file not generated"
-          exit 1
-        fi
-        
-        echo "=== OpenSCAP Compliance Summary ===" | tee openscap-reports/summary.txt
+        echo "=== OpenSCAP Compliance Summary (CI Runner Baseline) ===" | tee openscap-reports/summary.txt
+        echo "" | tee -a openscap-reports/summary.txt
+        echo "Target: GitHub Actions runner (Ubuntu 24.04)" | tee -a openscap-reports/summary.txt
+        echo "Profile: CIS Level 1 Server" | tee -a openscap-reports/summary.txt
+        echo "Mode: Report-only (does not block merges)" | tee -a openscap-reports/summary.txt
         echo "" | tee -a openscap-reports/summary.txt
         
         # Extract score and results using oscap xccdf generate
@@ -104,9 +110,14 @@ jobs:
         ERROR_RULES=$(xmllint --xpath 'count(//rule-result[result="error"])' openscap-reports/results.xml 2>/dev/null || echo "0")
         NOTAPPLICABLE_RULES=$(xmllint --xpath 'count(//rule-result[result="notapplicable"])' openscap-reports/results.xml 2>/dev/null || echo "0")
         
+        # Count high-severity failures for reporting
+        HIGH_SEVERITY_FAIL=$(xmllint --xpath 'count(//rule-result[result="fail" and @severity="high"])' openscap-reports/results.xml 2>/dev/null || echo "0")
+        MEDIUM_SEVERITY_FAIL=$(xmllint --xpath 'count(//rule-result[result="fail" and @severity="medium"])' openscap-reports/results.xml 2>/dev/null || echo "0")
+        LOW_SEVERITY_FAIL=$(xmllint --xpath 'count(//rule-result[result="fail" and @severity="low"])' openscap-reports/results.xml 2>/dev/null || echo "0")
+        
         echo "Total Rules Evaluated: $TOTAL_RULES" | tee -a openscap-reports/summary.txt
         echo "Passed: $PASS_RULES" | tee -a openscap-reports/summary.txt
-        echo "Failed: $FAIL_RULES" | tee -a openscap-reports/summary.txt
+        echo "Failed: $FAIL_RULES (High: $HIGH_SEVERITY_FAIL, Medium: $MEDIUM_SEVERITY_FAIL, Low: $LOW_SEVERITY_FAIL)" | tee -a openscap-reports/summary.txt
         echo "Errors: $ERROR_RULES" | tee -a openscap-reports/summary.txt
         echo "Not Applicable: $NOTAPPLICABLE_RULES" | tee -a openscap-reports/summary.txt
         echo "" | tee -a openscap-reports/summary.txt
@@ -120,37 +131,22 @@ jobs:
         echo "" | tee -a openscap-reports/summary.txt
         echo "Full report: openscap-reports/report.html" | tee -a openscap-reports/summary.txt
         echo "Results (ARF): openscap-reports/results.xml" | tee -a openscap-reports/summary.txt
+        echo "" | tee -a openscap-reports/summary.txt
+        
+        # Report high-severity findings
+        if [ "$HIGH_SEVERITY_FAIL" -gt 0 ]; then
+          echo "⚠️  Found $HIGH_SEVERITY_FAIL high-severity compliance failures on CI runner baseline" | tee -a openscap-reports/summary.txt
+          echo "   This is report-only and does not block merges." | tee -a openscap-reports/summary.txt
+          echo "   The runner is ephemeral and controlled by GitHub, not this project." | tee -a openscap-reports/summary.txt
+          echo "" | tee -a openscap-reports/summary.txt
+          echo "   To review findings, download the openscap-compliance-reports artifact" | tee -a openscap-reports/summary.txt
+          echo "   and open report.html" | tee -a openscap-reports/summary.txt
+        else
+          echo "✅ No high-severity compliance failures detected" | tee -a openscap-reports/summary.txt
+        fi
         
         # Show the summary
         cat openscap-reports/summary.txt
-
-    - name: Check for high-severity failures
-      if: always()
-      run: |
-        if [ ! -f openscap-reports/results.xml ]; then
-          echo "ERROR: Cannot evaluate severity - results file missing"
-          exit 1
-        fi
-        
-        # Count high-severity failures
-        # SCAP severity levels: low, medium, high
-        HIGH_SEVERITY_FAIL=$(xmllint --xpath 'count(//rule-result[result="fail" and @severity="high"])' openscap-reports/results.xml 2>/dev/null || echo "0")
-        
-        echo "High-severity failures: $HIGH_SEVERITY_FAIL"
-        
-        if [ "$HIGH_SEVERITY_FAIL" -gt 0 ]; then
-          echo "❌ BLOCKING: Found $HIGH_SEVERITY_FAIL high-severity compliance failures"
-          echo ""
-          echo "Review the OpenSCAP report artifact for details:"
-          echo "  - openscap-reports/report.html (human-readable)"
-          echo "  - openscap-reports/results.xml (XCCDF results)"
-          echo ""
-          echo "This job fails on high-severity rule failures to enforce compliance baselines."
-          echo "See docs/SECURITY-GATE.md for remediation guidance."
-          exit 1
-        else
-          echo "✅ No high-severity failures detected"
-        fi
 
     - name: Upload OpenSCAP reports
       if: always()
@@ -178,28 +174,69 @@ jobs:
         echo "   If a converter becomes available, we can add SARIF upload here."
         echo "   See: https://github.com/openscap/openscap/issues (feature requests)"
 
-  container-security-note:
+  container-scap-analysis:
     runs-on: ubuntu-24.04
     steps:
-    - name: Document Alpine SCAP limitation
+    - name: Investigate container SCAP scanning options
       run: |
-        echo "=== OpenSCAP Container Scanning Status ==="
+        echo "=== Container-Level OpenSCAP Scanning Investigation ==="
         echo ""
-        echo "ℹ️  This workflow scans the CI runner (Ubuntu 24.04) for compliance baseline."
+        echo "ℹ️  Current state:"
+        echo "   • CI runner baseline: Ubuntu 24.04 scanned with SSG CIS L1 Server (report-only)"
+        echo "   • Container base: nginx:1.31.8-alpine-slim (pinned by SHA256)"
+        echo "   • Container vulnerabilities: Covered by Trivy/Docker Scout (gates on HIGH/CRITICAL)"
         echo ""
         echo "⚠️  Alpine Linux SCAP limitation:"
-        echo "   The container base image (nginx:alpine-slim) has limited SCAP Security Guide"
-        echo "   profile coverage. Alpine uses musl libc and apk package manager, which are"
-        echo "   not covered by the standard SCAP Security Guide (SSG) content."
+        echo "   Alpine uses musl libc and apk (not glibc/apt/yum), which are not covered by"
+        echo "   standard SCAP Security Guide (SSG) content. Meaningful SCAP scanning requires"
+        echo "   a base image with SSG profile support."
         echo ""
-        echo "📋 Current approach:"
-        echo "   • CI runner baseline scan: Provides NIST 800-53 compliance evidence for the"
-        echo "     build environment (Ubuntu 24.04 with CIS benchmark profile)"
-        echo "   • Container vulnerabilities: Covered by existing Trivy/Docker Scout scans"
+        echo "🔍 Recommended follow-up investigation:"
         echo ""
-        echo "🔄 Future enhancement options:"
-        echo "   1. Migrate to RHEL UBI (Universal Base Image) for full SCAP coverage"
-        echo "   2. Add custom OVAL vulnerability scanning for Alpine packages"
-        echo "   3. Accept CI runner baseline as the compliance boundary"
+        echo "   Option 1: Ubuntu minimal base (ubuntu:24.04-minimal or ubuntu:noble)"
+        echo "   ├─ Pros: SSG profiles available, apt ecosystem, broader community support"
+        echo "   ├─ Cons: Larger image (~30-50MB vs Alpine's ~8MB), systemd considerations"
+        echo "   ├─ nginx: Available via apt (nginx-light for minimal footprint)"
+        echo "   └─ SCAP: Full CIS/DISA-STIG profiles via ssg-debian package"
         echo ""
-        echo "See docs/SECURITY-GATE.md for full details."
+        echo "   Option 2: Red Hat UBI (ubi9-minimal or ubi9-micro)"
+        echo "   ├─ Pros: Enterprise-grade, excellent SSG support (DISA-STIG, OSPP, CIS)"
+        echo "   ├─ Cons: RHEL ecosystem (yum/dnf), slightly larger than Alpine"
+        echo "   ├─ nginx: Available via dnf or AppStream"
+        echo "   ├─ SCAP: Comprehensive via scap-security-guide package"
+        echo "   └─ FIPS: Optional FIPS 140-3 mode for federal compliance (if needed later)"
+        echo ""
+        echo "   Option 3: Debian slim (debian:12-slim)"
+        echo "   ├─ Pros: Middle ground on size (~25-40MB), broad SSG support"
+        echo "   ├─ Cons: Less minimal than Alpine, needs SSG backports for latest profiles"
+        echo "   ├─ nginx: Native nginx package available"
+        echo "   └─ SCAP: CIS profiles via ssg-debian"
+        echo ""
+        echo "   Option 4: Keep Alpine + custom OVAL"
+        echo "   ├─ Pros: Smallest image, existing Trivy/Scout coverage sufficient"
+        echo "   ├─ Cons: No comprehensive SSG profiles, manual OVAL maintenance burden"
+        echo "   └─ Recommendation: Only if image size is critical and existing vuln scans suffice"
+        echo ""
+        echo "📊 Trade-off summary:"
+        echo "   • Image size: Alpine < UBI micro < Ubuntu minimal < Debian slim < UBI minimal"
+        echo "   • SCAP coverage: UBI ≈ Ubuntu > Debian >> Alpine"
+        echo "   • Existing vuln scans: Trivy/Scout cover all bases well (HIGH/CRITICAL gate)"
+        echo "   • Federal/FedRAMP: UBI has FIPS option; Ubuntu/Debian need hardening guides"
+        echo ""
+        echo "💡 Recommended path:"
+        echo "   1. Evaluate if current Trivy/Scout gates provide sufficient security validation"
+        echo "   2. If SCAP evidence is required for compliance: test Ubuntu 24.04 minimal or UBI9-micro"
+        echo "   3. Compare image size impact: docker images <image> --format '{{.Size}}'"
+        echo "   4. Run oscap-docker/oscap-podman on test images to confirm profile compatibility"
+        echo "   5. Document the decision in PR description or docs/SECURITY-GATE.md"
+        echo ""
+        echo "   Example test command (Ubuntu base):"
+        echo "   docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \\"
+        echo "     openscapcontent/openscap-base:latest \\"
+        echo "     oscap-docker image ubuntu:24.04 xccdf eval \\"
+        echo "       --profile xccdf_org.ssgproject.content_profile_cis_level1_server \\"
+        echo "       /usr/share/xml/scap/ssg/content/ssg-ubuntu2404-ds.xml"
+        echo ""
+        echo "📋 Current recommendation: Accept CI runner baseline as sufficient unless"
+        echo "   customer/auditor requires container-level SCAP evidence. Trivy HIGH/CRITICAL"
+        echo "   gate already provides strong vulnerability coverage for the shipped artifact."

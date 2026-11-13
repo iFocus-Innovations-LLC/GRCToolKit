@@ -98,9 +98,10 @@ The CI runner baseline scan provides:
 Container security remains covered by existing Trivy and Docker Scout vulnerability scanning.
 
 **Blocking threshold:**
-- **HIGH severity rule failures**: SCAP rules marked as high severity that fail the compliance check
-- The scan gates merges when high-severity compliance failures are detected
-- Lower severity failures (medium, low) are reported but don't block
+- **REPORT-ONLY**: This scan does not block merges
+- Scans the GitHub-hosted runner (ephemeral, controlled by GitHub, not this project)
+- Compliance failures are reported in artifacts but do not fail the job
+- The job fails only if oscap itself encounters an error (exit code 1), not on compliance rule failures (exit code 2)
 
 **Configuration:** `.github/workflows/openscap-compliance.yml`
 
@@ -118,7 +119,7 @@ oscap xccdf eval \
 - `openscap-reports/summary.txt` - Quick summary of pass/fail/error counts
 
 **How it blocks:**
-The workflow step fails when high-severity compliance rule failures are detected, blocking the required status check.
+It doesn't - this is report-only. The job fails only if oscap itself errors (e.g., cannot parse datastream), not on compliance rule failures. Gating on the GitHub runner's baseline would be unfair since we don't control it.
 
 **Alpine container limitation:**
 The container base image (nginx:alpine-slim) cannot be meaningfully scanned with OpenSCAP SSG profiles. Future enhancement options include:
@@ -143,10 +144,10 @@ The container base image (nginx:alpine-slim) cannot be meaningfully scanned with
 | **CodeQL** | Advisory | Advisory | **BLOCKS** | **BLOCKS** |
 | **Trivy** | Silent | Advisory | **BLOCKS** | **BLOCKS** |
 | **Docker Scout** | Silent | Advisory | **BLOCKS*** | **BLOCKS*** |
-| **OpenSCAP** | Advisory | Advisory | **BLOCKS** | N/A** |
+| **OpenSCAP** | Advisory | Advisory | **Report** | N/A** |
 
 \* Only when `DOCKER_SCOUT_TOKEN` is configured  
-\*\* OpenSCAP uses SCAP severity levels (low/medium/high), not CVSS scoring, so "CRITICAL" doesn't directly apply
+\*\* OpenSCAP uses SCAP severity levels (low/medium/high), not CVSS scoring, so "CRITICAL" doesn't directly apply; all findings are report-only
 
 ## Merge Requirements
 
@@ -158,7 +159,7 @@ A pull request can only be merged when:
    - GitHub's code scanning ruleset enforces no HIGH/CRITICAL unresolved alerts
    - Trivy scan completes with no HIGH/CRITICAL unfixed vulnerabilities
    - Docker Scout passes (if enabled)
-   - OpenSCAP compliance scan completes with no high-severity rule failures
+   - OpenSCAP compliance scan runs (report-only, not a required check for merge)
 
 2. ✅ At least 1 human approval from a code owner
 
@@ -253,9 +254,9 @@ trivy image --severity HIGH,CRITICAL grc-toolkit:test
 
 Commit the updated dependency files.
 
-### Step 4b: Resolve OpenSCAP Compliance Failures
+### Step 4b: Review OpenSCAP Compliance Findings (Report-Only)
 
-If OpenSCAP blocks on high-severity compliance rule failures:
+OpenSCAP compliance scans are report-only and do not block merges. To review findings:
 
 1. **Download the report artifact:**
    - Go to the failed workflow run
@@ -267,56 +268,28 @@ If OpenSCAP blocks on high-severity compliance rule failures:
    - Note the rule ID (e.g., `xccdf_org.ssgproject.content_rule_accounts_password_minlen_login_defs`)
    - Review the rule description, rationale, and NIST 800-53 mapping
 
-3. **Understand the failure context:**
-   - OpenSCAP scans the **CI runner** (Ubuntu 24.04), not your application code
-   - Failures typically indicate baseline security configuration issues in the build environment
-   - Some rules may be pre-existing environment conditions (not caused by your PR)
+3. **Understand the scan context:**
+   - OpenSCAP scans the **GitHub Actions runner** (Ubuntu 24.04), not your application code or container
+   - The runner is ephemeral and controlled by GitHub, not this project
+   - Findings reflect the baseline state of GitHub's infrastructure
+   - These are informational for compliance awareness, not actionable defects in your PR
 
-4. **Resolution options:**
+4. **Why report-only?**
+   
+   The OpenSCAP scan is report-only because:
+   - We don't control the GitHub-hosted runner baseline
+   - Failures would be on infrastructure we can't fix
+   - It doesn't validate the GRCToolKit artifact itself (the container)
+   - Container security is already covered by Trivy HIGH/CRITICAL gates
+   
+   The scan provides visibility into the build environment's compliance posture for reference.
 
-   **Option A: Fix is not applicable to CI environment (most common)**
+5. **What to do with findings:**
    
-   Many CIS benchmark rules target production servers, not ephemeral CI runners. If a rule failure is:
-   - Not relevant to CI/CD security posture
-   - Caused by GitHub Actions runner defaults
-   - Outside the control of this repository
-   
-   Then document why it's not applicable and continue with the PR. The repository maintainers can adjust the OpenSCAP profile or accept the baseline.
-
-   **Option B: Fix applies to repository configuration**
-   
-   If the failure relates to repository security configuration (e.g., workflow permissions, secret handling), fix it:
-   
-   ```bash
-   # Example: If OpenSCAP flags overly permissive workflow permissions
-   # Edit .github/workflows/*.yml to use minimal permissions
-   permissions:
-     contents: read
-     security-events: write
-   ```
-
-   **Option C: Fix applies to container/application security**
-   
-   If the failure relates to your application's runtime security:
-   
-   ```bash
-   # Example: If OpenSCAP flags weak crypto settings
-   # Update application configuration or Dockerfile
-   ```
-
-5. **Note on CI runner baseline failures:**
-   
-   If your PR introduces no security-relevant changes but OpenSCAP still blocks:
-   - This may indicate a pre-existing baseline issue
-   - Maintainers should review if the profile is appropriate for CI runners
-   - Consider excluding non-applicable rules or documenting accepted risks
-
-6. **Testing locally:**
-   
-   You cannot easily replicate the exact CI runner environment locally. Instead:
-   - Review the HTML report to understand the failure
-   - Fix issues in your repository files (workflows, Dockerfiles, configs)
-   - Push changes and let CI re-run the OpenSCAP scan
+   - **No action required** - Findings don't block merges
+   - Review the report if interested in build environment baseline state
+   - Use the ARF XML results (`results.xml`) as supplementary compliance documentation if needed
+   - For container-level SCAP scanning, see the investigation in the workflow's `container-scap-analysis` job
 
 ### Step 5: Verify Locally
 
@@ -394,7 +367,6 @@ Create a ruleset named `main-security-gate`:
     - `pr-test` (from pr-test.yml on pull requests)
     - `Analyze (javascript-typescript)` (from codeql.yml)
     - `Analyze (python)` (from codeql.yml)
-    - `openscap-scan` (from openscap-compliance.yml)
 - ✅ **Require code scanning results** (GitHub native enforcement):
   - Tools: All tools
   - Security alerts: High or higher
@@ -420,7 +392,6 @@ Branch name pattern: `main` (repeat for `dev`, `qa`)
     - `ci-test` (or `pr-test` depending on which applies)
     - `Analyze (javascript-typescript)`
     - `Analyze (python)`
-    - `openscap-scan`
 - ✅ Require conversation resolution
 - ✅ Include administrators (recommended)
 - ✅ Restrict who can push (maintainers only)
@@ -456,10 +427,11 @@ If you don't have admin access to the repository, provide this checklist to your
 - [ ] Disable GitHub default CodeQL setup (Settings → Security and quality → Advanced Security → CodeQL analysis → ⋮ menu → Disable CodeQL)
 - [ ] Create branch protection ruleset `main-security-gate` targeting `main`, `dev`, `qa`
   - [ ] Require pull request reviews (1 approval; do NOT enable code owners requirement in solo-maintainer repo)
-  - [ ] Require status checks: `ci-test`, `pr-test`, `Analyze (javascript-typescript)`, `Analyze (python)`, `openscap-scan`
+  - [ ] Require status checks: `ci-test`, `pr-test`, `Analyze (javascript-typescript)`, `Analyze (python)`
   - [ ] Require code scanning results: High or higher (native GitHub enforcement)
   - [ ] Require branches up to date
   - [ ] Block force pushes
+- [ ] Note: OpenSCAP scan runs on every PR but is report-only (not a required check)
 - [ ] (Optional) Set `DOCKER_SCOUT_TOKEN` secret to enable Docker Scout mandatory scanning
 - [ ] Verify: Open a test PR, confirm security checks appear and are required
 - [ ] Schedule weekly security review (Saturdays 9:00 AM America/Phoenix, owned by Kevin)

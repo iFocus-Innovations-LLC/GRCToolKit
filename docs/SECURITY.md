@@ -98,25 +98,43 @@ Dockerfile              # Updated to use startup script
 - **Stay ahead of industry**: Prefer newest stable LTS/patch releases unless blocked by compatibility.
 - **No unpinned dependencies**: Avoid `latest` or wildcard dependency versions in build/test tooling.
 
-### 6. OpenSCAP Compliance Scanning
+### 6. OpenSCAP Compliance Scanning (Report-Only)
 
-GRCToolKit uses OpenSCAP (Open Security Content Automation Protocol) to validate compliance against NIST 800-53, FedRAMP, and CMMC requirements.
+GRCToolKit runs OpenSCAP (Open Security Content Automation Protocol) scans to provide NIST 800-53, FedRAMP, and CMMC compliance awareness.
 
 **What is scanned:**
-- CI/CD build environment (GitHub Actions Ubuntu 24.04 runner)
+- CI/CD build environment (GitHub Actions Ubuntu 24.04 runner) - **report-only**
 - SCAP Security Guide (SSG) CIS Level 1 Server benchmark profile
 - Baseline security configuration compliance
+
+**Report-only mode:**
+OpenSCAP findings do not block merges because:
+- The GitHub-hosted runner is ephemeral and controlled by GitHub, not this project
+- Gating on infrastructure we don't control would be unfair
+- The scan doesn't validate the GRCToolKit artifact itself (the container)
+- Container security is already enforced by Trivy HIGH/CRITICAL gates
+
+The scan provides baseline visibility for compliance documentation purposes.
 
 **Why CI runner, not the container?**
 
 The container base image (nginx:alpine-slim) uses Alpine Linux, which has limited SCAP Security Guide profile support. Alpine uses musl libc instead of glibc and the apk package manager instead of apt/yum, which are not covered by standard SSG content.
 
-The CI runner baseline scan provides:
-- **NIST 800-53 compliance evidence** for the build infrastructure
-- **CIS benchmark validation** of the CI environment
-- **FedRAMP/CMMC supporting evidence** showing secure build practices
+**Container-level SCAP scanning options** (future enhancement):
 
-Container vulnerability scanning is handled by Trivy and Docker Scout.
+To enable meaningful container-level SCAP scanning, the base image would need to migrate to:
+- **Ubuntu 24.04 minimal** (~30-50MB): Full SSG profiles, apt ecosystem, broad support
+- **Red Hat UBI9-micro/minimal** (~25-35MB): Enterprise-grade, excellent SSG/DISA-STIG profiles, optional FIPS 140-3
+- **Debian 12-slim** (~25-40MB): Middle ground on size, good SSG support
+
+Trade-offs:
+- **Image size**: Alpine (8MB) < UBI micro < Ubuntu minimal < Debian slim
+- **SCAP coverage**: UBI ≈ Ubuntu > Debian >> Alpine
+- **Current security**: Trivy/Docker Scout HIGH/CRITICAL gates already provide strong vulnerability coverage
+
+**Recommendation**: Accept CI runner baseline as sufficient unless customer/auditor requires container-level SCAP evidence. The existing Trivy gate provides robust vulnerability coverage for the shipped artifact.
+
+Container vulnerability scanning is handled by Trivy and Docker Scout with HIGH/CRITICAL severity gates.
 
 **Reading the OpenSCAP report:**
 
