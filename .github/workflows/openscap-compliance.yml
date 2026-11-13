@@ -42,19 +42,34 @@ jobs:
       id: scan
       run: |
         # Determine which SSG datastream to use
+        # Note: Ubuntu 24.04 SSG packages don't include Ubuntu-specific content
+        # Fall back to Debian profiles (Ubuntu is Debian-based)
         if [ -f /usr/share/xml/scap/ssg/content/ssg-ubuntu2404-ds.xml ]; then
           DATASTREAM="/usr/share/xml/scap/ssg/content/ssg-ubuntu2404-ds.xml"
           PROFILE_ID="xccdf_org.ssgproject.content_profile_cis_level1_server"
+          PROFILE_DESC="Ubuntu 24.04 CIS Level 1 Server"
         elif [ -f /usr/share/xml/scap/ssg/content/ssg-ubuntu2204-ds.xml ]; then
           DATASTREAM="/usr/share/xml/scap/ssg/content/ssg-ubuntu2204-ds.xml"
           PROFILE_ID="xccdf_org.ssgproject.content_profile_cis_level1_server"
+          PROFILE_DESC="Ubuntu 22.04 CIS Level 1 Server"
+        elif [ -f /usr/share/xml/scap/ssg/content/ssg-debian12-ds.xml ]; then
+          DATASTREAM="/usr/share/xml/scap/ssg/content/ssg-debian12-ds.xml"
+          PROFILE_ID="xccdf_org.ssgproject.content_profile_cis_level1_server"
+          PROFILE_DESC="Debian 12 CIS Level 1 Server (Ubuntu 24.04 is Debian-based)"
+        elif [ -f /usr/share/xml/scap/ssg/content/ssg-debian11-ds.xml ]; then
+          DATASTREAM="/usr/share/xml/scap/ssg/content/ssg-debian11-ds.xml"
+          PROFILE_ID="xccdf_org.ssgproject.content_profile_cis_level1_server"
+          PROFILE_DESC="Debian 11 CIS Level 1 Server (fallback for Debian-based Ubuntu)"
         else
-          echo "ERROR: No Ubuntu SSG datastream found"
+          echo "ERROR: No Ubuntu or Debian SSG datastream found"
+          echo "Available datastreams:"
+          ls -1 /usr/share/xml/scap/ssg/content/*.xml | head -10
           exit 1
         fi
         
         echo "Using datastream: $DATASTREAM"
-        echo "Using profile: $PROFILE_ID"
+        echo "Using profile: $PROFILE_DESC"
+        echo "Profile ID: $PROFILE_ID"
         echo ""
         echo "ℹ️  REPORT-ONLY MODE: This scans the GitHub-hosted runner baseline."
         echo "   Compliance failures are reported but do not block merges."
@@ -79,6 +94,7 @@ jobs:
         # 1 = error occurred (fail the job - this is a real error)
         # 2 = scan completed, some rules failed (report only, don't fail)
         echo "scan_exit_code=${SCAN_EXIT:-0}" >> $GITHUB_OUTPUT
+        echo "profile_desc=$PROFILE_DESC" >> $GITHUB_OUTPUT
         
         if [ "${SCAN_EXIT:-0}" -eq 1 ]; then
           echo "❌ ERROR: OpenSCAP scan encountered an error"
@@ -93,10 +109,13 @@ jobs:
     - name: Generate compliance summary and report high-severity findings
       if: always() && hashFiles('openscap-reports/results.xml') != ''
       run: |
+        # Get profile description from scan step
+        PROFILE_DESC="${{ steps.scan.outputs.profile_desc || 'CIS Level 1 Server' }}"
+        
         echo "=== OpenSCAP Compliance Summary (CI Runner Baseline) ===" | tee openscap-reports/summary.txt
         echo "" | tee -a openscap-reports/summary.txt
         echo "Target: GitHub Actions runner (Ubuntu 24.04)" | tee -a openscap-reports/summary.txt
-        echo "Profile: CIS Level 1 Server" | tee -a openscap-reports/summary.txt
+        echo "Profile: $PROFILE_DESC" | tee -a openscap-reports/summary.txt
         echo "Mode: Report-only (does not block merges)" | tee -a openscap-reports/summary.txt
         echo "" | tee -a openscap-reports/summary.txt
         
