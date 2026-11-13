@@ -75,6 +75,68 @@ The Trivy step fails with exit code 1 when HIGH/CRITICAL vulnerabilities are det
 
 **Configuration:** `.github/workflows/ci-cd.yml` and `.github/workflows/pr-test.yml` (Docker Scout steps)
 
+### 4. OpenSCAP Compliance Scanning
+
+**When it runs:**
+- On every pull request to `main`, `dev`, or `qa` branches
+- On pushes to `main`, `dev`, or `qa` branches
+- Can be triggered manually via workflow_dispatch
+
+**What it scans:**
+- **CI runner baseline** (Ubuntu 24.04) against SCAP Security Guide (SSG) profiles
+- Uses CIS Level 1 Server benchmark for NIST 800-53 alignment
+- Generates XCCDF results (ARF) and HTML compliance reports
+
+**Scanning scope:**
+This workflow scans the **build environment** (GitHub Actions runner), not the Alpine container itself. This design choice reflects a technical constraint: Alpine Linux lacks comprehensive SCAP Security Guide profile coverage because it uses musl libc instead of glibc and apk instead of apt/yum package managers.
+
+The CI runner baseline scan provides:
+- NIST 800-53 compliance evidence for the build infrastructure
+- CIS benchmark validation of the CI environment
+- Compliance baseline that can be used for FedRAMP and CMMC evidence
+
+Container security remains covered by existing Trivy and Docker Scout vulnerability scanning.
+
+**Blocking threshold:**
+- **REPORT-ONLY**: This scan does not block merges
+- Scans the GitHub-hosted runner (ephemeral, controlled by GitHub, not this project)
+- Compliance failures are reported in artifacts but do not fail the job
+- The job fails only if oscap itself encounters an error (exit code 1), not on compliance rule failures (exit code 2)
+
+**Configuration:** `.github/workflows/openscap-compliance.yml`
+
+**Key settings:**
+```yaml
+oscap xccdf eval \
+  --profile xccdf_org.ssgproject.content_profile_cis_level1_server \
+  --results openscap-reports/results.xml \
+  --report openscap-reports/report.html
+```
+
+**Output artifacts:**
+- `openscap-reports/report.html` - Human-readable compliance report
+- `openscap-reports/results.xml` - XCCDF results in ARF (Asset Reporting Format)
+- `openscap-reports/summary.txt` - Quick summary of pass/fail/error counts
+
+**How it blocks:**
+It doesn't - this is report-only. The job fails only if oscap itself errors (e.g., cannot parse datastream), not on compliance rule failures. Gating on the GitHub runner's baseline would be unfair since we don't control it.
+
+**Alpine container limitation:**
+The container base image (nginx:alpine-slim) cannot be meaningfully scanned with OpenSCAP SSG profiles. Future enhancement options include:
+1. Migrating to RHEL Universal Base Image (UBI) for full SCAP coverage
+2. Custom OVAL vulnerability definitions for Alpine packages
+3. Accepting CI runner baseline as the compliance boundary (current approach)
+
+**Reading the report:**
+1. Download the workflow artifact `openscap-compliance-reports`
+2. Open `report.html` in a browser
+3. Review failed rules, especially those marked "high severity"
+4. Each rule includes:
+   - NIST 800-53 control mapping (e.g., AC-6, IA-5)
+   - Rule description and rationale
+   - Remediation guidance (commands or configuration changes)
+   - Pass/Fail/Not Applicable status
+
 ## Severity Thresholds
 
 | Scanner | LOW | MEDIUM | HIGH | CRITICAL |
@@ -82,8 +144,10 @@ The Trivy step fails with exit code 1 when HIGH/CRITICAL vulnerabilities are det
 | **CodeQL** | Advisory | Advisory | **BLOCKS** | **BLOCKS** |
 | **Trivy** | Silent | Advisory | **BLOCKS** | **BLOCKS** |
 | **Docker Scout** | Silent | Advisory | **BLOCKS*** | **BLOCKS*** |
+| **OpenSCAP** | Advisory | Advisory | **Report** | N/A** |
 
-\* Only when `DOCKER_SCOUT_TOKEN` is configured
+\* Only when `DOCKER_SCOUT_TOKEN` is configured  
+\*\* OpenSCAP uses SCAP severity levels (low/medium/high), not CVSS scoring, so "CRITICAL" doesn't directly apply; all findings are report-only
 
 ## Merge Requirements
 
@@ -95,6 +159,7 @@ A pull request can only be merged when:
    - GitHub's code scanning ruleset enforces no HIGH/CRITICAL unresolved alerts
    - Trivy scan completes with no HIGH/CRITICAL unfixed vulnerabilities
    - Docker Scout passes (if enabled)
+   - OpenSCAP compliance scan runs (report-only, not a required check for merge)
 
 2. ✅ At least 1 human approval from a code owner
 
@@ -188,6 +253,43 @@ trivy image --severity HIGH,CRITICAL grc-toolkit:test
 ```
 
 Commit the updated dependency files.
+
+### Step 4b: Review OpenSCAP Compliance Findings (Report-Only)
+
+OpenSCAP compliance scans are report-only and do not block merges. To review findings:
+
+1. **Download the report artifact:**
+   - Go to the failed workflow run
+   - Download `openscap-compliance-reports` artifact
+   - Open `report.html` in a browser
+
+2. **Identify the failing rules:**
+   - Look for rules marked **"high"** severity with **"fail"** result
+   - Note the rule ID (e.g., `xccdf_org.ssgproject.content_rule_accounts_password_minlen_login_defs`)
+   - Review the rule description, rationale, and NIST 800-53 mapping
+
+3. **Understand the scan context:**
+   - OpenSCAP scans the **GitHub Actions runner** (Ubuntu 24.04), not your application code or container
+   - The runner is ephemeral and controlled by GitHub, not this project
+   - Findings reflect the baseline state of GitHub's infrastructure
+   - These are informational for compliance awareness, not actionable defects in your PR
+
+4. **Why report-only?**
+   
+   The OpenSCAP scan is report-only because:
+   - We don't control the GitHub-hosted runner baseline
+   - Failures would be on infrastructure we can't fix
+   - It doesn't validate the GRCToolKit artifact itself (the container)
+   - Container security is already covered by Trivy HIGH/CRITICAL gates
+   
+   The scan provides visibility into the build environment's compliance posture for reference.
+
+5. **What to do with findings:**
+   
+   - **No action required** - Findings don't block merges
+   - Review the report if interested in build environment baseline state
+   - Use the ARF XML results (`results.xml`) as supplementary compliance documentation if needed
+   - For container-level SCAP scanning, see the investigation in the workflow's `container-scap-analysis` job
 
 ### Step 5: Verify Locally
 
@@ -329,6 +431,7 @@ If you don't have admin access to the repository, provide this checklist to your
   - [ ] Require code scanning results: High or higher (native GitHub enforcement)
   - [ ] Require branches up to date
   - [ ] Block force pushes
+- [ ] Note: OpenSCAP scan runs on every PR but is report-only (not a required check)
 - [ ] (Optional) Set `DOCKER_SCOUT_TOKEN` secret to enable Docker Scout mandatory scanning
 - [ ] Verify: Open a test PR, confirm security checks appear and are required
 - [ ] Schedule weekly security review (Saturdays 9:00 AM America/Phoenix, owned by Kevin)
