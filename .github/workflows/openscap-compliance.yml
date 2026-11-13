@@ -27,16 +27,16 @@ jobs:
     - name: List available SSG profiles
       run: |
         echo "=== Available SCAP Security Guide Datastreams ==="
-        ls -lh /usr/share/xml/scap/ssg/content/
+        ls -lh /usr/share/xml/scap/ssg/content/ | grep "debian\|ubuntu" || ls -lh /usr/share/xml/scap/ssg/content/ | head -20
         echo ""
-        echo "=== Ubuntu 24.04 (Noble) profiles ==="
-        if [ -f /usr/share/xml/scap/ssg/content/ssg-ubuntu2404-ds.xml ]; then
-          oscap info /usr/share/xml/scap/ssg/content/ssg-ubuntu2404-ds.xml
-        else
-          echo "Ubuntu 24.04 SSG datastream not found"
-          echo "Falling back to Ubuntu 22.04 (Jammy) profiles:"
-          oscap info /usr/share/xml/scap/ssg/content/ssg-ubuntu2204-ds.xml 2>/dev/null || echo "No Ubuntu SSG found"
-        fi
+        echo "=== Checking for Ubuntu/Debian profiles ==="
+        for ds in ssg-ubuntu2404-ds.xml ssg-ubuntu2204-ds.xml ssg-debian12-ds.xml ssg-debian11-ds.xml; do
+          if [ -f /usr/share/xml/scap/ssg/content/$ds ]; then
+            echo "Found: $ds"
+            oscap info /usr/share/xml/scap/ssg/content/$ds | grep -A 2 "Profiles:" | head -20
+            break
+          fi
+        done
 
     - name: Run OpenSCAP compliance scan (report-only, runner baseline)
       id: scan
@@ -44,6 +44,7 @@ jobs:
         # Determine which SSG datastream to use
         # Note: Ubuntu 24.04 SSG packages don't include Ubuntu-specific content
         # Fall back to Debian profiles (Ubuntu is Debian-based)
+        # Debian profiles use different naming - "standard" instead of "cis_level1_server"
         if [ -f /usr/share/xml/scap/ssg/content/ssg-ubuntu2404-ds.xml ]; then
           DATASTREAM="/usr/share/xml/scap/ssg/content/ssg-ubuntu2404-ds.xml"
           PROFILE_ID="xccdf_org.ssgproject.content_profile_cis_level1_server"
@@ -54,12 +55,13 @@ jobs:
           PROFILE_DESC="Ubuntu 22.04 CIS Level 1 Server"
         elif [ -f /usr/share/xml/scap/ssg/content/ssg-debian12-ds.xml ]; then
           DATASTREAM="/usr/share/xml/scap/ssg/content/ssg-debian12-ds.xml"
-          PROFILE_ID="xccdf_org.ssgproject.content_profile_cis_level1_server"
-          PROFILE_DESC="Debian 12 CIS Level 1 Server (Ubuntu 24.04 is Debian-based)"
+          # Debian uses "standard" profile which aligns with CIS and NIST 800-53
+          PROFILE_ID="xccdf_org.ssgproject.content_profile_standard"
+          PROFILE_DESC="Debian 12 Standard System Security Profile (Ubuntu 24.04 is Debian-based)"
         elif [ -f /usr/share/xml/scap/ssg/content/ssg-debian11-ds.xml ]; then
           DATASTREAM="/usr/share/xml/scap/ssg/content/ssg-debian11-ds.xml"
-          PROFILE_ID="xccdf_org.ssgproject.content_profile_cis_level1_server"
-          PROFILE_DESC="Debian 11 CIS Level 1 Server (fallback for Debian-based Ubuntu)"
+          PROFILE_ID="xccdf_org.ssgproject.content_profile_standard"
+          PROFILE_DESC="Debian 11 Standard System Security Profile (fallback for Debian-based Ubuntu)"
         else
           echo "ERROR: No Ubuntu or Debian SSG datastream found"
           echo "Available datastreams:"
