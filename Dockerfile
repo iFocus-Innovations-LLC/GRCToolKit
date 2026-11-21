@@ -1,9 +1,15 @@
 # Multi-stage build to eliminate vendored/bundled vulnerable packages
 # Stage 1: Builder with dependencies
-FROM nginx:1.31.8-alpine-slim@sha256:9c68ad4f28e7dee4b9484a7859bf451da39ef661bcd038ef62e87593fcd91c86 AS builder
+FROM ubuntu:24.04@sha256:0d5255be560e2d2ddcfbfda88549e9e815ef29e7cd7fc62183d5709e6e2963c6 AS builder
 
-# Install Python and build dependencies
-RUN apk add --no-cache python3 wget && \
+# Install Python, venv, and wget for bootstrapping pip
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        python3 \
+        python3-venv \
+        wget \
+        ca-certificates && \
+    rm -rf /var/lib/apt/lists/* && \
     python3 -m venv /opt/venv
 
 # Bootstrap pip and install app dependencies
@@ -22,11 +28,18 @@ RUN find /opt/venv -type d -name "_vendor" -exec rm -rf {} + 2>/dev/null || true
     rm -rf /opt/venv/lib/python*/site-packages/pip 2>/dev/null || true
 
 # Stage 2: Final runtime image
-FROM nginx:1.31.8-alpine-slim@sha256:9c68ad4f28e7dee4b9484a7859bf451da39ef661bcd038ef62e87593fcd91c86
+FROM ubuntu:24.04@sha256:0d5255be560e2d2ddcfbfda88549e9e815ef29e7cd7fc62183d5709e6e2963c6
 
-# Install only Python runtime (no pip, no build tools)
-RUN apk add --no-cache python3 && \
-    rm -f /etc/nginx/conf.d/default.conf
+# Install only runtime dependencies: nginx, python3, curl for healthcheck
+# nginx-light is a minimal variant without unnecessary modules
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        nginx-light \
+        python3 \
+        curl \
+        ca-certificates && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* && \
+    rm -f /etc/nginx/sites-enabled/default
 
 # Copy only the installed packages from builder (no pip, no vendored packages)
 COPY --from=builder /opt/venv /opt/venv
@@ -45,22 +58,27 @@ COPY assets ./assets/
 # Copy Python LLM proxy (dependencies already installed in builder stage)
 COPY scripts/ansible-runner-api.py /app/ansible-runner-api.py
 RUN mkdir -p /tmp/grc-oscal-reports && \
-    chown nginx:nginx /tmp/grc-oscal-reports
+    chown www-data:www-data /tmp/grc-oscal-reports
 
 # Copy startup script that launches both nginx and Python proxy
 COPY scripts/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod 550 /docker-entrypoint.sh && \
-    chown nginx:nginx /docker-entrypoint.sh
+    chown www-data:www-data /docker-entrypoint.sh
 
-# Ensure nginx user can read files and write pid/cache
-RUN chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/log/nginx /tmp /app /opt/venv
+# Ensure www-data user can read files and write pid/cache
+# Ubuntu nginx uses www-data instead of nginx user
+RUN chown -R www-data:www-data /usr/share/nginx/html /var/log/nginx /tmp /app /opt/venv && \
+    chown -R www-data:www-data /var/lib/nginx && \
+    mkdir -p /var/cache/nginx && \
+    chown -R www-data:www-data /var/cache/nginx
 
 # Run as non-root (required by container hardening checks)
-USER nginx
+# Ubuntu nginx default user is www-data
+USER www-data
 
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=3s \
-  CMD wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1
+  CMD curl -f http://127.0.0.1:8080/health || exit 1
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
