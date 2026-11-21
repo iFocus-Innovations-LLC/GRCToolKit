@@ -3,7 +3,9 @@
 FROM ubuntu:24.04@sha256:9c7f200c07e3d4a03e7249d2c16bf66a51120fb876aa2242cf31451412543289 AS builder
 
 # Install Python, venv, and wget for bootstrapping pip
+# Apply security updates before installing packages
 RUN apt-get update && \
+    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         python3 \
         python3-venv \
@@ -32,7 +34,9 @@ FROM ubuntu:24.04@sha256:9c7f200c07e3d4a03e7249d2c16bf66a51120fb876aa2242cf31451
 
 # Install only runtime dependencies: nginx, python3, curl for healthcheck
 # nginx-light is a minimal variant without unnecessary modules
+# Apply security updates before installing packages
 RUN apt-get update && \
+    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         nginx-light \
         python3 \
