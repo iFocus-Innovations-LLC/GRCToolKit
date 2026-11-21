@@ -1,6 +1,6 @@
 # Multi-stage build to eliminate vendored/bundled vulnerable packages
 # Stage 1: Builder with dependencies
-FROM ubuntu:24.04@sha256:0d5255be560e2d2ddcfbfda88549e9e815ef29e7cd7fc62183d5709e6e2963c6 AS builder
+FROM ubuntu:24.04@sha256:9c7f200c07e3d4a03e7249d2c16bf66a51120fb876aa2242cf31451412543289 AS builder
 
 # Install Python, venv, and wget for bootstrapping pip
 RUN apt-get update && \
@@ -28,7 +28,7 @@ RUN find /opt/venv -type d -name "_vendor" -exec rm -rf {} + 2>/dev/null || true
     rm -rf /opt/venv/lib/python*/site-packages/pip 2>/dev/null || true
 
 # Stage 2: Final runtime image
-FROM ubuntu:24.04@sha256:0d5255be560e2d2ddcfbfda88549e9e815ef29e7cd7fc62183d5709e6e2963c6
+FROM ubuntu:24.04@sha256:9c7f200c07e3d4a03e7249d2c16bf66a51120fb876aa2242cf31451412543289
 
 # Install only runtime dependencies: nginx, python3, curl for healthcheck
 # nginx-light is a minimal variant without unnecessary modules
