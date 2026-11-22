@@ -36,9 +36,9 @@ GRCToolKit.ai targets that gap:
 
 **Fair positioning:** GRCToolKit is not a replacement for full enterprise GRC operations (multi-tenant RBAC, vendor risk suites, FedRAMP-authorized SaaS). It is open source **infrastructure for automated NIST validation, OSCAL evidence, and HITL-guarded AI** — built for security engineers, auditors, and innovation programs that need controls **validated in the stack**, not only tracked in a dashboard.
 
-Three market forces align with this approach: **OSCAL** adoption for machine-readable assessments, **PQC** migration mandates ([DoW 2030 support / 2031 use](ROADMAP.md#dow-pqc-strategy-alignment) + CNSA 2.0 for NSS; optional NIST 2030/2035 civilian track), and **Physical AI** systems that require security and compliance in the same pipeline.
+Three market forces align with this approach: **OSCAL** adoption for machine-readable assessments, **PQC** migration mandates (2030/2035 compliance deadlines), and **Physical AI** systems that require security and compliance in the same pipeline.
 
-For roadmap detail, see [ROADMAP.md](ROADMAP.md#market-positioning-grctoolkit-vs-traditional-grc).
+For roadmap detail, see [ROADMAP.md](ROADMAP.md).
 
 ---
 
@@ -68,21 +68,20 @@ For roadmap detail, see [ROADMAP.md](ROADMAP.md#market-positioning-grctoolkit-vs
 - **Experimental:** Puppet noop audit engine — Ansible-driven read-only validation using `puppet apply --noop` on targets with Puppet/OpenVox already installed. Parses structured reports (`last_run_report.yaml`) for drift detection. SKIP if Puppet not found (never installs it). No k8s/sidecar changes. See [docs/PUPPET-AUDIT-ENGINE.md](PUPPET-AUDIT-ENGINE.md)
 - Auditor-ready report generation (`compliance-docs/`)
 - **Roadmap:** Windows targets via [Chocolatey](https://chocolatey.org/) bootstrap + WinRM inventory; mobile companion (Android/iOS) via PWA → Capacitor  
-  → [Windows OS Ansible validation](ROADMAP.md#windows-os-ansible-validation-chocolatey) · [Mobile groundwork](ROADMAP.md#44-mobile-app-level-groundwork-android-and-ios)
+  → [ROADMAP.md](ROADMAP.md)
 
 ### Human-in-the-Loop (HITL)
 - Three-tier model: **Automated → Human Review → Human-Guided**
 - Confidence thresholds trigger human review before high-impact actions
 - Documented sentinel architecture and policy anchors  
   → [HITL Framework](HITL-FRAMEWORK.md)
-- **Scheduled / agentic workflows** (future): assessment and triage may run on a throttle-controlled schedule via [Google ADK](https://adk.dev/); remediation still requires HITL, and GCP QA must enforce token budgets before enabling schedulers  
-  → [Agentic GRC runtime (ADK) + token throttling](ROADMAP.md#agentic-grc-runtime-adk--token-throttling)
+- **Scheduled / agentic workflows** (future): assessment and triage may run on a throttle-controlled schedule; remediation still requires HITL  
+  → [ROADMAP.md](ROADMAP.md)
 
 ### Post-quantum cryptography (PQC)
 - Cryptographic asset inventory and quantum risk scoring
 - Four-phase migration roadmap (Preparation → Baseline → Execution → Monitoring)
-- Multi-mandate timelines: DoW 2030/2031 + CNSA 2.0 awareness; optional NIST 2030/2035 civilian track  
-  → [DoW PQC Strategy alignment](ROADMAP.md#dow-pqc-strategy-alignment)
+- PQC migration timeline tracking for 2030/2035 compliance deadlines
 - Ansible automation for ML-KEM, ML-DSA, and SLH-DSA (FIPS 203/204/205)  
   → [PQC Integration Summary](PQC-INTEGRATION-SUMMARY.md)
 
@@ -156,7 +155,7 @@ flowchart LR
 | **OSCAL 1.0.0** | Machine-readable catalogs, assessments, and results |
 | **NIST CSF 2.0** | Mapping context for AI recommendations (roadmap expansion) |
 | **NIST FIPS 203 / 204 / 205** | PQC algorithms (ML-KEM, ML-DSA, SLH-DSA) |
-| **DoW PQC Strategy / CNSA 2.0** | Federal deadline model (2030 support / 2031 use) and NSS algorithm-suite awareness — see [ROADMAP DoW alignment](ROADMAP.md#dow-pqc-strategy-alignment) |
+| **PQC migration deadlines** | 2030/2035 compliance timeline tracking |
 | **Zero-trust principles** | Least privilege, secrets management, audit logging |
 
 ---
